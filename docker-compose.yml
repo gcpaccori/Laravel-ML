@@ -16,7 +16,7 @@ services:
 
   db:
     image: mysql:8
-    container_name: laravel_db
+    container_name: sismapiscis_mysql
     restart: always
     environment:
       MYSQL_DATABASE: sismapiscis
@@ -32,7 +32,7 @@ services:
 
   nginx:
     image: nginx:alpine
-    container_name: laravel_nginx
+    container_name: sismapiscis_nginx
     restart: unless-stopped
     ports:
       - "80:80"
