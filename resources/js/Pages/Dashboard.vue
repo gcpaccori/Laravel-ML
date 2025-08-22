@@ -246,8 +246,8 @@
                 <div class="card card-flush overflow-hidden h-xl-100">
                     <div class="card-header py-5">
                         <h3 class="card-title align-items-start flex-column">
-                            <span class="card-label fw-bold text-dark">Human Resources</span>
-                            <span class="text-gray-400 mt-1 fw-semibold fs-6">Reports by states and ganders</span>
+                            <span class="card-label fw-bold text-dark">Total de Piscigranja por Departamento</span>
+                            <span class="text-gray-400 mt-1 fw-semibold fs-6">Conteo total de piscigranjas por departamento</span>
                         </h3>
                     </div>
                     <div class="card-body pt-0">
@@ -262,8 +262,8 @@
                 <div class="card card-flush overflow-hidden h-xl-100">
                     <div class="card-header py-5">
                         <h3 class="card-title align-items-start flex-column">
-                            <span class="card-label fw-bold text-dark">Human Resources</span>
-                            <span class="text-gray-400 mt-1 fw-semibold fs-6">Reports by states and ganders</span>
+                            <span class="card-label fw-bold text-dark">Tranferencia de información</span>
+                            <span class="text-gray-400 mt-1 fw-semibold fs-6">Envio de información a la central</span>
                         </h3>
                     </div>
                     <div class="card-body pt-0">
