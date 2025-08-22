@@ -1,0 +1,13 @@
+body, #app {
+    display: flex;
+    flex-direction: column;
+}
+
+html, body, #app {
+    height: 100%;
+}
+
+.popover-auto-width {
+    width: auto !important;
+    max-width: 100%;
+}
