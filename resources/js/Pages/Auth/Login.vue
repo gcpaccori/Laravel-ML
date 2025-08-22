@@ -36,7 +36,7 @@
                 <form class="form w-100" @submit.prevent="submit">
                     <div class="text-center mb-11">
                         <h1 class="text-dark fw-bolder mb-3">Inicar Sesión</h1>
-                        <div class="text-gray-500 fw-semibold fs-6">Ingrese sus credenciales</div>
+                        <div class="text-gray-500 fw-semibold fs-6">Acceder al SISMA PISCIS</div>
                     </div>
                     <div class="separator separator-content my-10">
                         <span class="w-125px text-gray-500 fw-semibold fs-7">*</span>

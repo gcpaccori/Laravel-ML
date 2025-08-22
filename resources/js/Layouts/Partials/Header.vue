@@ -35,7 +35,7 @@
             <!--begin::Mobile logo-->
             <div class="d-flex align-items-center flex-grow-1 flex-lg-grow-0">
                 <Link :href="route('dashboard')" class="d-lg-none">
-                    <img alt="Logo" src="/assets/media/logos/desysapp-small.png" class="h-50px" />
+                    <img alt="Logo" src="/assets/media/logos/logo_sisma.png" class="h-50px" />
                 </Link>
             </div>
             <!--end::Mobile logo-->

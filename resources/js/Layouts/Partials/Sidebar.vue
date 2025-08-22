@@ -13,11 +13,11 @@
 <template>
     <div id="kt_app_sidebar" class="app-sidebar flex-column" data-kt-drawer="true" data-kt-drawer-name="app-sidebar" data-kt-drawer-activate="{default: true, lg: false}" data-kt-drawer-overlay="true" data-kt-drawer-width="225px" data-kt-drawer-direction="start" data-kt-drawer-toggle="#kt_app_sidebar_mobile_toggle">
         <!--begin::Logo-->
-        <div class="app-sidebar-logo px-6" id="kt_app_sidebar_logo">
+        <div class="app-sidebar-logo px-6 d-flex justify-content-center align-items-center" id="kt_app_sidebar_logo">
             <!--begin::Logo image-->
             <Link :href="route('dashboard')">
-                <img alt="Logo" src="/assets/media/logos/desysapp.svg" class="h-50px app-sidebar-logo-default" />
-                <img alt="Logo" src="/assets/media/logos/desysapp.svg" class="h-50px app-sidebar-logo-minimize" />
+                <img alt="Logo" src="/assets/media/logos/logo_sisma.png" class="h-90px app-sidebar-logo-default" />
+                <img alt="Logo" src="/assets/media/logos/logo_sisma.png" class="h-70px app-sidebar-logo-minimize" />
             </Link>
             <!--end::Logo image-->
             <!--begin::Sidebar toggle-->
