@@ -24,7 +24,8 @@ class DataTableHelper
         ->values()
         ->toArray();
 
-        return response()->json($columns);
+        // return response()->json($columns);
+        return $columns;
     }
 
     public static function getAccionesPermitidasDelModulo($resourceId = null, string $controllerName = null)

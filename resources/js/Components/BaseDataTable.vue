@@ -55,7 +55,7 @@ const ajaxConfig = ref({
 });
 
     const IndexBtnAction = computed(() => {
-        return Object.values(props.columns).findIndex(col => col.data === 'action');
+        return props.columns.findIndex(col => col.data === 'action');
     });
 
     const visibleColumns = computed(() =>
@@ -198,7 +198,7 @@ const ajaxConfig = ref({
                         order: [0, 'desc'],
                         searching: true,
                         processing: true,
-                        serverSide: useServerSide,
+                        serverSide: false,
                         language: {
                             url: 'https://cdn.datatables.net/plug-ins/1.13.5/i18n/es-ES.json'
                         },
@@ -275,7 +275,7 @@ const ajaxConfig = ref({
                     order: [0, 'desc'],
                     searching: true,
                     processing: true,
-                    serverSide: useServerSide,
+                    serverSide: false,
                     language: {
                         url: 'https://cdn.datatables.net/plug-ins/1.13.5/i18n/es-ES.json'
                     },

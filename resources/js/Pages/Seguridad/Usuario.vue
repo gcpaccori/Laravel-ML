@@ -150,7 +150,7 @@
         </template>
         <BaseDataTable
           :ajax-url="ajaxUrl"
-          :columns="columns.original"
+          :columns="columns"
           :filters="formInline"
           @tableReady="handleTableReady"
           @action="handleDynamicAction"

@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
             ModuloSeeder::class,
             PermissionSeeder::class,
             UserSeeder::class,
+            UbigeoSeeder::class,
         ]);
     }
 }

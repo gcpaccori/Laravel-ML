@@ -1,8 +1,8 @@
 <script setup>
     import { ref } from 'vue';
-    import FormRole from './FormRole.vue';
     import { ElMessage, ElMessageBox } from 'element-plus';
-    import { useDynamicAction } from '@/Composables/useDynamicAction'
+    import { useDynamicAction } from '@/Composables/useDynamicAction';
+    import PiscigranjaForm from '../Form/PiscigranjaForm.vue';
 
     const props = defineProps({
         title: String,
@@ -22,7 +22,7 @@
     });
 
     const tableInstance = ref(null);
-    const ajaxUrl = route('datatable.roles');
+    const ajaxUrl = route('datatable.piscigranjas');
     const dataForm = ref(null);
 
     // MODAL
@@ -31,19 +31,6 @@
     const showModal = () => {
         dialogVisible.value = true;
         dataForm.value = null;
-    };
-
-    //Filtros
-    const formInline = ref({
-        fecha_at: '',
-        f_updated: ''
-    })
-
-    const limpiarFiltros = () => {
-        Object.keys(formInline.value).forEach(key => {
-            formInline.value[key] = '';
-        });
-        reloadTable();
     };
 
     // Inicializar Tabla
@@ -56,16 +43,15 @@
     };
 
     // RECUPERAR DATOS GUARDADOS
-    const handleSaved = (registro) => {
+    const handleSaved = ( res ) => {
         // Para recargar formulario desde otra vista
-        // console.log('Registro:', registro);
-        dataForm.value = null;
+        // console.log('Sistema creado:', sistema);
         reloadTable();
     };
 
     // FUNCIONES DE ACCIONES (BOTONES)
     const handleEdit = async (id) => {
-        const { data } = await axios.get(route('seguridad.roles.edit', id));
+        const { data } = await axios.get(route('piscigranjas.edit', id));
         dataForm.value = data;
         dialogVisible.value = true;
     };
@@ -82,10 +68,10 @@
             }
         ).then( async () => {
             try {
-                const response = await axios.delete(route('seguridad.roles.destroy', id));
+                const response = await axios.delete(route('piscigranjas.destroy', id));
                 ElMessage({
                     message: response.data.message,
-                    type: 'success',
+                    type: response.data.success ? 'success' : 'error',
                 });
             reloadTable();
             } catch (error) {
@@ -99,21 +85,17 @@
         } );
     };
 
-    const handleShow = async() => {
-
-    }
-
     // FUNCIONES EXPUESTAS DEL BASEDATATABLE
     const methods = {
         handleEdit,
-        handleDelete,
-        handleShow
+        handleDelete
     };
+
+    const { handleDynamicAction } = useDynamicAction(methods);
 
     function handleActionGrilla(nombre) {
         const funciones = {
             handleNew: showModal,
-            // más funciones aquí...
         }
 
         if (funciones[nombre]) {
@@ -123,69 +105,32 @@
         }
     }
 
-    const { handleDynamicAction } = useDynamicAction(methods);
-
 </script>
 
 <template>
     <App :title="title" :toolbar="toolbar">
+
         <template #btnCreate>
             <template v-for="(action, index) in accionesGrilla" :key="index">
                 <el-button
                     :icon="action.icon"
                     :type="action.type"
                     class="mr-2"
+                    size="small"
                     @click="handleActionGrilla(action.name_funcion)"
                 >
                     {{ action.action }}
                 </el-button>
             </template>
         </template>
+
         <BaseDataTable
           :ajax-url="ajaxUrl"
           :columns="columns"
-          :filters="formInline"
           @tableReady="handleTableReady"
           @action="handleDynamicAction"
-        >
-            <template #filters>
-                <el-form :model="formInline" label-position="top" class="w-100">
-                    <el-row :gutter="20">
-                        <el-col :lg="6">
-                            <el-form-item label="Fecha Creación">
-                                <el-date-picker
-                                    v-model="formInline.fecha_at"
-                                    type="date"
-                                    format="DD/MM/YYYY"
-                                    value-format="YYYY-MM-DD"
-                                    placeholder="DD/MM/YYYY"
-                                    clearable
-                                    style="width: 100%;"
-                                />
-                            </el-form-item>
-                        </el-col>
-                        <el-col :lg="6">
-                            <el-form-item label="Fecha Actualización">
-                                <el-date-picker
-                                    v-model="formInline.f_updated"
-                                    type="date"
-                                    format="DD/MM/YYYY"
-                                    value-format="YYYY-MM-DD"
-                                    placeholder="DD/MM/YYYY"
-                                    clearable
-                                    style="width: 100%;"
-                                />
-                            </el-form-item>
-                        </el-col>
-                        <el-col :lg="24" class="d-flex justify-content-center">
-                            <el-button icon="Search" type="primary" @click="reloadTable">Buscar</el-button>
-                            <el-button icon="Delete" type="info" @click="limpiarFiltros">Limpiar</el-button>
-                        </el-col>
-                    </el-row>
-                </el-form>
-            </template>
-        </BaseDataTable>
+        ></BaseDataTable>
 
-        <FormRole v-model="dialogVisible" :dataForm="dataForm" @saved="handleSaved"/>
+        <PiscigranjaForm v-model="dialogVisible" :dataForm="dataForm" @saved="handleSaved"/>
     </App>
 </template>
