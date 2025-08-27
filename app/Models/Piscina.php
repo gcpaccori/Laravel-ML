@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
@@ -22,6 +23,11 @@ class Piscina extends Model
     public function etapas() : belongsToMany
     {
         return $this->belongsToMany(CampaniaEtapa::class, 'campania_etapa_piscinas');
+    }
+
+    public function parametrosAguas() : HasMany
+    {
+        return $this->hasMany(ParametroAgua::class);
     }
 
     protected function casts(): array

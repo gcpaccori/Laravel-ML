@@ -104,7 +104,7 @@ class RoleController extends Controller
     {
 
         DB::transaction(function () use ($id) {
-            // LA ELIMINACION YA ES DE FORMA ACTOMATICA POR LA RELACION
+            // LA ELIMINACION YA ES DE FORMA AUTOMATICA POR LA RELACION
             // $role->permissions()->detach();
             $role = Role::findOrFail($id);
 
@@ -138,11 +138,11 @@ class RoleController extends Controller
 
         $data = $sistemas->map(function ($sistema) {
             return [
-                'id' => 'sistema_' . $sistema->id,
+                'id' => $sistema->url,
                 'label' => $sistema->name,
                 'children' => $sistema->modulos->map(function ($modulo) {
                     $moduloData = [
-                        'id' => 'modulo_' . $modulo->id,
+                        'id' => 'modulo_'. $modulo->url,
                         'label' => $modulo->name,
                         'children' => [],
                     ];
@@ -161,7 +161,7 @@ class RoleController extends Controller
                     if ($modulo->children->isNotEmpty()) {
                         foreach ($modulo->children as $submodulo) {
                             $subData = [
-                                'id' => 'modulo_' . $submodulo->id,
+                                'id' => 'modulo_' . $submodulo->url,
                                 'label' => $submodulo->name,
                                 'children' => $submodulo->acciones->map(function ($accion) use ($submodulo) {
                                     return [

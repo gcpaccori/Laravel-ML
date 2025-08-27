@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Inertia\Inertia;
+use App\Models\Piscina;
 use App\Models\Piscigranja;
 use Illuminate\Http\Request;
 use App\Helpers\DataTableHelper;
@@ -186,5 +187,19 @@ class PiscigranjaController extends Controller
             'success' => true,
             'message' => 'Encuestado eliminado correctamente.',
         ]);
+    }
+
+    public function options()
+    {
+        $data = Piscigranja::with('piscinas')->get();
+        return response()->json([
+            'data' => $data
+        ]);
+    }
+
+    public function getPiscinas( string $id )
+    {
+        $piscina = Piscina::where('piscigranja_id', $id)->get();
+        return response()->json($piscina);
     }
 }

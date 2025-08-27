@@ -32,11 +32,27 @@
     const emit = defineEmits(['update:modelValue', 'saved']);
 
     const submitFormulario = () => {
-        const checkedNodes = treeRef.value.getCheckedKeys();
+        const checkedKeys = treeRef.value.getCheckedKeys(true); // true: get leaf and non-leaf
+        const checkedNodes = treeRef.value.getCheckedNodes(true); // true: include partially selected
 
-        const permisos = checkedNodes
-            .filter(id => id.startsWith('permiso_'))
-            .map(id => id.replace('permiso_', '')); // obtenemos solo el nombre real del permiso
+        const permisosAcciones = checkedKeys
+        .filter(id => id.startsWith('permiso_'))
+        .map(id => id.replace('permiso_', ''));
+
+        const permisosModulos = checkedKeys
+        .filter(id => id.startsWith('modulo_'))
+        .map(id => id.replace('modulo_', ''))
+        .filter(Boolean); // elimina nulos
+
+        // También agregamos módulos base desde permisosAcciones
+        const modulosDesdeAcciones = permisosAcciones.map(p => p.split('.')[0]);
+
+        // Unimos y eliminamos duplicados
+        const permisos = [...new Set([
+            ...permisosAcciones,
+            ...modulosDesdeAcciones,
+            ...permisosModulos
+        ])];
 
         const routeName = props.dataForm ? 'seguridad.roles.update' : 'seguridad.roles.store';
         submitForm({
@@ -89,8 +105,23 @@
             };
 
             // Marcar permisos
+            // if (props.dataForm?.permisos) {
+            //     checkedKeys.value = props.dataForm.permisos.map(p => `permiso_${p}`);
+            // }
+
             if (props.dataForm?.permisos) {
-                checkedKeys.value = props.dataForm.permisos.map(p => `permiso_${p}`);
+                const permisos = props.dataForm.permisos;
+
+                // Extraer IDs o claves de permisos
+                const clavesPermisos = permisos.map(p => `permiso_${p}`);
+
+                // Extraer módulos base desde los permisos (antes del punto)
+                const clavesModulos = permisos
+                    .map(p => p.split('.')[0])       // usuario.index -> usuario
+                    .filter((v, i, a) => a.indexOf(v) === i) // únicos
+                    .map(m => `modulo_${m}`);        // asumimos que así están los IDs de nodos de módulo
+
+                checkedKeys.value = [...clavesPermisos, ...clavesModulos];
             }
         }
     });

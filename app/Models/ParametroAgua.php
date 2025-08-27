@@ -14,7 +14,11 @@ class ParametroAgua extends Model
     protected function casts(): array
     {
         return [
-            'fecha_medicion' => 'datetime'
+            'fecha_medicion'    => 'datetime',
+            'temperatura'       => 'float',
+            'ph'                => 'float',
+            'oxigeno_disuelto'  => 'float',
+            'ion_nitrato'       => 'float',
         ];
     }
 }

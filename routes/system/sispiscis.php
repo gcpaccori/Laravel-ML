@@ -8,10 +8,12 @@ use App\Http\Controllers\PiscigranjaController;
 Route::get('/piscigranjas', [PiscigranjaController::class, 'index'])->name('sispiscis.piscigranjas.index')->middleware('modulo:piscigranja');
 Route::get('/datatable/piscigranjas', [PiscigranjaController::class, 'datatable'])->name('datatable.piscigranjas');
 Route::post('/piscigranjas/store', [PiscigranjaController::class, 'store'])->name('piscigranjas.store');
+Route::get('/piscigranjas/options', [PiscigranjaController::class, 'options'])->name('piscigranjas.options');
 
 Route::get('/piscigranjas/{id}', [PiscigranjaController::class, 'edit'])->name('piscigranjas.edit');
 Route::put('/piscigranjas/{id}', [PiscigranjaController::class, 'update'])->name('piscigranjas.update');
 Route::delete('/piscigranjas/{id}', [PiscigranjaController::class, 'destroy'])->name('piscigranjas.destroy');
+Route::get('/piscigranjas/{id}/piscinas', [PiscigranjaController::class, 'getPiscinas'])->name('piscigranjas.piscinas');
 
 // PISCINAS
 Route::get('/piscinas', [PiscinaController::class, 'index'])->name('sispiscis.piscinas.index')->middleware('modulo:piscina');

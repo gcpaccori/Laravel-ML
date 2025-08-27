@@ -27,4 +27,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'),'verified'])
     // S. PISCIGRANJAS
     require __DIR__.'/system/sispiscis.php';
 
+    // S. MONITOREO
+    require __DIR__.'/system/monitoreo.php';
+
 });
