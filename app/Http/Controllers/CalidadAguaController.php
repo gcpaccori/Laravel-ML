@@ -15,8 +15,6 @@ class CalidadAguaController extends Controller
      */
     public function index()
     {
-        $ultimo = ParametroAgua::latest('fecha_medicion')->first();
-
         return Inertia::render('Modules/Views/CalidadAgua', [
             'title' => 'Monitoreo de Calidad del Agua',
             'toolbar' => [
@@ -31,10 +29,10 @@ class CalidadAguaController extends Controller
                 if ($request->has('piscina_id') && $request->piscina_id !== 'T') {
                     $q->where('id', $request->piscina_id);
                 }
-                }, 'piscinas.parametrosAguas' => function ($q) {
-                    // ordenamos por fecha para que el último quede primero
-                    $q->latest('fecha_medicion')->first();
-                }])
+            }, 'piscinas.parametrosAguas' => function ($q) {
+                // ordenamos por fecha para que el último quede primero
+                $q->latest('created_at');
+            }])
             ->where('activo', true);
 
         if ($request->has('piscigranja_id') && $request->piscigranja_id !== 'T') {
@@ -45,16 +43,22 @@ class CalidadAguaController extends Controller
 
         // Buscar el último registro de parámetros de agua
         $ultimo = null;
+        $piscinaDelUltimo = null;
+        $piscigranjaDelUltimo = null;
+
         foreach ($piscigranjas as $pg) {
             foreach ($pg->piscinas as $piscina) {
                 if ($piscina->parametrosAguas->isNotEmpty()) {
                     $registro = $piscina->parametrosAguas->first(); // ya está ordenado latest()
-                    if (!$ultimo || $registro->fecha_medicion > $ultimo->fecha_medicion) {
+                    if (!$ultimo || $registro->created_at > $ultimo->created_at) {
                         $ultimo = $registro;
+                        $piscinaDelUltimo = $piscina;
+                        $piscigranjaDelUltimo = $pg;
                     }
                 }
             }
         }
+
         return response()->json([
             'piscigranjas' => $piscigranjas,
             'parametros' => [
@@ -62,8 +66,20 @@ class CalidadAguaController extends Controller
                 'ph' => $ultimo?->ph ?? 0,
                 'oxigeno' => $ultimo?->oxigeno_disuelto ?? 0,
                 'nitrato' => $ultimo?->ion_nitrato ?? 0,
-                'fecha_medicion' => $ultimo?->fecha_medicion,
-                'fecha_registro' => $ultimo?->created_at,
+                'fecha_medicion' => $ultimo?->fecha_medicion?->format('d/m/Y H:i:s'),
+                'fecha_registro' => $ultimo?->created_at?->format('d/m/Y H:i:s'),
+                'piscina_id' => $ultimo?->piscina_id,
+                'piscina' => [
+                    'id' => $piscinaDelUltimo?->id,
+                    'piscigranja_id' => $piscinaDelUltimo?->piscigranja_id,
+                    'nombre' => $piscinaDelUltimo?->nombre,
+                    'estado' => $piscinaDelUltimo?->estado ?? null,
+                ],
+                'piscigranja' => [
+                    'id' => $piscigranjaDelUltimo?->id,
+                    'nombre' => $piscigranjaDelUltimo?->nombre,
+                    'activo' => $piscigranjaDelUltimo?->activo ?? null,
+                ]
             ]
         ]);
     }

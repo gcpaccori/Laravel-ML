@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use Illuminate\Http\Request;
 use App\Models\ParametroAgua;
 use App\Http\Controllers\Controller;
+use App\Events\ParametroAguaActualizado;
 
 class ParametroAguaController extends Controller
 {
@@ -38,6 +39,8 @@ class ParametroAguaController extends Controller
                 'ion_nitrato'       => $request['ion_nitrato'],
                 'fecha_medicion'    => $request['fecha_medicion']
             ]);
+
+            event(new ParametroAguaActualizado($parametro));
 
             return response()->json([
                 'message' => 'Parámetros registrados correctamente.',

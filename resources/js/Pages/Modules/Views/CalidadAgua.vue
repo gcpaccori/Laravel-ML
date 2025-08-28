@@ -77,17 +77,18 @@
         piscinasList.value = data;
     }
 
-    let intervalId = null;
+    // let intervalId = null;
 
     onMounted( async() => {
         await piscigranjasOptions();
         await loadParametros();
 
-        intervalId = setInterval(loadParametros, 20000); // cada 20 segundos
-    });
-
-    onUnmounted(() => {
-        if (intervalId) clearInterval(intervalId);
+        // Para canal público
+        window.Echo.channel('parametros-agua')
+        .listen('.parametro.actualizado', (data) => {
+            console.log('Parámetros actualizados:', data);
+            loadParametros();
+        });
     });
 
 </script>
@@ -97,7 +98,7 @@
         <!-- FILTROS -->
         <div class="row g-5 g-xl-8">
             <div class="col-xl-12">
-                <div class="card bg-body hoverable card-xl-stretch mb-xl-8">
+                <div class="card bg-body hoverable card-xl-stretch mb-xl-1">
                     <div class="card-body">
                         <el-form :model="form" label-position="top" class="w-100">
                             <div class="row">
@@ -142,6 +143,41 @@
                         </el-form>
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <div class="row g-5 g-xl-8">
+            <div class="col-xl-3">
+                <a href="#" class="card bg-body hoverable card-xl-stretch mb-xl-8">
+                    <div class="card-body">
+                        <div class="text-gray-900 fw-bold fs-3">{{ parametros_agua.piscigranja?.nombre ?? '-' }}</div>
+                        <div class="fw-semibold text-gray-400">Última Piscigranja</div>
+                    </div>
+                </a>
+            </div>
+            <div class="col-xl-3">
+                <a href="#" class="card bg-dark hoverable card-xl-stretch mb-xl-8">
+                    <div class="card-body">
+                        <div class="text-gray-100 fw-bold fs-3">{{ parametros_agua.piscina?.nombre ?? '-' }}</div>
+                        <div class="fw-semibold text-gray-100">Última Piscina</div>
+                    </div>
+                </a>
+            </div>
+            <div class="col-xl-3">
+                <a href="#" class="card bg-warning hoverable card-xl-stretch mb-xl-8">
+                    <div class="card-body">
+                        <div class="text-white fw-bold fs-3">{{ parametros_agua?.fecha_medicion ?? '-' }}</div>
+                        <div class="fw-semibold text-white">Última fecha de medición</div>
+                    </div>
+                </a>
+            </div>
+            <div class="col-xl-3">
+                <a href="#" class="card bg-info hoverable card-xl-stretch mb-5 mb-xl-8">
+                    <div class="card-body">
+                        <div class="text-white fw-bold fs-3">{{ parametros_agua?.fecha_registro ?? '-' }}</div>
+                        <div class="fw-semibold text-white">Última fecha de registro</div>
+                    </div>
+                </a>
             </div>
         </div>
 
