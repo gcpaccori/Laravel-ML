@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ParametroAgua extends Model
 {
@@ -21,4 +22,10 @@ class ParametroAgua extends Model
             'ion_nitrato'       => 'float',
         ];
     }
+
+    public function piscina(): BelongsTo
+    {
+        return $this->belongsTo(Piscina::class);
+    }
+
 }

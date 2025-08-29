@@ -35,14 +35,7 @@ class ParametroAguaActualizado implements ShouldBroadcastNow // ← Cambiar esto
     public function broadcastWith(): array
     {
         return [
-            'message' => "[{$this->parametroAgua->created_at}] Nuevos parámetros recibidos para piscina {$this->parametroAgua->piscina_id}.",
-            'data' => [
-                'id' => $this->parametroAgua->id,
-                'piscina_id' => $this->parametroAgua->piscina_id,
-                'temperatura' => $this->parametroAgua->temperatura,
-                'ph' => $this->parametroAgua->ph,
-                'oxigeno_disuelto' => $this->parametroAgua->oxigeno_disuelto,
-            ]
+            'message' => "Parámetros de agua actualizados.",
         ];
     }
 }

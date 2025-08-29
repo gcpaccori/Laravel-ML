@@ -86,7 +86,7 @@
         // Para canal público
         window.Echo.channel('parametros-agua')
         .listen('.parametro.actualizado', (data) => {
-            console.log('Parámetros actualizados:', data);
+            console.log(data.message);
             loadParametros();
         });
     });
@@ -164,7 +164,7 @@
                 </a>
             </div>
             <div class="col-xl-3">
-                <a href="#" class="card bg-warning hoverable card-xl-stretch mb-xl-8">
+                <a href="#" class="card bg-success hoverable card-xl-stretch mb-xl-8">
                     <div class="card-body">
                         <div class="text-white fw-bold fs-3">{{ parametros_agua?.fecha_medicion ?? '-' }}</div>
                         <div class="fw-semibold text-white">Última fecha de medición</div>

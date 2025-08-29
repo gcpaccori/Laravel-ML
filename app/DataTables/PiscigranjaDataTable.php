@@ -27,6 +27,12 @@ class PiscigranjaDataTable extends DataTable
             ->addColumn('action', function ($s) {
                 return DataTableHelper::getAccionesPermitidasDelModulo($s->id);
             })
+            ->addColumn('piscinas', function ($s) {
+                return $s->piscinas?->count() ?? 0;
+            })
+            ->addColumn('campanias', function ($s) {
+                return $s->campanias?->count() ?? 0;
+            })
             ->addColumn('ubigeo', function ($s) {
                 $depa = $s->departamento?->name ?? '-';
                 $prov = $s->provincia?->name ?? '-';
@@ -88,11 +94,12 @@ class PiscigranjaDataTable extends DataTable
             Column::make('direccion')->title('Direccion'),
             Column::make('latitud')->title('Latitud'),
             Column::make('longitud')->title('Longitud'),
-            // Column::make('propietario'),
+            Column::computed('piscinas')->title('Piscinas')->addClass('text-center'),
+            Column::computed('campanias')->title('Campañas')->addClass('text-center'),
             // Column::make('telefono_contacto'),
             // Column::make('email_contacto'),
             Column::make('activo')->title('Activo')->addClass('text-center'),
-            Column::computed('action')->title('Acciones')->addClass('text-center')
+            Column::computed('action')->title('Acciones')->addClass('text-center min-w-100px')
         ];
     }
 
