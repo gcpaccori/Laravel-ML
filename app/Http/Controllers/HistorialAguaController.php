@@ -35,173 +35,115 @@ class HistorialAguaController extends Controller
         return $dataTable->ajax();
     }
 
-    public function getChartData( Request $request )
+    public function getChartData(Request $request)
     {
         $piscigranjaId = $request->piscigranja_id;
         $piscinaId = $request->piscina_id;
+        $tipoTiempo = $request->tipo_tiempo ?? 'D'; // D=diario, M=mensual, Y=anual
 
-        // Traer datos ordenados por fecha
-            $query = ParametroAgua::query()
-                ->with(['piscina.piscigranja'])
-                ->orderBy('fecha_medicion', 'asc');
+        $query = ParametroAgua::with(['piscina.piscigranja'])
+            ->orderBy('fecha_medicion', 'asc');
 
-            if ( $piscigranjaId !== 'T' ) {
-                $query->whereHas('piscina', function($q) use ( $piscigranjaId ) {
-                    $q->where('piscigranja_id',  $piscigranjaId );
-                });
-            }
+        if ($piscigranjaId !== 'T') {
+            $query->whereHas('piscina', function ($q) use ($piscigranjaId) {
+                $q->where('piscigranja_id', $piscigranjaId);
+            });
+        }
 
-            if ( $piscinaId !== 'T') {
-                $query->where('piscina_id',  $piscinaId);
-            }
+        if ($piscinaId !== 'T') {
+            $query->where('piscina_id', $piscinaId);
+        }
 
-            $parametros = $query->get();
+        // Filtro por rango de tiempo
+        if ($tipoTiempo === 'D' && $request->filled('fecha')) {
+            $query->whereDate('fecha_medicion', $request->fecha);
+        } elseif ($tipoTiempo === 'M' && $request->filled('mes')) {
+            $query->whereYear('fecha_medicion', substr($request->mes, 0, 4))
+                ->whereMonth('fecha_medicion', substr($request->mes, 5, 2));
+        } elseif ($tipoTiempo === 'Y' && $request->filled('anio')) {
+            $query->whereYear('fecha_medicion', $request->anio);
+        }
 
-        // Agrupar por fecha (solo día) y calcular promedio
-        // $parametros = ParametroAgua::select(
-        //         DB::raw('DATE(fecha_medicion) as fecha_medicion'),
-        //         DB::raw('AVG(temperatura) as temperatura'),
-        //         DB::raw('AVG(ph) as ph'),
-        //         DB::raw('AVG(oxigeno_disuelto) as oxigeno_disuelto'),
-        //         DB::raw('AVG(ion_nitrato) as ion_nitrato')
-        //     )
-        //     ->groupBy(DB::raw('DATE(fecha_medicion)'))
-        //     ->orderBy(DB::raw('DATE(fecha_medicion)'), 'asc')
-        //     ->get();
+        $parametros = $query->get();
 
-        // Eje X corto (para mostrar en el gráfico)
-        $labels = $parametros->map(function ($item) {
-            return $item->fecha_medicion
-                ? $item->fecha_medicion->format('d/m/Y')
-                : null;
-        });
+        // Agrupación dinámica según filtro
+        if ($tipoTiempo === 'D') {
+            // Sin agrupar, muestra variación en el día
+            $grouped = $parametros->map(function ($item) {
+                return [
+                    'fecha' => $item->fecha_medicion,
+                    'temperatura' => $item->temperatura,
+                    'ph' => $item->ph,
+                    'oxigeno_disuelto' => $item->oxigeno_disuelto,
+                    'ion_nitrato' => $item->ion_nitrato,
+                ];
+            });
+        } elseif ($tipoTiempo === 'M') {
+            // Agrupar por día y promediar
+            $grouped = $parametros->groupBy(function ($item) {
+                return $item->fecha_medicion->format('Y-m-d');
+            })->map(function ($items) {
+                return [
+                    'fecha' => $items->first()->fecha_medicion->startOfDay(),
+                    'temperatura' => $items->avg('temperatura'),
+                    'ph' => $items->avg('ph'),
+                    'oxigeno_disuelto' => $items->avg('oxigeno_disuelto'),
+                    'ion_nitrato' => $items->avg('ion_nitrato'),
+                ];
+            });
+        } else { // Y = anual
+            // Agrupar por mes y promediar
+            $grouped = $parametros->groupBy(function ($item) {
+                return $item->fecha_medicion->format('Y-m');
+            })->map(function ($items) {
+                return [
+                    'fecha' => $items->first()->fecha_medicion->startOfMonth(),
+                    'temperatura' => $items->avg('temperatura'),
+                    'ph' => $items->avg('ph'),
+                    'oxigeno_disuelto' => $items->avg('oxigeno_disuelto'),
+                    'ion_nitrato' => $items->avg('ion_nitrato'),
+                ];
+            });
+        }
 
-        // Fechas completas (para usar en el tooltip)
-        $tooltips = $parametros->map(function ($item) {
-            return $item->fecha_medicion
-                ? $item->fecha_medicion->translatedFormat('l, d M Y H:i:s')
-                : null;
-        });
+        // Preparar datos para el gráfico
+        $labels = $grouped->map(fn($item) => $item['fecha']->translatedFormat($tipoTiempo === 'Y' ? 'M Y' : ($tipoTiempo === 'M' ? 'd M Y' : 'H:i')))
+                        ->values();
+
+        $tooltips = $grouped->map(fn($item) => $item['fecha']->translatedFormat( $tipoTiempo === 'D' ? 'l, d M Y H:i:s' :  'l, d M Y'))
+                            ->values();
 
         $series = [
             [
                 'name' => 'Temperatura (°C)',
                 'type' => 'line',
                 'smooth' => true,
-                'data' => $parametros->pluck('temperatura'),
+                'data' => $grouped->pluck('temperatura')->values(),
             ],
             [
                 'name' => 'pH',
                 'type' => 'line',
                 'smooth' => true,
-                'data' => $parametros->pluck('ph'),
+                'data' => $grouped->pluck('ph')->values(),
             ],
             [
                 'name' => 'Oxígeno disuelto (mg/L)',
                 'type' => 'line',
                 'smooth' => true,
-                'data' => $parametros->pluck('oxigeno_disuelto'),
+                'data' => $grouped->pluck('oxigeno_disuelto')->values(),
             ],
             [
                 'name' => 'Ion Nitrato (mg/L)',
                 'type' => 'line',
                 'smooth' => true,
-                'data' => $parametros->pluck('ion_nitrato'),
+                'data' => $grouped->pluck('ion_nitrato')->values(),
             ],
         ];
 
         return response()->json([
-            'labels' => $labels,   // Para el eje X
-            'tooltips' => $tooltips, // Para el título del tooltip
+            'labels' => $labels,
+            'tooltips' => $tooltips,
             'series' => $series,
         ]);
-
     }
-
-
-// public function getChartData(Request $request)
-// {
-//     $filtro = $request->input('filtro', 'dia'); // 'dia', 'mes', 'anio'
-//     $piscinaId = $request->input('piscina_id');
-
-//     $query = ParametroAgua::query()
-//         ->when($piscinaId && $piscinaId !== 'T', function($q) use ($piscinaId) {
-//             $q->where('piscina_id', $piscinaId);
-//         });
-
-//     if ($filtro === 'dia') {
-//         // Último día (todas las mediciones por tiempo)
-//         $fecha = Carbon::now()->startOfDay();
-//         $data = $query->whereDate('fecha_medicion', $fecha)
-//             ->orderBy('fecha_medicion')
-//             ->get()
-//             ->map(function($item) {
-//                 return [
-//                     'fecha' => $item->fecha_medicion->format('d M Y H:i'),
-//                     'tooltip' => $item->fecha_medicion->isoFormat('dddd, D MMM YYYY HH:mm:ss'),
-//                     'temperatura' => (float) $item->temperatura,
-//                     'ph' => (float) $item->ph,
-//                     'oxigeno' => (float) $item->oxigeno_disuelto,
-//                     'nitrato' => (float) $item->ion_nitrato,
-//                 ];
-//             });
-
-//     } elseif ($filtro === 'mes') {
-//         // Promedio por día del mes actual
-//         $fecha = Carbon::now();
-//         $data = $query->select(
-//                 DB::raw('DATE(fecha_medicion) as fecha'),
-//                 DB::raw('AVG(temperatura) as temperatura'),
-//                 DB::raw('AVG(ph) as ph'),
-//                 DB::raw('AVG(oxigeno_disuelto) as oxigeno'),
-//                 DB::raw('AVG(ion_nitrato) as nitrato')
-//             )
-//             ->whereMonth('fecha_medicion', $fecha->month)
-//             ->whereYear('fecha_medicion', $fecha->year)
-//             ->groupBy(DB::raw('DATE(fecha_medicion)'))
-//             ->orderBy('fecha')
-//             ->get()
-//             ->map(function($item) {
-//                 $fecha = Carbon::parse($item->fecha);
-//                 return [
-//                     'fecha' => $fecha->format('d M Y'),
-//                     'tooltip' => $fecha->isoFormat('dddd, D MMM YYYY'),
-//                     'temperatura' => (float) $item->temperatura,
-//                     'ph' => (float) $item->ph,
-//                     'oxigeno' => (float) $item->oxigeno,
-//                     'nitrato' => (float) $item->nitrato,
-//                 ];
-//             });
-
-//     } else { // año
-//         // Promedio por mes del año actual
-//         $fecha = Carbon::now();
-//         $data = $query->select(
-//                 DB::raw('MONTH(fecha_medicion) as mes'),
-//                 DB::raw('AVG(temperatura) as temperatura'),
-//                 DB::raw('AVG(ph) as ph'),
-//                 DB::raw('AVG(oxigeno_disuelto) as oxigeno'),
-//                 DB::raw('AVG(ion_nitrato) as nitrato')
-//             )
-//             ->whereYear('fecha_medicion', $fecha->year)
-//             ->groupBy(DB::raw('MONTH(fecha_medicion)'))
-//             ->orderBy('mes')
-//             ->get()
-//             ->map(function($item) use ($fecha) {
-//                 $f = Carbon::createFromDate($fecha->year, $item->mes, 1);
-//                 return [
-//                     'fecha' => $f->format('M Y'),
-//                     'tooltip' => $f->isoFormat('MMMM YYYY'),
-//                     'temperatura' => (float) $item->temperatura,
-//                     'ph' => (float) $item->ph,
-//                     'oxigeno' => (float) $item->oxigeno,
-//                     'nitrato' => (float) $item->nitrato,
-//                 ];
-//             });
-//     }
-
-//     return response()->json([
-//         'data' => $data
-//     ]);
-// }
 }

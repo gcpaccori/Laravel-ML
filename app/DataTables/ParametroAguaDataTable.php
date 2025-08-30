@@ -56,7 +56,37 @@ class ParametroAguaDataTable extends DataTable
      */
     public function query(ParametroAgua $model): QueryBuilder
     {
-        return $model->newQuery();
+        $query = $model->newQuery()
+            ->with(['piscina.piscigranja'])
+            ->orderBy('fecha_medicion', 'desc');
+
+        // Filtros que vienen del request
+        $piscigranjaId = request('piscigranja_id');
+        $piscinaId = request('piscina_id');
+        $tipoTiempo = request('tipo_tiempo', 'D');
+
+        if ($piscigranjaId && $piscigranjaId !== 'T') {
+            $query->whereHas('piscina', function ($q) use ($piscigranjaId) {
+                $q->where('piscigranja_id', $piscigranjaId);
+            });
+        }
+
+        if ($piscinaId && $piscinaId !== 'T') {
+            $query->where('piscina_id', $piscinaId);
+        }
+
+        // Filtros de tiempo
+        if ($tipoTiempo === 'D' && request()->filled('fecha')) {
+            $query->whereDate('fecha_medicion', request('fecha'));
+        } elseif ($tipoTiempo === 'M' && request()->filled('mes')) {
+            $mes = request('mes');
+            $query->whereYear('fecha_medicion', substr($mes, 0, 4))
+                ->whereMonth('fecha_medicion', substr($mes, 5, 2));
+        } elseif ($tipoTiempo === 'Y' && request()->filled('anio')) {
+            $query->whereYear('fecha_medicion', request('anio'));
+        }
+
+        return $query;
     }
 
     /**

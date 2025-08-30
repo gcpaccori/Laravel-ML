@@ -36,10 +36,10 @@ class ParametroAguaSeeder extends Seeder
                 ]);
 
                 // // avanzar 10 minutos
-                // $fecha->addMinutes(60);
+                $fecha->addMinutes(15);
 
                 // Avanzamos 6 horas
-                $fecha->addHours(6);
+                // $fecha->addHours(6);
             }
         }
 

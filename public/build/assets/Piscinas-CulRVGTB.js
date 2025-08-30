@@ -1,0 +1,1 @@
+import{f as e,E as r,p as a,o as n}from"./app-y5HalM8D.js";const c={__name:"Piscinas",props:{title:String,toolbar:{type:Array,required:!1}},setup(t){return e(()=>{}),(l,s)=>{const o=r("App");return n(),a(o,{title:t.title,toolbar:t.toolbar},null,8,["title","toolbar"])}}};export{c as default};
