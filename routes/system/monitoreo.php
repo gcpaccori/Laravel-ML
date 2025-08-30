@@ -10,3 +10,4 @@ Route::get('/calidadaguas/parametros', [CalidadAguaController::class, 'getDataPa
 // HISTORIAL AGUA
 Route::get('/historialaguas', [HistorialAguaController::class, 'index'])->name('monitoreo.historialaguas.index')->middleware('modulo:historialagua');
 Route::get('datatable/historialaguas', [HistorialAguaController::class, 'datatable'])->name('datatable.historialaguas');
+Route::get('/chart-historialaguas', [HistorialAguaController::class, 'getChartData'])->name('chart.historialaguas');
