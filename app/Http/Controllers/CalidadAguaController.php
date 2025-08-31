@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use Carbon\Carbon;
 use Inertia\Inertia;
 use App\Models\CalidadAgua;
 use App\Models\Piscigranja;
 use Illuminate\Http\Request;
 use App\Models\ParametroAgua;
+use Illuminate\Support\Facades\DB;
 
 class CalidadAguaController extends Controller
 {
@@ -23,63 +25,67 @@ class CalidadAguaController extends Controller
         ]);
     }
 
-    public function getDataParametros( Request $request )
+    public function getDataParametros(Request $request)
     {
-        $parametros = Piscigranja::with(['piscinas' => function ($q) use ($request) {
-                if ($request->has('piscina_id') && $request->piscina_id !== 'T') {
-                    $q->where('id', $request->piscina_id);
-                }
-            }, 'piscinas.parametrosAguas' => function ($q) {
-                // ordenamos por fecha para que el último quede primero
-                $q->latest('created_at');
-            }])
-            ->where('activo', true);
+        // ======================
+        // 1) Obtener piscigranjas activas con sus piscinas
+        // ======================
+        $piscigranjasQuery = Piscigranja::where('activo', true);
 
         if ($request->has('piscigranja_id') && $request->piscigranja_id !== 'T') {
-            $parametros->where('id', $request->piscigranja_id);
+            $piscigranjasQuery->where('id', $request->piscigranja_id);
         }
 
-        $piscigranjas = $parametros->get();
+        $piscigranjas = $piscigranjasQuery->get();
 
-        // Buscar el último registro de parámetros de agua
-        $ultimo = null;
-        $piscinaDelUltimo = null;
-        $piscigranjaDelUltimo = null;
+        // ======================
+        // 2) Obtener el último parámetro global filtrado
+        // ======================
+        $parametroQuery = ParametroAgua::with(['piscina.piscigranja'])
+            ->latest('fecha_medicion');
 
-        foreach ($piscigranjas as $pg) {
-            foreach ($pg->piscinas as $piscina) {
-                if ($piscina->parametrosAguas->isNotEmpty()) {
-                    $registro = $piscina->parametrosAguas->first(); // ya está ordenado latest()
-                    if (!$ultimo || $registro->created_at > $ultimo->created_at) {
-                        $ultimo = $registro;
-                        $piscinaDelUltimo = $piscina;
-                        $piscigranjaDelUltimo = $pg;
-                    }
-                }
-            }
+        // Filtro por piscigranja
+        if ($request->has('piscigranja_id') && $request->piscigranja_id !== 'T') {
+            $parametroQuery->whereHas('piscina.piscigranja', function($q) use ($request) {
+                $q->where('id', $request->piscigranja_id)
+                ->where('activo', true);
+            });
+        } else {
+            // si no hay filtro de piscigranja, aseguramos solo activas
+            $parametroQuery->whereHas('piscina.piscigranja', function($q) {
+                $q->where('activo', true);
+            });
         }
 
+        // Filtro por piscina
+        if ($request->has('piscina_id') && $request->piscina_id !== 'T') {
+            $parametroQuery->where('piscina_id', $request->piscina_id);
+        }
+
+        $ultimo = $parametroQuery->first();
+
+        // ======================
+        // 3) Respuesta JSON
+        // ======================
         return response()->json([
             'piscigranjas' => $piscigranjas,
             'parametros' => [
-                'temperatura' => $ultimo?->temperatura ?? 0,
-                'ph' => $ultimo?->ph ?? 0,
-                'oxigeno' => $ultimo?->oxigeno_disuelto ?? 0,
-                'nitrato' => $ultimo?->ion_nitrato ?? 0,
+                'temperatura'    => $ultimo?->temperatura ?? 0,
+                'ph'             => $ultimo?->ph ?? 0,
+                'oxigeno'        => $ultimo?->oxigeno_disuelto ?? 0,
+                'nitrato'        => $ultimo?->ion_nitrato ?? 0,
                 'fecha_medicion' => $ultimo?->fecha_medicion?->format('d/m/Y H:i:s'),
                 'fecha_registro' => $ultimo?->created_at?->format('d/m/Y H:i:s'),
-                'piscina_id' => $ultimo?->piscina_id,
-                'piscina' => [
-                    'id' => $piscinaDelUltimo?->id,
-                    'piscigranja_id' => $piscinaDelUltimo?->piscigranja_id,
-                    'nombre' => $piscinaDelUltimo?->nombre,
-                    'estado' => $piscinaDelUltimo?->estado ?? null,
-                ],
-                'piscigranja' => [
-                    'id' => $piscigranjaDelUltimo?->id,
-                    'nombre' => $piscigranjaDelUltimo?->nombre,
-                    'activo' => $piscigranjaDelUltimo?->activo ?? null,
-                ]
+                'piscina' => $ultimo?->piscina ? [
+                    'id'            => $ultimo->piscina->id,
+                    'nombre'        => $ultimo->piscina->nombre,
+                    'estado'        => $ultimo->piscina->estado ?? null,
+                ] : null,
+                'piscigranja' => $ultimo?->piscina?->piscigranja ? [
+                    'id'            => $ultimo->piscina->piscigranja->id,
+                    'nombre'        => $ultimo->piscina->piscigranja->nombre,
+                    'activo'        => $ultimo->piscina->piscigranja->activo,
+                ] : null,
             ]
         ]);
     }

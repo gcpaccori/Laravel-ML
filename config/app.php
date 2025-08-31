@@ -65,8 +65,8 @@ return [
     |
     */
 
-    'timezone' => 'UTC',
-    // 'timezone' => 'America/Lima',
+    // 'timezone' => 'UTC',
+    'timezone' => 'America/Lima',
 
     /*
     |--------------------------------------------------------------------------
