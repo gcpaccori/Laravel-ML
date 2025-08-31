@@ -8,6 +8,10 @@
         toolbar: {
             type: Array,
             required: false
+        },
+        bands: {
+            type: Object,
+            default: {}
         }
     });
 
@@ -17,33 +21,6 @@
     });
 
     const parametros_agua = ref({});
-
-    const bandsTemperatura = [
-        { title: "Frío", color: "#00BFFF", lowScore: 0, highScore: 15 },
-        { title: "Óptimo", color: "#54b947", lowScore: 15, highScore: 28 },
-        { title: "Alto", color: "#fdae19", lowScore: 28, highScore: 35 },
-        { title: "Crítico", color: "#ee1f25", lowScore: 35, highScore: 40 },
-    ];
-
-    const bandsPh = [
-        { title: "Ácido", color: "#ee1f25", lowScore: 0, highScore: 6.5 },
-        { title: "Óptimo", color: "#54b947", lowScore: 6.5, highScore: 8.5 },
-        { title: "Alcalino", color: "#fdae19", lowScore: 8.5, highScore: 14 },
-    ];
-
-    const bandsOxigeno = [
-        { title: "Crítico", color: "#ee1f25", lowScore: 0, highScore: 3 },
-        { title: "Bajo", color: "#fdae19", lowScore: 3, highScore: 5 },
-        { title: "Óptimo", color: "#54b947", lowScore: 5, highScore: 10 },
-        { title: "Alto", color: "#00BFFF", lowScore: 10, highScore: 15 },
-    ];
-
-    const bandsNitrato = [
-        { title: "Óptimo", color: "#54b947", lowScore: 0, highScore: 50 },
-        { title: "Moderado", color: "#fdae19", lowScore: 50, highScore: 100 },
-        { title: "Alto", color: "#ee1f25", lowScore: 100, highScore: 200 },
-    ];
-
     const piscigranjas = ref(null);
     const piscigranjasMap = ref([]);
 
@@ -148,10 +125,10 @@
 
         <div class="row g-5 g-xl-8">
             <div class="col-xl-3">
-                <a href="#" class="card bg-body hoverable card-xl-stretch mb-xl-8">
+                <a href="#" class="card bg-danger hoverable card-xl-stretch mb-xl-8">
                     <div class="card-body">
-                        <div class="text-gray-900 fw-bold fs-3">{{ parametros_agua.piscigranja?.nombre ?? '-' }}</div>
-                        <div class="fw-semibold text-gray-400">Última Piscigranja</div>
+                        <div class="text-gray-100 fw-bold fs-3">{{ parametros_agua.piscigranja?.nombre ?? '-' }}</div>
+                        <div class="fw-semibold text-gray-100">Última Piscigranja</div>
                     </div>
                 </a>
             </div>
@@ -205,14 +182,14 @@
                         </h3>
                     </div>
                     <div class="card-body pt-0">
-                        <div class="row">
+                        <div class="row mb-5">
                             <div class="col-lg-6">
                                 <h5 class="text-center font-bold mb-2">Temperatura</h5>
                                 <GaugeChart
                                     :value="parametros_agua.temperatura"
-                                    :min="0"
-                                    :max="40"
-                                    :bandsData="bandsTemperatura"
+                                    :min="props.bands.bandsTemperatura.min"
+                                    :max="props.bands.bandsTemperatura.max"
+                                    :bandsData="props.bands.bandsTemperatura.bands"
                                     unit="°C"
                                 />
                             </div>
@@ -220,9 +197,9 @@
                                 <h5 class="text-center font-bold mb-2">Grado de Acidez</h5>
                                 <GaugeChart
                                     :value="parametros_agua.ph"
-                                    :min="0"
-                                    :max="14"
-                                    :bandsData="bandsPh"
+                                    :min="props.bands.bandsPh.min"
+                                    :max="props.bands.bandsPh.max"
+                                    :bandsData="props.bands.bandsPh.bands"
                                     unit="pH"
                                 />
                             </div>
@@ -232,9 +209,9 @@
                                 <h5 class="text-center font-bold mb-2">Oxígeno Disuelto</h5>
                                 <GaugeChart
                                     :value="parametros_agua.oxigeno"
-                                    :min="0"
-                                    :max="15"
-                                    :bandsData="bandsOxigeno"
+                                    :min="props.bands.bandsOxigeno.min"
+                                    :max="props.bands.bandsOxigeno.max"
+                                    :bandsData="props.bands.bandsOxigeno.bands"
                                     unit="mg/L"
                                 />
                             </div>
@@ -242,9 +219,9 @@
                                 <h5 class="text-center font-bold mb-2">Ion de Nitrato</h5>
                                 <GaugeChart
                                     :value="parametros_agua.nitrato"
-                                    :min="0"
-                                    :max="200"
-                                    :bandsData="bandsNitrato"
+                                    :min="props.bands.bandsNitrato.min"
+                                    :max="props.bands.bandsNitrato.max"
+                                    :bandsData="props.bands.bandsNitrato.bands"
                                     unit="mg/L"
                                 />
                             </div>

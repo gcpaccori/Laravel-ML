@@ -19,13 +19,11 @@ let myChart: echarts.ECharts | null = null;
 
 function getOption(): EChartsOption {
     return {
-        // title: {
-        //   text: 'Parámetros de Agua',
-        //   subtext: 'Variación por fechas',
-        //   left: 'center',
-        // },
         tooltip: {
             trigger: "axis",
+            textStyle: {
+                fontSize: 12
+            },
             formatter: function (params) {
                 let index = params[0].dataIndex;
                 let dateTitle = props.tooltips[index]; // viene de Laravel

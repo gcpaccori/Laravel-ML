@@ -76,6 +76,8 @@ class HistorialAguaController extends Controller
                     'ph' => $item->ph,
                     'oxigeno_disuelto' => $item->oxigeno_disuelto,
                     'ion_nitrato' => $item->ion_nitrato,
+                    'piscina' => $item->piscina->nombre ?? '',
+                    'piscigranja' => $item->piscina->piscigranja->nombre ?? '',
                 ];
             });
         } elseif ($tipoTiempo === 'M') {
@@ -107,11 +109,23 @@ class HistorialAguaController extends Controller
         }
 
         // Preparar datos para el gráfico
-        $labels = $grouped->map(fn($item) => $item['fecha']->translatedFormat($tipoTiempo === 'Y' ? 'M Y' : ($tipoTiempo === 'M' ? 'd M Y' : 'H:i')))
-                        ->values();
+        $labels = $grouped->map(fn($item) =>
+            $item['fecha']->translatedFormat(
+                $tipoTiempo === 'Y' ? 'M Y' : ($tipoTiempo === 'M' ? 'd M Y' : 'H:i')
+            )
+        )->values();
 
-        $tooltips = $grouped->map(fn($item) => $item['fecha']->translatedFormat( $tipoTiempo === 'D' ? 'l, d M Y H:i:s' :  'l, d M Y'))
-                            ->values();
+        $tooltips = $grouped->map(function ($item) use ($tipoTiempo) {
+            $base = $item['fecha']->translatedFormat(
+                $tipoTiempo === 'D' ? 'l, d M Y H:i:s' : 'l, d M Y'
+            );
+
+            if ($tipoTiempo === 'D') {
+                $base .= " | {$item['piscigranja']} | {$item['piscina']}";
+            }
+
+            return $base;
+        })->values();
 
         $series = [
             [

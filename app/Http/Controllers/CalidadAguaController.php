@@ -8,6 +8,7 @@ use App\Models\CalidadAgua;
 use App\Models\Piscigranja;
 use Illuminate\Http\Request;
 use App\Models\ParametroAgua;
+use App\Models\ParametroBanda;
 use Illuminate\Support\Facades\DB;
 
 class CalidadAguaController extends Controller
@@ -17,11 +18,59 @@ class CalidadAguaController extends Controller
      */
     public function index()
     {
+        $bands = [
+            "bandsTemperatura" => [
+                "bands" => ParametroBanda::where('parametro', 'temperatura')->get()
+                    ->map(fn($item) => [
+                        "title"     => $item->title,
+                        "color"     => $item->color,
+                        "lowScore"  => $item->low_score,
+                        "highScore" => $item->high_score,
+                    ]),
+                "min" => 0,
+                "max" => 40,
+            ],
+            "bandsPh" => [
+                "bands" => ParametroBanda::where('parametro', 'ph')->get()
+                    ->map(fn($item) => [
+                        "title"     => $item->title,
+                        "color"     => $item->color,
+                        "lowScore"  => $item->low_score,
+                        "highScore" => $item->high_score,
+                    ]),
+                "min" => 0,
+                "max" => 14,
+            ],
+            "bandsOxigeno" => [
+                "bands" => ParametroBanda::where('parametro', 'oxigeno')->get()
+                    ->map(fn($item) => [
+                        "title"     => $item->title,
+                        "color"     => $item->color,
+                        "lowScore"  => $item->low_score,
+                        "highScore" => $item->high_score,
+                    ]),
+                "min" => 0,
+                "max" => 15,
+            ],
+            "bandsNitrato" => [
+                "bands" => ParametroBanda::where('parametro', 'nitrato')->get()
+                    ->map(fn($item) => [
+                        "title"     => $item->title,
+                        "color"     => $item->color,
+                        "lowScore"  => $item->low_score,
+                        "highScore" => $item->high_score,
+                    ]),
+                "min" => 0,
+                "max" => 2,
+            ],
+        ];
+
         return Inertia::render('Modules/Views/CalidadAgua', [
             'title' => 'Monitoreo de Calidad del Agua',
             'toolbar' => [
                 ['label' => 'Inicio', 'route' => 'dashboard']
-            ]
+            ],
+            "bands" => $bands
         ]);
     }
 

@@ -31,7 +31,7 @@ class ParametroAguaSeeder extends Seeder
                     'temperatura'       => fake()->randomFloat(2, 20, 32), // °C
                     'ph'                => fake()->randomFloat(2, 6.5, 9),
                     'oxigeno_disuelto'  => fake()->randomFloat(2, 4, 10), // mg/L
-                    'ion_nitrato'       => fake()->randomFloat(2, 0, 50), // mg/L
+                    'ion_nitrato'       => fake()->randomFloat(2, 0.1, 2), // mg/L
                     'fecha_medicion'    => $fecha,
                 ]);
 

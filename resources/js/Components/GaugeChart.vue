@@ -44,10 +44,10 @@ const renderChart = () => {
         detail: {
           valueAnimation: true,
           fontSize: 14,
-          offsetCenter: [0, "80%"],
+          offsetCenter: [0, "90%"],
           formatter: function (v) {
             let band = getBandTitle(v);
-            return v.toFixed(1) + " " + props.unit + "\n" + band;
+            return v.toFixed(2) + " " + props.unit + "\n" + band;
           },
         },
         min: props.min,
