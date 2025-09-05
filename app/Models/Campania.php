@@ -18,8 +18,8 @@ class Campania extends Model
         return $this->belongsTo(Piscigranja::class);
     }
 
-    public function etapas() : HasMany
+    public function especies() : HasMany
     {
-        return $this->hasMany(CampaniaEtapa::class);
+        return $this->hasMany(CampaniaEspecie::class);
     }
 }

@@ -41,50 +41,43 @@ class PiscigranjaController extends Controller
      */
     public function store(PiscigranjaRequest $request)
     {
-        try {
-            $piscigranja = DB::transaction(function () use ( $request ) {
-                // Crear la piscigranja
-                $piscigranja = Piscigranja::create([
-                    'nombre' => $request->nombre,
-                    'departamento_id' => $request->departamento_id,
-                    'provincia_id' => $request->provincia_id,
-                    'distrito_id' => $request->distrito_id,
-                    'direccion' => $request->direccion,
-                    'latitud' => $request->latitud,
-                    'longitud' => $request->longitud,
-                    'descripcion' => $request->descripcion,
-                    'propietario' => $request->propietario,
-                    'telefono_contacto' => $request->telefono_contacto,
-                    'email_contacto' => $request->email_contacto,
-                    'activo' => $request->activo,
-                ]);
-
-                // Guardar las piscinas si vienen en el request
-                if ($request->has('piscinas')) {
-                    foreach ($request['piscinas'] as $piscinaData) {
-                        $piscigranja->piscinas()->create([
-                            'nombre'         => $piscinaData['nombre'],
-                            'descripcion'    => $piscinaData['descripcion'],
-                            'superficie_m2'  => $piscinaData['superficie_m2'],
-                            'profundidad_m'  => $piscinaData['profundidad_m'],
-                            'estado'         => $piscinaData['estado'],
-                        ]);
-                    }
-                }
-
-                return $piscigranja->load('piscinas');
-            });
-
-            return response()->json([
-                'message' => 'Registro creado correctamente.',
-                'data' => $piscigranja
+        $piscigranja = DB::transaction(function () use ( $request ) {
+            // Crear la piscigranja
+            $piscigranja = Piscigranja::create([
+                'nombre' => $request->nombre,
+                'departamento_id' => $request->departamento_id,
+                'provincia_id' => $request->provincia_id,
+                'distrito_id' => $request->distrito_id,
+                'direccion' => $request->direccion,
+                'latitud' => $request->latitud,
+                'longitud' => $request->longitud,
+                'descripcion' => $request->descripcion,
+                'propietario' => $request->propietario,
+                'telefono_contacto' => $request->telefono_contacto,
+                'email_contacto' => $request->email_contacto,
+                'activo' => $request->activo,
             ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => $e->getMessage(),
-            ], 500);
-        }
 
+            // Guardar las piscinas si vienen en el request
+            if ($request->has('piscinas')) {
+                foreach ($request['piscinas'] as $piscinaData) {
+                    $piscigranja->piscinas()->create([
+                        'nombre'         => $piscinaData['nombre'],
+                        'descripcion'    => $piscinaData['descripcion'],
+                        'superficie_m2'  => $piscinaData['superficie_m2'],
+                        'profundidad_m'  => $piscinaData['profundidad_m'],
+                        'estado'         => $piscinaData['estado'],
+                    ]);
+                }
+            }
+
+            return $piscigranja->load('piscinas');
+        });
+
+        return response()->json([
+            'message' => 'Registro creado correctamente.',
+            'data' => $piscigranja
+        ]);
     }
 
     /**
@@ -101,71 +94,65 @@ class PiscigranjaController extends Controller
      */
     public function update(PiscigranjaRequest $request, Piscigranja $id)
     {
-        try {
-            $piscigranja = DB::transaction(function () use ($request, $id) {
-                // Actualizar la piscigranja
-                $id->update([
-                    'nombre'           => $request->nombre,
-                    'departamento_id'  => $request->departamento_id,
-                    'provincia_id'     => $request->provincia_id,
-                    'distrito_id'      => $request->distrito_id,
-                    'direccion'        => $request->direccion,
-                    'latitud'          => $request->latitud,
-                    'longitud'         => $request->longitud,
-                    'descripcion'      => $request->descripcion,
-                    'propietario'      => $request->propietario,
-                    'telefono_contacto'=> $request->telefono_contacto,
-                    'email_contacto'   => $request->email_contacto,
-                    'activo'           => $request->activo,
-                ]);
+        $piscigranja = DB::transaction(function () use ($request, $id) {
+            // Actualizar la piscigranja
+            $id->update([
+                'nombre'           => $request->nombre,
+                'departamento_id'  => $request->departamento_id,
+                'provincia_id'     => $request->provincia_id,
+                'distrito_id'      => $request->distrito_id,
+                'direccion'        => $request->direccion,
+                'latitud'          => $request->latitud,
+                'longitud'         => $request->longitud,
+                'descripcion'      => $request->descripcion,
+                'propietario'      => $request->propietario,
+                'telefono_contacto'=> $request->telefono_contacto,
+                'email_contacto'   => $request->email_contacto,
+                'activo'           => $request->activo,
+            ]);
 
-                // Manejo de las piscinas
-                if ($request->has('piscinas')) {
-                    $piscinaIds = [];
+            // Manejo de las piscinas
+            if ($request->has('piscinas')) {
+                $piscinaIds = [];
 
-                    foreach ($request['piscinas'] as $piscinaData) {
-                        if (isset($piscinaData['id'])) {
-                            // Si existe el ID → actualizar
-                            $piscina = $id->piscinas()->find($piscinaData['id']);
-                            if ($piscina) {
-                                $piscina->update([
-                                    'nombre'        => $piscinaData['nombre'],
-                                    'descripcion'   => $piscinaData['descripcion'],
-                                    'superficie_m2' => $piscinaData['superficie_m2'],
-                                    'profundidad_m' => $piscinaData['profundidad_m'],
-                                    'estado'        => $piscinaData['estado'],
-                                ]);
-                                $piscinaIds[] = $piscina->id;
-                            }
-                        } else {
-                            // Si no existe ID → crear
-                            $newPiscina = $id->piscinas()->create([
+                foreach ($request['piscinas'] as $piscinaData) {
+                    if (isset($piscinaData['id'])) {
+                        // Si existe el ID → actualizar
+                        $piscina = $id->piscinas()->find($piscinaData['id']);
+                        if ($piscina) {
+                            $piscina->update([
                                 'nombre'        => $piscinaData['nombre'],
                                 'descripcion'   => $piscinaData['descripcion'],
                                 'superficie_m2' => $piscinaData['superficie_m2'],
                                 'profundidad_m' => $piscinaData['profundidad_m'],
                                 'estado'        => $piscinaData['estado'],
                             ]);
-                            $piscinaIds[] = $newPiscina->id;
+                            $piscinaIds[] = $piscina->id;
                         }
+                    } else {
+                        // Si no existe ID → crear
+                        $newPiscina = $id->piscinas()->create([
+                            'nombre'        => $piscinaData['nombre'],
+                            'descripcion'   => $piscinaData['descripcion'],
+                            'superficie_m2' => $piscinaData['superficie_m2'],
+                            'profundidad_m' => $piscinaData['profundidad_m'],
+                            'estado'        => $piscinaData['estado'],
+                        ]);
+                        $piscinaIds[] = $newPiscina->id;
                     }
-
-                    // // Eliminar piscinas que no vinieron en el request
-                    // $id->piscinas()->whereNotIn('id', $piscinaIds)->delete();
                 }
 
-                return $id->load('piscinas');
-            });
+                // // Eliminar piscinas que no vinieron en el request
+                // $id->piscinas()->whereNotIn('id', $piscinaIds)->delete();
+            }
 
-            return response()->json([
-                'message' => 'Registro actualizado correctamente.',
-                'data' => $piscigranja
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => $e->getMessage(),
-            ], 500);
-        }
+            return $id->load('piscinas');
+        });
+
+        return response()->json([
+            'message' => 'Registro actualizado correctamente.',
+            'data' => $piscigranja
+        ]);
     }
 
     /**

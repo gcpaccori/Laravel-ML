@@ -12,7 +12,7 @@ class Etapa extends Model
 
     protected $guarded = [];
 
-    public function campanias() : HasMany
+    public function campaniaEtapas() : HasMany
     {
         return $this->hasMany(CampaniaEtapa::class);
     }

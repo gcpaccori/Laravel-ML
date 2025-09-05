@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\CampaniaEtapa;
 use Illuminate\Http\Request;
 
 class CampaniaEtapaController extends Controller
@@ -34,7 +33,7 @@ class CampaniaEtapaController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(CampaniaEtapa $campaniaEtapa)
+    public function show(string $id)
     {
         //
     }
@@ -42,7 +41,7 @@ class CampaniaEtapaController extends Controller
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(CampaniaEtapa $campaniaEtapa)
+    public function edit(string $id)
     {
         //
     }
@@ -50,7 +49,7 @@ class CampaniaEtapaController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, CampaniaEtapa $campaniaEtapa)
+    public function update(Request $request, string $id)
     {
         //
     }
@@ -58,7 +57,7 @@ class CampaniaEtapaController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(CampaniaEtapa $campaniaEtapa)
+    public function destroy(string $id)
     {
         //
     }

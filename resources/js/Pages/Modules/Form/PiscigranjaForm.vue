@@ -1,8 +1,9 @@
 <script setup>
     import { onMounted, ref, watch } from 'vue';
     import useSubmitForm from '@/Composables/useSubmitForm';
-    import { ElMessage } from 'element-plus';
+    import { ElMessage, ElMessageBox } from 'element-plus';
     import useUbigeo from '@/Composables/useUbigeo';
+    import { Delete } from '@element-plus/icons-vue'
 
     const { loading, progress, errors, submitForm } = useSubmitForm();
     const { loadDepartamentosTo, loadProvinciasTo, loadDistritosTo } = useUbigeo();
@@ -20,10 +21,6 @@
     const departamentos = ref([]);
     const provincias = ref([]);
     const distritos = ref([]);
-
-    const tableData = ref([
-        { nombre: 'Piscina 1', descripcion: 'Piscina principal', superficie_m2: 50, profundidad_m: 2, estado: true },
-    ]);
 
     const form = ref({
         nombre: '',
@@ -93,8 +90,11 @@
             superficie_m2: 0,
             profundidad_m: 0,
             estado: 'operativa',
-            editing: true, // bandera para saber si es fila en edición
         })
+    }
+
+    const eliminarPiscina = (index) => {
+        form.value.piscinas.splice(index, 1);
     }
 
     // Sincronizar cambios del padre
@@ -280,7 +280,22 @@
                             </el-form-item>
                         </template>
                     </el-table-column>
+
+                    <!-- Acciones -->
+                    <el-table-column label="Acciones" class-name="text-center">
+                        <template #default="{ row, $index }">
+                            <el-button
+                                type="danger"
+                                :icon="Delete"
+                                :disabled="row.id && row.id > 0"
+                                @click="eliminarPiscina($index)"
+                                circle
+                            >
+                            </el-button>
+                        </template>
+                    </el-table-column>
                 </el-table>
+
             </div>
         </div>
 

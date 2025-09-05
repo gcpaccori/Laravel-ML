@@ -54,7 +54,7 @@ const formatMY = (yyyyMm) => {
     return `${pad2(m)}/${y}`;
 };
 
-const tituloFiltros = computed(() => {
+const subTituloFiltros = computed(() => {
     const parts = [];
 
     // Piscigranja
@@ -85,6 +85,17 @@ const tituloFiltros = computed(() => {
 
     return parts.length ? parts.join(" - ") : "Todos";
 });
+
+const tituloCard = computed(() => {
+    let title = "-";
+    if ( form.value.piscigranja_id === "T" || form.value.piscina_id === "T" || form.value.tipo_tiempo !== "D" ) {
+        title = ' - Promedios';
+    }else{
+        title = ' - Registros';
+    }
+
+    return title;
+})
 
 // Inicializar Tabla
 const handleTableReady = (dt) => {
@@ -236,6 +247,7 @@ onMounted(async () => {
                                 >
                                     <el-form-item label="Fecha">
                                         <el-date-picker
+                                            class="w-100"
                                             type="date"
                                             v-model="form.fecha"
                                             format="DD/MM/YYYY"
@@ -252,6 +264,7 @@ onMounted(async () => {
                                 >
                                     <el-form-item label="Mes">
                                         <el-date-picker
+                                            class="w-100"
                                             v-model="form.mes"
                                             type="month"
                                             format="MM/YYYY"
@@ -268,6 +281,7 @@ onMounted(async () => {
                                 >
                                     <el-form-item label="Año">
                                         <el-date-picker
+                                            class="w-100"
                                             type="year"
                                             v-model="form.anio"
                                             format="YYYY"
@@ -289,12 +303,9 @@ onMounted(async () => {
                 <div class="card card-flush overflow-hidden h-xl-100">
                     <div class="card-header py-5">
                         <h3 class="card-title align-items-start flex-column">
-                            <span class="card-label fw-bold text-dark"
-                                >Historial de Registros de Parámetros del
-                                Agua</span
-                            >
+                            <span class="card-label fw-bold text-dark">Historial de Registros de Parámetros del Agua {{ tituloCard }}</span>
                             <span class="text-gray-400 mt-1 fw-semibold fs-6">{{
-                                tituloFiltros
+                                subTituloFiltros
                             }}</span>
                         </h3>
                     </div>

@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('etapas', function (Blueprint $table) {
             $table->id();
-            $table->string('nombre', 100); // Ej: Inicio, Crecimiento, Engorde
+            $table->string('nombre', 100); // Inicio, Crecimiento, Engorde
             $table->text('descripcion')->nullable();
             $table->timestamps();
             $table->softDeletes();

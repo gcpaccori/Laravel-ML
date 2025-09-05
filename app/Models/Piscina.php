@@ -20,9 +20,9 @@ class Piscina extends Model
         return $this->belongsTo(Piscigranja::class);
     }
 
-    public function etapas() : belongsToMany
+    public function etapas() : HasMany
     {
-        return $this->belongsToMany(CampaniaEtapa::class, 'campania_etapa_piscinas');
+        return $this->hasMany(CampaniaEtapa::class);
     }
 
     public function parametrosAguas() : HasMany

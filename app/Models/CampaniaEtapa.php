@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class CampaniaEtapa extends Model
 {
@@ -13,9 +12,9 @@ class CampaniaEtapa extends Model
 
     protected $guarded = [];
 
-    public function campania() : BelongsTo
+    public function campaniaEspecie() : BelongsTo
     {
-        return $this->belongsTo(Campania::class);
+        return $this->belongsTo(CampaniaEspecie::class);
     }
 
     public function etapa() : BelongsTo
@@ -23,8 +22,8 @@ class CampaniaEtapa extends Model
         return $this->belongsTo(Etapa::class);
     }
 
-    public function piscinas() : BelongsToMany
+    public function piscina() : belongsTo
     {
-        return $this->belongsToMany(Piscina::class, 'campania_etapa_piscinas');
+        return $this->belongsTo(Piscina::class);
     }
 }
