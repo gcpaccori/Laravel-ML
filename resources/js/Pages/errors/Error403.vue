@@ -9,6 +9,10 @@
             type: String,
             required: false,
             default: 'Error Desconocido'
+        },
+        redirect: {
+            type: Object,
+            default: {'route' : 'dashboard', 'text' : 'Regresar a inicio'}
         }
     });
 </script>
@@ -33,7 +37,7 @@
                     <!--end::Illustration-->
                     <!--begin::Link-->
                     <div class="mb-0">
-                        <a :href="route('dashboard')" class="btn btn-sm btn-primary">Regresar a Inicio</a>
+                        <a :href="route(redirect.route)" class="btn btn-sm btn-primary">{{ redirect.text }}</a>
                     </div>
                     <!--end::Link-->
                 </div>

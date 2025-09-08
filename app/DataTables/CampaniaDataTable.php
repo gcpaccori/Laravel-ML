@@ -15,6 +15,10 @@ use Illuminate\Database\Eloquent\Builder as QueryBuilder;
 
 class CampaniaDataTable extends DataTable
 {
+    private function formatDate($date): string
+    {
+        return $date?->format('d/m/Y') ?? '-';
+    }
     /**
      * Build the DataTable class.
      *
@@ -76,6 +80,9 @@ class CampaniaDataTable extends DataTable
                 }
                 return $badge;
             })
+            ->editColumn('fecha_inicio', fn($s) => $this->formatDate($s->fecha_inicio))
+            ->editColumn('fecha_fin_estimada', fn($s) => $this->formatDate($s->fecha_fin_estimada))
+            ->editColumn('fecha_fin_real', fn($s) => $this->formatDate($s->fecha_fin_real))
             ->setRowId('id');
     }
 

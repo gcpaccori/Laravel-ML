@@ -1,5 +1,6 @@
 <script setup>
     import { onMounted, ref } from "vue";
+    import { router } from '@inertiajs/vue3';
     import { ElMessage, ElMessageBox } from 'element-plus';
     import { useDynamicAction } from '@/Composables/useDynamicAction';
     import CampaniaForm from "../Form/CampaniaForm.vue";
@@ -33,6 +34,11 @@
         dialogVisible.value = true;
         dataForm.value = null;
     };
+
+    const showForm = ( campania_id ) => {
+        router.visit(route('campanias.etapas.create', campania_id));
+    };
+
 
     // Inicializar Tabla
     const handleTableReady = (dt) => {
@@ -130,12 +136,12 @@
           @action="handleDynamicAction"
         >
             <template #column-6="props">
-                <!-- {{ props.rowData.id }} -->
                 <el-button
                     :icon="View"
                     type="success"
                     size="small"
                     round
+                    @click="showForm( props.rowData.id )"
                 >
                     Etapas
                 </el-button>

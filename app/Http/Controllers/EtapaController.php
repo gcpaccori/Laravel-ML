@@ -62,4 +62,10 @@ class EtapaController extends Controller
     {
         //
     }
+
+    public function options()
+    {
+        $data = Etapa::all();
+        return response()->json($data);
+    }
 }

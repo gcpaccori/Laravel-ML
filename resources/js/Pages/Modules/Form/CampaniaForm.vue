@@ -263,7 +263,7 @@
                         </template>
                     </el-table-column>
 
-                    <el-table-column label="Peso Promedio">
+                    <el-table-column label="Peso Promedio (g)">
                         <template #default="{ row, $index }">
                             <el-form-item :error="errors[`especies.${$index}.peso_promedio_gr`]?.[0]">
                                 <el-input-number class="w-100" v-model="row.peso_promedio_gr" :precision="2" :step="0.01" />

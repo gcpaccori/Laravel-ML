@@ -1,4 +1,6 @@
 <script setup>
+    import { Link } from '@inertiajs/vue3';
+
     defineProps({
         title: {
             type: String,
@@ -31,7 +33,7 @@
                     </template>
 
                     <template v-if="item.route">
-                        <a :href="route(item.route)" class="text-muted text-hover-primary">{{ item.label }}</a>
+                        <Link :href="route(item.route)" class="text-muted text-hover-primary">{{ item.label }}</Link>
                     </template>
                     <template v-else>
                         <span class="text-muted">{{ item.label }}</span>

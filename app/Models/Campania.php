@@ -22,4 +22,13 @@ class Campania extends Model
     {
         return $this->hasMany(CampaniaEspecie::class);
     }
+
+    protected function casts(): array
+    {
+        return [
+            'fecha_inicio' => 'date',
+            'fecha_fin_estimada' => 'date',
+            'fecha_fin_real' => 'date',
+        ];
+    }
 }

@@ -1,9 +1,11 @@
 <?php
 
+use App\Http\Controllers\EtapaController;
 use App\Http\Controllers\EspecieController;
 use App\Http\Controllers\PiscinaController;
 use App\Http\Controllers\CampaniaController;
 use App\Http\Controllers\PiscigranjaController;
+use App\Http\Controllers\CampaniaEtapaController;
 use App\Http\Controllers\CampaniaEspecieController;
 
 // PISCIGRANJAS
@@ -47,5 +49,17 @@ Route::get('/campanias/{id}', [CampaniaController::class, 'edit'])->name('campan
 Route::put('/campanias/{id}', [CampaniaController::class, 'update'])->name('campanias.update');
 Route::delete('/campanias/{id}', [CampaniaController::class, 'destroy'])->name('campanias.destroy');
 
+// ETAPAS
+Route::get('/etapas/options', [EtapaController::class, 'options'])->name('etapas.options');
+
 // CAMPAÑA ESPECIE
 Route::delete('/campanias-especies/{reg}', [CampaniaEspecieController::class, 'destroy'])->name('campanias.especies.destroy');
+
+//CAMPAÑA ETAPAS
+Route::post('/campanias-etapas/store', [CampaniaEtapaController::class, 'store'])->name('campanias.etapas.store');
+
+Route::get('/campanias-etapas/options/{campania_especie_id}', [CampaniaEtapaController::class, 'options'])->name('campanias.etapas.options');
+Route::get('/campanias-etapas/{campania_id}', [CampaniaEtapaController::class, 'create'])->name('campanias.etapas.create');
+Route::get('/campanias-etapas/{id}', [CampaniaEtapaController::class, 'edit'])->name('campanias.etapas.edit');
+Route::put('/campanias-etapas/{id}', [CampaniaEtapaController::class, 'update'])->name('campanias.etapas.update');
+Route::delete('/campanias-etapas/{id}', [CampaniaEtapaController::class, 'destroy'])->name('campanias.etapas.destroy');
