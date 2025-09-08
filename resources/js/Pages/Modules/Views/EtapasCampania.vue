@@ -15,7 +15,6 @@ const props = defineProps({
     campania: Object
 });
 
-const tableData = [];
 const isLoadingEtapas = ref({});
 const especieEtapas = ref({});
 // MODAL
@@ -49,8 +48,6 @@ const getEspecieEtapas = (campaniaEspecieId) => {
 
 // RECUPERAR DATOS GUARDADOS
 const handleSaved = async( res ) => {
-    // Para recargar formulario desde otra vista
-    console.log(res);
     await loadEspecieEtapas( res.campania_especie_id )
 };
 

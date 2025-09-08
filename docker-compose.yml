@@ -85,8 +85,8 @@ services:
     environment:
       PMA_HOST: db
       PMA_PORT: 3306
-      PMA_USER: root
-      PMA_PASSWORD: sismapiscis2025
+    #   PMA_USER: root
+    #   PMA_PASSWORD: sismapiscis2025
       PMA_ARBITRARY: 1
     ports:
       - "8081:80"
