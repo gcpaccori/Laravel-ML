@@ -2,9 +2,9 @@
 
 namespace App\Http\Requests;
 
-use DB;
 use Carbon\Carbon;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Foundation\Http\FormRequest;
 
 class CampaniaEtapaRequest extends FormRequest
@@ -36,7 +36,28 @@ class CampaniaEtapaRequest extends FormRequest
                         $query->whereNull('deleted_at');
                     })
             ],
-            "piscina_id" => 'required|integer',
+            "piscina_id" => [
+                'required',
+                'integer',
+                function ($attribute, $value, $fail) {
+                    if ($value) {
+                        // Verificar si la piscina ya está siendo usada en otra etapa en proceso
+                        $piscinaOcupada = DB::table('campania_etapas')
+                            ->where('piscina_id', $value)
+                            ->where('estado', 'en_proceso')
+                            ->whereNull('deleted_at')
+                            ->when($this->id, function ($query) {
+                                // Excluir el registro actual si es una actualización
+                                $query->where('id', '!=', $this->id);
+                            })
+                            ->exists();
+
+                        if ($piscinaOcupada) {
+                            $fail('La piscina seleccionada ya está siendo utilizada en otra etapa que se encuentra en proceso.');
+                        }
+                    }
+                }
+            ],
             "fecha_inicio" => [
                 'required',
                 'date',

@@ -2,6 +2,7 @@
     import { onMounted, onUnmounted, ref } from "vue";
     import GaugeChart from "@/Components/GaugeChart.vue";
     import PiscigranjasMap from "@/Components/PiscigranjasMap.vue";
+    import ServerTime from "@/Components/ServerTime.vue";
 
     const props = defineProps({
         title: String,
@@ -116,6 +117,10 @@
                                     </el-form-item>
                                 </div>
 
+                                <div class="col-lg-4 d-flex justify-content-end">
+                                    <ServerTime/>
+                                </div>
+
                             </div>
                         </el-form>
                     </div>
@@ -128,7 +133,7 @@
                 <a href="#" class="card bg-danger hoverable card-xl-stretch mb-xl-8">
                     <div class="card-body">
                         <div class="text-gray-100 fw-bold fs-3">{{ parametros_agua.piscigranja?.nombre ?? '-' }}</div>
-                        <div class="fw-semibold text-gray-100">Última Piscigranja</div>
+                        <div class="fw-semibold text-gray-100">Última registro</div>
                     </div>
                 </a>
             </div>
@@ -136,7 +141,7 @@
                 <a href="#" class="card bg-dark hoverable card-xl-stretch mb-xl-8">
                     <div class="card-body">
                         <div class="text-gray-100 fw-bold fs-3">{{ parametros_agua.piscina?.nombre ?? '-' }}</div>
-                        <div class="fw-semibold text-gray-100">Última Piscina</div>
+                        <div class="fw-semibold text-gray-100">Última registro</div>
                     </div>
                 </a>
             </div>

@@ -58,8 +58,9 @@ Route::delete('/campanias-especies/{reg}', [CampaniaEspecieController::class, 'd
 //CAMPAÑA ETAPAS
 Route::post('/campanias-etapas/store', [CampaniaEtapaController::class, 'store'])->name('campanias.etapas.store');
 
-Route::get('/campanias-etapas/options/{campania_especie_id}', [CampaniaEtapaController::class, 'options'])->name('campanias.etapas.options');
-Route::get('/campanias-etapas/{campania_id}', [CampaniaEtapaController::class, 'create'])->name('campanias.etapas.create');
 Route::get('/campanias-etapas/{id}', [CampaniaEtapaController::class, 'edit'])->name('campanias.etapas.edit');
 Route::put('/campanias-etapas/{id}', [CampaniaEtapaController::class, 'update'])->name('campanias.etapas.update');
 Route::delete('/campanias-etapas/{id}', [CampaniaEtapaController::class, 'destroy'])->name('campanias.etapas.destroy');
+Route::get('/campanias-etapas/options/{campania_especie_id}', [CampaniaEtapaController::class, 'options'])->name('campanias.etapas.options');
+Route::get('/campanias-etapas/create/{campania_id}', [CampaniaEtapaController::class, 'create'])->name('campanias.etapas.create');
+Route::put('/campanias-etapas/close/{id}', [CampaniaEtapaController::class, 'updateClose'])->name('campanias.etapas.close');

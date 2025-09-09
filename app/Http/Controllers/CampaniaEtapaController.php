@@ -7,6 +7,7 @@ use App\Models\Campania;
 use Illuminate\Http\Request;
 use App\Models\CampaniaEtapa;
 use App\Http\Requests\CampaniaEtapaRequest;
+use App\Http\Requests\CampaniaEtapaCloseRequest;
 
 class CampaniaEtapaController extends Controller
 {
@@ -83,30 +84,68 @@ class CampaniaEtapaController extends Controller
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(string $id)
+    public function edit(CampaniaEtapa $id)
     {
-        //
+        return response()->json($id);
     }
 
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, string $id)
+    public function update(CampaniaEtapaRequest $request, CampaniaEtapa $id)
     {
-        //
+        $id->update([
+            "campania_especie_id" => $request->campania_especie_id,
+            "etapa_id" => $request->etapa_id,
+            "piscina_id" => $request->piscina_id,
+            "fecha_inicio" => $request->fecha_inicio,
+            "fecha_fin" => $request->fecha_fin,
+            "cantidad_inicial" => $request->cantidad_inicial,
+            "cantidad_final" => $request->cantidad_final,
+            "peso_promedio_gr" => $request->peso_promedio_gr,
+            "estado" => $request->estado,
+        ]);
+
+        return response()->json([
+            'message' => 'Registro actualizado correctamente.',
+            'data' => $id
+        ]);
+    }
+
+    public function updateClose(CampaniaEtapaCloseRequest $request, CampaniaEtapa $id)
+    {
+        $id->update([
+            "fecha_fin" => $request->fecha_fin,
+            "cantidad_final" => $request->cantidad_final,
+            "peso_promedio_gr" => $request->peso_promedio_gr,
+            "estado" => 'finalizada',
+        ]);
+
+        return response()->json([
+            'message' => 'Etapa finalizada correctamente.',
+            'data' => $id
+        ]);
     }
 
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(string $id)
+    public function destroy(CampaniaEtapa $id)
     {
-        //
+        $id->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Registro eliminado correctamente.',
+        ]);
     }
 
     public function options( string $campania_especie_id )
     {
-        $data = CampaniaEtapa::with(['etapa', 'piscina'])->where('campania_especie_id', $campania_especie_id)->get();
+        $data = CampaniaEtapa::with(['etapa', 'piscina'])
+                ->where('campania_especie_id', $campania_especie_id)
+                ->orderBy('id', 'desc')
+                ->get();
         return response()->json($data);
     }
 }

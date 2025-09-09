@@ -1,10 +1,9 @@
 <script setup>
 import { onMounted, ref } from "vue";
+import { ElMessage, ElMessageBox } from 'element-plus';
+import { Delete, Edit, Check, View } from '@element-plus/icons-vue'
 import CampaniaEtapaForm from "../Form/CampaniaEtapaForm.vue";
-import {
-  Delete,
-  Edit,
-} from '@element-plus/icons-vue'
+import CampaniaEtapaClose from "../Form/CampaniaEtapaClose.vue";
 
 const props = defineProps({
     title: String,
@@ -17,9 +16,13 @@ const props = defineProps({
 
 const isLoadingEtapas = ref({});
 const especieEtapas = ref({});
+
 // MODAL
 const dialogVisible = ref(false);
+const dialogFinalizar = ref(false);
+
 const dataForm = ref(null);
+const dataFormClose = ref({});
 
 const showModal = ( campania_especie_id, piscigranja_id ) => {
     dialogVisible.value = true;
@@ -49,6 +52,45 @@ const getEspecieEtapas = (campaniaEspecieId) => {
 // RECUPERAR DATOS GUARDADOS
 const handleSaved = async( res ) => {
     await loadEspecieEtapas( res.campania_especie_id )
+};
+
+const handleSavedClose = async( res ) => {
+    await loadEspecieEtapas( res.campania_especie_id )
+};
+
+// FUNCIONES DE ACCIONES (BOTONES)
+const handleEdit = async (campania_etapa_id, piscigranja_id) => {
+    const { data } = await axios.get(route('campanias.etapas.edit', campania_etapa_id));
+    dataForm.value = data;
+    dataForm.value.piscigranja_id = piscigranja_id;
+    dialogVisible.value = true;
+};
+
+const handleDelete = async(campania_etapa_id, campania_especie_id) => {
+    ElMessageBox.confirm(
+        '¿Estás seguro de que deseas eliminar este registro?',
+        'Advertencia',
+        {
+            confirmButtonText: 'Eliminar',
+            cancelButtonText: 'Cancelar',
+            type: 'warning',
+            center: true,
+        }
+    ).then( async () => {
+        const response = await axios.delete(route('campanias.etapas.destroy', campania_etapa_id));
+        ElMessage({
+            message: response.data.message,
+            type: response.data.success ? 'success' : 'error',
+        });
+        await loadEspecieEtapas( campania_especie_id );
+    }).catch( (e) => {
+        console.log(e);
+    } );
+};
+
+const handleClose = async (campania_etapa_id) => {
+    dataFormClose.value.campania_etapa_id = campania_etapa_id;
+    dialogFinalizar.value = true;
 };
 
 onMounted(async () => {
@@ -113,9 +155,9 @@ onMounted(async () => {
                                         </template>
                                     </el-table-column>
 
-                                    <el-table-column class-name="text-center" prop="cantidad_inicial" label="Cantidad Inicial" />
-                                    <el-table-column class-name="text-center" prop="cantidad_final" label="Cantidad Final" />
-                                    <el-table-column class-name="text-center" prop="peso_promedio_gr" label="Peso Promedio" />
+                                    <el-table-column class-name="text-center" prop="cantidad_inicial" label="Cantidad Inicial" width="130"/>
+                                    <el-table-column class-name="text-center" prop="cantidad_final" label="Cantidad Final" width="130" />
+                                    <el-table-column class-name="text-center" prop="peso_promedio_gr" label="Peso Promedio" width="130"/>
                                     <el-table-column class-name="text-center" label="Estado">
                                         <template #default="{ row }">
                                             <el-tag v-if="row.estado === 'en_proceso'" type="warning" effect="dark" round>En Proceso</el-tag>
@@ -124,11 +166,12 @@ onMounted(async () => {
                                         </template>
                                     </el-table-column>
 
-                                    <el-table-column class-name="text-center"label="Opciones">
+                                    <el-table-column class-name="text-center" label="Opciones" width="130">
                                         <template #default="{ row }">
                                             <el-button-group class="ml-4">
-                                                <el-button type="primary" size="small" :icon="Edit" />
-                                                <el-button type="danger" size="small" :icon="Delete" />
+                                                <el-button v-if="row.estado !== 'finalizada'" @click="handleClose( row.id )" type="success" size="small" :icon="Check" />
+                                                <el-button @click="handleEdit( row.id, campania.piscigranja_id )" type="primary" size="small" :icon="row.estado === 'finalizada'?View:Edit" />
+                                                <el-button v-if="row.estado !== 'finalizada'" @click="handleDelete( row.id, row.campania_especie_id )" type="danger" size="small" :icon="Delete" />
                                             </el-button-group>
                                         </template>
                                     </el-table-column>
@@ -155,5 +198,6 @@ onMounted(async () => {
             </div>
         </div>
         <CampaniaEtapaForm v-model="dialogVisible" :dataForm="dataForm" @saved="handleSaved"/>
+        <CampaniaEtapaClose v-model="dialogFinalizar" :dataForm="dataFormClose" @saved="handleSavedClose"/>
     </App>
 </template>
