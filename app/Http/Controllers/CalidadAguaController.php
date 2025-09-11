@@ -79,10 +79,23 @@ class CalidadAguaController extends Controller
         // ======================
         // 1) Obtener piscigranjas activas con sus piscinas
         // ======================
-        $piscigranjasQuery = Piscigranja::where('activo', true);
+        $piscigranjasQuery = Piscigranja::with('piscinas')->where('activo', true);
 
         if ($request->has('piscigranja_id') && $request->piscigranja_id !== 'T') {
             $piscigranjasQuery->where('id', $request->piscigranja_id);
+        }
+
+        if ($request->has('piscina_id') && $request->piscina_id !== 'T') {
+            $piscigranjasQuery->whereHas('piscinas', function($query) use ($request) {
+                $query->where('id', $request->piscina_id);
+            });
+
+            // Filtrar también el with para traer solo la piscina específica
+            $piscigranjasQuery->with(['piscinas' => function($query) use ($request) {
+                $query->where('id', $request->piscina_id);
+            }]);
+        } else {
+            $piscigranjasQuery->with('piscinas');
         }
 
         $piscigranjas = $piscigranjasQuery->get();

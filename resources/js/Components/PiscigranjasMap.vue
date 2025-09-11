@@ -48,26 +48,73 @@ const customIcon = L.divIcon({
   popupAnchor: [0, -30]
 });
 
-// const customIcon = L.icon({
-//     iconUrl: 'assets/media/misc/marker-icon.png',
-//     // iconSize:     [40, 50],
-//     // iconAnchor:   [25, 41]
-// });
-
 onMounted(() => {
+    // Capas base
+    const esriSat = L.tileLayer(
+      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      {
+        attribution: '© Esri, USGS, GeoEye, IGN, and the GIS User Community',
+        maxZoom: 17,
+      }
+    );
+
+    const osmStreet = L.tileLayer(
+      'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      {
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 19,
+      }
+    );
+
+    // Overlay de etiquetas de Esri (para poner encima del satélite)
+    const esriLabels = L.tileLayer(
+      'https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+      {
+        attribution: '© Esri',
+        maxZoom: 17,
+      }
+    );
+
+    // Definimos combinaciones
+    const baseMaps = {
+      "🌍 Satélite": esriSat,
+      "🗺️ Calles (OSM)": osmStreet,
+      "🌍 Satélite + Calles": L.layerGroup([esriSat, esriLabels]),
+    };
+
   map = L.map('map', {
-    maxZoom: 16, // <- Limita el zoom máximo
-  }).setView([-9.189967, -75.015152], 5);
+    center: [-9.189967, -75.015152],
+    zoom: Math.min(5, esriSat.options.maxZoom), // zoom inicial no mayor al permitido
+    maxZoom: esriSat.options.maxZoom,
+  });
 
-  // Capa satélite
-  L.tileLayer(
-    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    {
-      attribution:
-        '© Esri, USDA, USGS, GeoEye, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+
+  // Añadimos la capa inicial
+  esriSat.addTo(map);
+
+  // Control de capas
+  L.control.layers(baseMaps).addTo(map);
+
+  // Escuchar cambios de capa para ajustar maxZoom
+  map.on('baselayerchange', function (e) {
+    let maxZoom;
+
+    if (e.name === "🗺️ Calles (OSM)") {
+      maxZoom = osmStreet.options.maxZoom;
+    } else {
+      maxZoom = 17; // Esri Satélite y Satélite+Calles
     }
-  ).addTo(map);
 
+    // Cambiar el maxZoom del mapa
+    map.setMaxZoom(maxZoom);
+
+    // Si el zoom actual es mayor, ajustarlo al límite
+    if (map.getZoom() > maxZoom) {
+      map.setZoom(maxZoom);
+    }
+  });
+
+  // Capa para los marcadores
   markersLayer = L.layerGroup().addTo(map);
   dibujarMarcadores();
 });
@@ -78,7 +125,7 @@ function dibujarMarcadores() {
   props.piscigranjas.forEach((p) => {
     if (p.latitud && p.longitud) {
       L.marker([parseFloat(p.latitud), parseFloat(p.longitud)], {
-        icon: customIcon // Usar el icono personalizado
+        icon: customIcon
       })
         .addTo(markersLayer)
         .bindPopup(`

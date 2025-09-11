@@ -23,7 +23,7 @@
 
     const parametros_agua = ref({});
     const piscigranjas = ref(null);
-    const piscigranjasMap = ref([]);
+    const piscigranjasMapList = ref([]);
 
     const piscinasList = ref(null);
 
@@ -40,7 +40,7 @@
     const loadParametros = async() => {
         const {data} = await axios.get(route('calidadaguas.parametros', form.value));
 
-        piscigranjasMap.value = data.piscigranjas;
+        piscigranjasMapList.value = data.piscigranjas;
         parametros_agua.value = data.parametros;
 
         if (form.value.piscigranja_id == 'T') {
@@ -128,9 +128,9 @@
             </div>
         </div>
 
-        <div class="row g-5 g-xl-8">
+        <div class="row g-5">
             <div class="col-xl-3">
-                <a href="#" class="card bg-danger hoverable card-xl-stretch mb-xl-8">
+                <a href="#" class="card bg-danger hoverable card-xl-stretch mb-xl-3">
                     <div class="card-body">
                         <div class="text-gray-100 fw-bold fs-3">{{ parametros_agua.piscigranja?.nombre ?? '-' }}</div>
                         <div class="fw-semibold text-gray-100">Última registro</div>
@@ -138,7 +138,7 @@
                 </a>
             </div>
             <div class="col-xl-3">
-                <a href="#" class="card bg-dark hoverable card-xl-stretch mb-xl-8">
+                <a href="#" class="card bg-dark hoverable card-xl-stretch mb-xl-3">
                     <div class="card-body">
                         <div class="text-gray-100 fw-bold fs-3">{{ parametros_agua.piscina?.nombre ?? '-' }}</div>
                         <div class="fw-semibold text-gray-100">Última registro</div>
@@ -146,7 +146,7 @@
                 </a>
             </div>
             <div class="col-xl-3">
-                <a href="#" class="card bg-success hoverable card-xl-stretch mb-xl-8">
+                <a href="#" class="card bg-success hoverable card-xl-stretch mb-xl-3">
                     <div class="card-body">
                         <div class="text-white fw-bold fs-3">{{ parametros_agua?.fecha_medicion ?? '-' }}</div>
                         <div class="fw-semibold text-white">Última fecha de medición</div>
@@ -154,7 +154,7 @@
                 </a>
             </div>
             <div class="col-xl-3">
-                <a href="#" class="card bg-info hoverable card-xl-stretch mb-5 mb-xl-8">
+                <a href="#" class="card bg-info hoverable card-xl-stretch mb-5 mb-xl-3">
                     <div class="card-body">
                         <div class="text-white fw-bold fs-3">{{ parametros_agua?.fecha_registro ?? '-' }}</div>
                         <div class="fw-semibold text-white">Última fecha de registro</div>
@@ -173,7 +173,7 @@
                         </h3>
                     </div>
                     <div class="card-body pt-0">
-                        <PiscigranjasMap :piscigranjas="piscigranjasMap" />
+                        <PiscigranjasMap :piscigranjas="piscigranjasMapList" />
                     </div>
                 </div>
             </div>
