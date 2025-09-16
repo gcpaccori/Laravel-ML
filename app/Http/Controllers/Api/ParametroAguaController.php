@@ -29,10 +29,11 @@ class ParametroAguaController extends Controller
         try {
             // Validar API Key
             if ($request->api_key !== $this->apiKey) {
-                return response()->json(['error' => 'Clave API incorrecta proporcionada.'], 401);
+                // return response()->json(['error' => 'Clave API incorrecta proporcionada.'], 401);
+                return 'Clave API incorrecta proporcionada.';
             }
 
-            \Log::info('Fecha recibida', ['fecha_medicion' => $request->fecha_medicion]);
+            \Log::info('Datos Recibidos', ['parametros' => $request]);
 
             // Normalizar fecha: de "Y-d-m" a "Y-m-d"
             // $fechaFormateada = Carbon::createFromFormat('Y-d-m H:i:s', $request->fecha_medicion)->format('Y-m-d H:i:s');
@@ -49,15 +50,16 @@ class ParametroAguaController extends Controller
 
             event(new ParametroAguaActualizado($parametro));
 
-            return response()->json([
+            \Log::info('Exito', [
                 'message' => 'Parámetros registrados correctamente.',
                 'data' => $parametro
             ]);
+            
         } catch (\Exception $e) {
-            return response()->json([
+            \Log::info('Error', [
                 'error' => 'Error',
                 'message' => $e->getMessage()
-            ], 500);
+            ]);
         }
     }
 
