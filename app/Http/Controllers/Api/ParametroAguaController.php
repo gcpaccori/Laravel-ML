@@ -32,10 +32,11 @@ class ParametroAguaController extends Controller
                 return response()->json(['error' => 'Clave API incorrecta proporcionada.'], 401);
             }
 
-            \Log::info('Fecha recibida', ['fecha_medicion' => $request->fecha_medicion]);
+            // \Log::info('Fecha recibida', ['fecha_medicion' => $request->fecha_medicion]);
 
             // Normalizar fecha: de "Y-d-m" a "Y-m-d"
-            $fechaFormateada = Carbon::createFromFormat('Y-d-m H:i:s', $request->fecha_medicion)->format('Y-m-d H:i:s');
+            // $fechaFormateada = Carbon::createFromFormat('Y-d-m H:i:s', $request->fecha_medicion)->format('Y-m-d H:i:s');
+            $fechaFormateada = Carbon::createFromFormat('d/m/Y H:i:s', $request->fecha_medicion)->format('Y-m-d H:i:s');
 
             $parametro = ParametroAgua::create([
                 'piscina_id'        => $request->piscina_id,
