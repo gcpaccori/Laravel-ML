@@ -26,11 +26,13 @@ class ParametroAguaController extends Controller
      */
     public function store(Request $request)
     {
-        // \Log::info('Datos Recibidos', ['parametros' => $request->all()]);
+        \Log::info('Datos Recibidos', ['parametros' => $request->all()]);
+
+        // return 'OK';
 
         // Validar API Key
         if ($request->api_key == $this->apiKey) {
-            $fechaFormateada = Carbon::createFromFormat('d/m/Y H:i:s', $request->fecha_medicion)->format('Y-m-d H:i:s');
+            // $fechaFormateada = Carbon::createFromFormat('d/m/Y H:i:s', $request->fecha_medicion)->format('Y-m-d H:i:s');
 
             $parametro = ParametroAgua::create([
                 'piscina_id'        => $request->piscina_id,
@@ -38,7 +40,7 @@ class ParametroAguaController extends Controller
                 'ph'                => $request->ph,
                 'oxigeno_disuelto'  => $request->oxigeno_disuelto,
                 'ion_nitrato'       => $request->ion_nitrato,
-                'fecha_medicion'    => $fechaFormateada,
+                'fecha_medicion'    => $request->fecha_medicion,
             ]);
 
             event(new ParametroAguaActualizado($parametro));
