@@ -145,7 +145,7 @@ class ParametroAguaDataTable extends DataTable
     {
         return [
             Column::make('id')->title('Código')->addClass('text-center'),
-            Column::make('diferencia')->title('Diferencia')->addClass('text-center'),
+            Column::computed('diferencia')->title('Diferencia')->addClass('text-center'),
             Column::make('created_at')->title('Fecha Creación')->addClass('text-center min-w-175px'),
             Column::make('fecha_medicion')->title('Fecha Medición')->addClass('text-center min-w-175px'),
             Column::computed('piscigranja')->title('Piscigranja')->addClass('min-w-200px'),
