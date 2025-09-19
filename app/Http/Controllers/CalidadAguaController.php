@@ -61,7 +61,7 @@ class CalidadAguaController extends Controller
                         "highScore" => $item->high_score,
                     ]),
                 "min" => 0,
-                "max" => 2,
+                "max" => 2000,
             ],
         ];
 

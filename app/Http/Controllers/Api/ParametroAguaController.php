@@ -26,17 +26,10 @@ class ParametroAguaController extends Controller
      */
     public function store(Request $request)
     {
-        try {
-            // Validar API Key
-            if ($request->api_key !== $this->apiKey) {
-                // return response()->json(['error' => 'Clave API incorrecta proporcionada.'], 401);
-                return 'Clave API incorrecta proporcionada.';
-            }
+        // \Log::info('Datos Recibidos', ['parametros' => $request->all()]);
 
-            \Log::info('Datos Recibidos', ['parametros' => $request]);
-
-            // Normalizar fecha: de "Y-d-m" a "Y-m-d"
-            // $fechaFormateada = Carbon::createFromFormat('Y-d-m H:i:s', $request->fecha_medicion)->format('Y-m-d H:i:s');
+        // Validar API Key
+        if ($request->api_key == $this->apiKey) {
             $fechaFormateada = Carbon::createFromFormat('d/m/Y H:i:s', $request->fecha_medicion)->format('Y-m-d H:i:s');
 
             $parametro = ParametroAgua::create([
@@ -50,16 +43,15 @@ class ParametroAguaController extends Controller
 
             event(new ParametroAguaActualizado($parametro));
 
-            \Log::info('Exito', [
-                'message' => 'Parámetros registrados correctamente.',
-                'data' => $parametro
-            ]);
-            
-        } catch (\Exception $e) {
-            \Log::info('Error', [
-                'error' => 'Error',
-                'message' => $e->getMessage()
-            ]);
+            echo "New record created successfully";
+
+            // \Log::info('Exito', [
+            //     'message' => 'Parámetros registrados correctamente.',
+            //     'data' => $parametro
+            // ]);
+        }
+        else{
+            echo "Wrong API Key provided.";
         }
     }
 

@@ -2,6 +2,7 @@
 
 namespace App\DataTables;
 
+use Carbon\CarbonInterface;
 use App\Models\ParametroAgua;
 use Yajra\DataTables\Html\Button;
 use Yajra\DataTables\Html\Column;
@@ -22,6 +23,7 @@ class ParametroAguaDataTable extends DataTable
     public function dataTable(QueryBuilder $query): EloquentDataTable
     {
         return (new EloquentDataTable($query))
+            ->rawColumns(['diferencia'])
             ->addColumn('piscina', function ($s) {
                 return $s->piscina?->nombre ?? '-';
             })
@@ -45,6 +47,32 @@ class ParametroAguaDataTable extends DataTable
             })
             ->editColumn('created_at', function ($s) {
                 return $s->created_at ? $s->created_at->format('d/m/Y - H:i:s') : '-';
+            })
+            ->addColumn('diferencia', function ($s) {
+                if (!$s->fecha_medicion || !$s->created_at) {
+                    return '-';
+                }
+
+                $diff = $s->created_at->diffForHumans($s->fecha_medicion, [
+                    'parts' => 2,   // máximo 2 partes: 1h 5m
+                    'short' => true, // formato corto
+                    'syntax' => CarbonInterface::DIFF_ABSOLUTE // quita “antes/después”
+                ]);
+
+                $icon = $s->created_at->greaterThan($s->fecha_medicion) ?
+                    '<span class="badge badge-light-success fs-base">
+                    <i class="ki-duotone ki-arrow-up fs-7 text-success">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>'.$diff.'</span>'
+                    : '<span class="badge badge-light-danger fs-base">
+                        <i class="ki-duotone ki-arrow-down fs-7 text-danger">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>'.$diff.'</span>';
+
+                return $icon;
+
             })
             ->setRowId('id');
     }
@@ -117,6 +145,7 @@ class ParametroAguaDataTable extends DataTable
     {
         return [
             Column::make('id')->title('Código')->addClass('text-center'),
+            Column::make('diferencia')->title('Diferencia')->addClass('text-center'),
             Column::make('created_at')->title('Fecha Creación')->addClass('text-center min-w-175px'),
             Column::make('fecha_medicion')->title('Fecha Medición')->addClass('text-center min-w-175px'),
             Column::computed('piscigranja')->title('Piscigranja')->addClass('min-w-200px'),
