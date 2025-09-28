@@ -3,6 +3,7 @@
 namespace App\DataTables;
 
 use App\Models\Campania;
+use Illuminate\Support\Str;
 use App\Helpers\DataTableHelper;
 use Yajra\DataTables\Html\Button;
 use Yajra\DataTables\Html\Column;
@@ -69,6 +70,9 @@ class CampaniaDataTable extends DataTable
             ->editColumn('estado', function ($s) {
                 $estado = $s->estado;
                 $badge = '<div class="badge badge-dark fw-bold">Error</div>';
+                if ($estado  === 'planificada') {
+                    $badge = '<div class="badge badge-info fw-bold">Planificada</div>';
+                }
                 if ($estado  === 'en_proceso') {
                     $badge = '<div class="badge badge-success fw-bold">En Proceso</div>';
                 }
@@ -80,6 +84,7 @@ class CampaniaDataTable extends DataTable
                 }
                 return $badge;
             })
+            ->editColumn('sistema_crianza', fn($s) => Str::upper($s->sistema_crianza))
             ->editColumn('fecha_inicio', fn($s) => $this->formatDate($s->fecha_inicio))
             ->editColumn('fecha_fin_estimada', fn($s) => $this->formatDate($s->fecha_fin_estimada))
             ->editColumn('fecha_fin_real', fn($s) => $this->formatDate($s->fecha_fin_real))
@@ -125,7 +130,8 @@ class CampaniaDataTable extends DataTable
         return [
             Column::make('id')->title('Item')->addClass('text-center'),
             Column::make('piscigranja_id')->title('Piscigranja')->addClass('min-w-175px'),
-            Column::make('nombre')->title('Campaña')->addClass('min-w-175px'),
+            Column::make('nombre')->title('Campaña')->addClass('min-w-200px'),
+            Column::make('sistema_crianza')->title('Sistema Crianza')->addClass('min-w-175px text-center'),
             Column::make('fecha_inicio')->title('F. Inicio')->addClass('min-w-100px'),
             Column::make('fecha_fin_estimada')->title('F. Fin Estimada')->addClass('min-w-150px'),
             Column::make('fecha_fin_real')->title('F. Fin Real')->addClass('min-w-125px'),

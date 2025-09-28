@@ -19,7 +19,8 @@ return new class extends Migration
             $table->integer('cantidad_siembra')->nullable();
             $table->date('fecha_siembra')->nullable();
             $table->integer('cantidad_cosechada')->nullable();
-            $table->decimal('peso_promedio_gr', 8, 2)->nullable();
+            $table->decimal('peso_inicial_gr', 8, 2)->nullable();
+            $table->decimal('peso_final_gr', 8, 2)->nullable();
             $table->timestamps();
             $table->softDeletes();
         });

@@ -18,7 +18,8 @@ return new class extends Migration
             $table->date('fecha_inicio')->nullable();
             $table->date('fecha_fin_estimada')->nullable();
             $table->date('fecha_fin_real')->nullable();
-            $table->enum('estado', ['en_proceso', 'finalizada', 'cancelada'])->default('en_proceso');
+            $table->enum('sistema_crianza', ['monofasico', 'bifasico', 'trifasico'])->default('monofasico'); // Basado en Excel
+            $table->enum('estado', ['planificada', 'en_proceso', 'finalizada', 'cancelada'])->default('planificada');
             $table->timestamps();
             $table->softDeletes();
         });

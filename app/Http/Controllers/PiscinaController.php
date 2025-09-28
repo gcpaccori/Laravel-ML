@@ -46,6 +46,7 @@ class PiscinaController extends Controller
             "descripcion" => $request->descripcion,
             "superficie_m2" => $request->superficie_m2,
             "profundidad_m" => $request->profundidad_m,
+            "volumen_m3" => $request->volumen_m3,
             "estado" => $request->estado
         ] );
 
@@ -74,6 +75,7 @@ class PiscinaController extends Controller
             "descripcion" => $request->descripcion,
             "superficie_m2" => $request->superficie_m2,
             "profundidad_m" => $request->profundidad_m,
+            "volumen_m3" => $request->volumen_m3,
             "estado" => $request->estado
         ] );
 

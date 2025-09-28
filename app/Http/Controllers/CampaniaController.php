@@ -47,6 +47,7 @@ class CampaniaController extends Controller
             $campania = Campania::create([
                 "piscigranja_id"        => $request->piscigranja_id,
                 "nombre"                => $request->nombre,
+                "sistema_crianza"       => $request->sistema_crianza,
                 "fecha_inicio"          => $request->fecha_inicio,
                 "fecha_fin_estimada"    => $request->fecha_fin_estimada,
                 "fecha_fin_real"        => $request->fecha_fin_real,
@@ -61,7 +62,8 @@ class CampaniaController extends Controller
                         'cantidad_siembra'      => $especie['cantidad_siembra'],
                         'fecha_siembra'         => $especie['fecha_siembra'],
                         'cantidad_cosechada'    => $especie['cantidad_cosechada'],
-                        'peso_promedio_gr'      => $especie['peso_promedio_gr'],
+                        'peso_inicial_gr'       => $especie['peso_inicial_gr'],
+                        'peso_final_gr'         => $especie['peso_final_gr'],
                     ]);
                 }
             }
@@ -94,6 +96,7 @@ class CampaniaController extends Controller
             $id->update([
                 "piscigranja_id"        => $request->piscigranja_id,
                 "nombre"                => $request->nombre,
+                "sistema_crianza"       => $request->sistema_crianza,
                 "fecha_inicio"          => $request->fecha_inicio,
                 "fecha_fin_estimada"    => $request->fecha_fin_estimada,
                 "fecha_fin_real"        => $request->fecha_fin_real,
@@ -112,7 +115,8 @@ class CampaniaController extends Controller
                             'cantidad_siembra'      => $especieData['cantidad_siembra'],
                             'fecha_siembra'         => $especieData['fecha_siembra'],
                             'cantidad_cosechada'    => $especieData['cantidad_cosechada'] ?? null,
-                            'peso_promedio_gr'      => $especieData['peso_promedio_gr'] ?? null,
+                            'peso_inicial_gr'       => $especieData['peso_inicial_gr'] ?? null,
+                            'peso_final_gr'         => $especieData['peso_final_gr'] ?? null,
                         ]
                     );
                 }

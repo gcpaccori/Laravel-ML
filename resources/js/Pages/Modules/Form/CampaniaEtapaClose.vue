@@ -19,7 +19,8 @@
     const form = ref({
         fecha_fin: '',
         cantidad_final: 0,
-        peso_promedio_gr: 0.0,
+        peso_promedio_inicial_gr: 0.0,
+        peso_promedio_final_gr: 0.0,
     });
 
     const emit = defineEmits(['update:modelValue', 'saved']);
@@ -48,7 +49,8 @@
         }
         form.value.fecha_fin = 0;
         form.value.cantidad_final = 0;
-        form.value.peso_promedio_gr = 0.0;
+        form.value.peso_promedio_inicial_gr = 0.0;
+        form.value.peso_promedio_final_gr = 0.0;
         errors.value = {};
     };
 
@@ -61,7 +63,8 @@
                 form.value = { ...props.dataForm };
                 form.value.fecha_fin = props.dataForm.fecha_fin ?? '';
                 form.value.cantidad_final = props.dataForm.cantidad_final ?? 0;
-                form.value.peso_promedio_gr = props.dataForm.peso_promedio_gr ?? 0.0;
+                form.value.peso_promedio_inicial_gr = props.dataForm.peso_promedio_inicial_gr ?? 0.0;
+                form.value.peso_promedio_final_gr = props.dataForm.peso_promedio_final_gr ?? 0.0;
             }
         }
     });
@@ -95,8 +98,14 @@
             </div>
 
             <div class="col-lg-4">
-                <el-form-item label="Peso Promedio (g)" :error="errors.peso_promedio_gr?.[0]">
-                    <el-input-number class="w-100" v-model="form.peso_promedio_gr" :precision="2" :step="0.01" :min="0"/>
+                <el-form-item label="Peso Inicial (g)" :error="errors.peso_promedio_inicial_gr?.[0]">
+                    <el-input-number class="w-100" v-model="form.peso_promedio_inicial_gr" :precision="2" :step="0.01" :min="0"/>
+                </el-form-item>
+            </div>
+
+            <div class="col-lg-4">
+                <el-form-item label="Peso Final (g)" :error="errors.peso_promedio_final_gr?.[0]">
+                    <el-input-number class="w-100" v-model="form.peso_promedio_final_gr" :precision="2" :step="0.01" :min="0"/>
                 </el-form-item>
             </div>
         </div>

@@ -23,6 +23,7 @@
         descripcion : '',
         superficie_m2 : 0,
         profundidad_m : 0,
+        volumen_m3 : 0,
         estado : 'operativa'
     });
 
@@ -61,6 +62,7 @@
         }
         form.value.superficie_m2 = 0;
         form.value.profundidad_m = 0;
+        form.value.volumen_m3 = 0;
         form.value.estado = 'operativa';
 
         errors.value = {};
@@ -117,14 +119,20 @@
             </div>
 
             <div class="col-lg-4">
-                <el-form-item label="Superficie (m²)" :error="errors.superficie_m2?.[0]">
-                    <el-input-number style="width: 100%" v-model="form.superficie_m2" :min="0" :precision="2" :step="0.01" placeholder="m²" />
+                <el-form-item label="Superficie (m2)" :error="errors.superficie_m2?.[0]">
+                    <el-input-number style="width: 100%" v-model="form.superficie_m2" :min="0" :precision="2" :step="0.01" placeholder="m2" />
                 </el-form-item>
             </div>
 
             <div class="col-lg-4">
                 <el-form-item label="Profundidad (m)" :error="errors.profundidad_m?.[0]">
-                    <el-input-number style="width: 100%" v-model="form.profundidad_m" :min="0" :precision="2" :step="0.01" placeholder="m²" />
+                    <el-input-number style="width: 100%" v-model="form.profundidad_m" :min="0" :precision="2" :step="0.01" placeholder="m" />
+                </el-form-item>
+            </div>
+
+            <div class="col-lg-4">
+                <el-form-item label="Volumen (m3)" :error="errors.volumen_m3?.[0]">
+                    <el-input-number style="width: 100%" v-model="form.volumen_m3" :min="0" :precision="2" :step="0.01" placeholder="m3" />
                 </el-form-item>
             </div>
 

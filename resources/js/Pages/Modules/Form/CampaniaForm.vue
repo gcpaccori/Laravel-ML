@@ -22,10 +22,11 @@
     const form = ref({
         piscigranja_id : '',
         nombre: '',
+        sistema_crianza: 'monofasico',
         fecha_inicio: '',
         fecha_fin_estimada: '',
         fecha_fin_real: '',
-        estado : 'en_proceso',
+        estado : 'planificada',
         especies: []
     });
 
@@ -68,7 +69,8 @@
             form.value[key] = '';
         }
         form.value.especies = [];
-        form.value.estado  = 'en_proceso';
+        form.value.estado  = 'planificada';
+        form.value.sistema_crianza = 'monofasico';
         errors.value = {};
     };
 
@@ -79,7 +81,8 @@
             cantidad_siembra : 0,
             fecha_siembra : '',
             cantidad_cosechada : 0,
-            peso_promedio_gr : 0.00
+            peso_inicial_gr : 0.00,
+            peso_final_gr : 0.00
         })
     }
 
@@ -143,6 +146,7 @@
         <h6 class="text-muted">Información General</h6>
         <div class="separator separator-dotted mb-5"></div>
         <div class="row">
+
             <div class="col-lg-4">
                 <el-form-item label="Piscigranja" :error="errors.piscigranja_id?.[0]" required>
                     <el-select v-model="form.piscigranja_id" placeholder="Seleccione una piscigranja" filterable>
@@ -155,9 +159,20 @@
                     </el-select>
                 </el-form-item>
             </div>
+
             <div class="col-lg-4">
                 <el-form-item label="Nombre" :error="errors.nombre?.[0]" required>
                     <el-input v-model="form.nombre" />
+                </el-form-item>
+            </div>
+
+            <div class="col-lg-4">
+                <el-form-item label="Sistema de Crianza" :error="errors.sistema_crianza?.[0]" required>
+                    <el-select v-model="form.sistema_crianza" placeholder="Seleccione">
+                        <el-option label="Monofásico" value="monofasico" />
+                        <el-option label="Bifásico" value="bifasico" />
+                        <el-option label="Trifásico" value="trifasico" />
+                    </el-select>
                 </el-form-item>
             </div>
 
@@ -203,6 +218,7 @@
             <div class="col-lg-2">
                 <el-form-item label="Estado" :error="errors.estado?.[0]" required>
                     <el-select v-model="form.estado" placeholder="Seleccione">
+                        <el-option label="Planificada" value="planificada" />
                         <el-option label="En Proceso" value="en_proceso" />
                         <el-option label="Finalizada" value="finalizada" />
                         <el-option label="Cancelada" value="cancelada" />
@@ -247,7 +263,7 @@
                         </template>
                     </el-table-column>
 
-                    <el-table-column label="Cant. Siembra">
+                    <el-table-column label="N° alevines inicial">
                         <template #default="{ row, $index }">
                             <el-form-item :error="errors[`especies.${$index}.cantidad_siembra`]?.[0]">
                                 <el-input-number class="w-100" v-model="row.cantidad_siembra" :min="0" :step="1" />
@@ -255,7 +271,7 @@
                         </template>
                     </el-table-column>
 
-                    <el-table-column label="Cant. Cosecha">
+                    <el-table-column label="N° peces final">
                         <template #default="{ row, $index }">
                             <el-form-item :error="errors[`especies.${$index}.cantidad_cosechada`]?.[0]">
                                 <el-input-number class="w-100" v-model="row.cantidad_cosechada" :min="0" :step="1" />
@@ -263,10 +279,18 @@
                         </template>
                     </el-table-column>
 
-                    <el-table-column label="Peso Promedio (g)">
+                    <el-table-column label="Peso inicial Alevin(g)">
                         <template #default="{ row, $index }">
-                            <el-form-item :error="errors[`especies.${$index}.peso_promedio_gr`]?.[0]">
-                                <el-input-number class="w-100" v-model="row.peso_promedio_gr" :precision="2" :step="0.01" />
+                            <el-form-item :error="errors[`especies.${$index}.peso_inicial_gr`]?.[0]">
+                                <el-input-number class="w-100" v-model="row.peso_inicial_gr" :precision="2" :step="0.01" />
+                            </el-form-item>
+                        </template>
+                    </el-table-column>
+
+                    <el-table-column label="Peso Final Pez(g)">
+                        <template #default="{ row, $index }">
+                            <el-form-item :error="errors[`especies.${$index}.peso_final_gr`]?.[0]">
+                                <el-input-number class="w-100" v-model="row.peso_final_gr" :precision="2" :step="0.01" />
                             </el-form-item>
                         </template>
                     </el-table-column>

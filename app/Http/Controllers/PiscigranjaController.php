@@ -66,6 +66,7 @@ class PiscigranjaController extends Controller
                         'descripcion'    => $piscinaData['descripcion'],
                         'superficie_m2'  => $piscinaData['superficie_m2'],
                         'profundidad_m'  => $piscinaData['profundidad_m'],
+                        'volumen_m3'     => $piscinaData['volumen_m3'],
                         'estado'         => $piscinaData['estado'],
                     ]);
                 }
@@ -125,6 +126,7 @@ class PiscigranjaController extends Controller
                                 'descripcion'   => $piscinaData['descripcion'],
                                 'superficie_m2' => $piscinaData['superficie_m2'],
                                 'profundidad_m' => $piscinaData['profundidad_m'],
+                                'volumen_m3'    => $piscinaData['volumen_m3'],
                                 'estado'        => $piscinaData['estado'],
                             ]);
                             $piscinaIds[] = $piscina->id;
@@ -136,6 +138,7 @@ class PiscigranjaController extends Controller
                             'descripcion'   => $piscinaData['descripcion'],
                             'superficie_m2' => $piscinaData['superficie_m2'],
                             'profundidad_m' => $piscinaData['profundidad_m'],
+                            'volumen_m3'    => $piscinaData['volumen_m3'],
                             'estado'        => $piscinaData['estado'],
                         ]);
                         $piscinaIds[] = $newPiscina->id;

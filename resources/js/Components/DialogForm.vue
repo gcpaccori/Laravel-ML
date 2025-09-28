@@ -54,6 +54,7 @@ onMounted(() => {
     @close="() => dialogVisible = false"
     :width="computedWidth"
     :fullscreen="fullscreen"
+    top="5vh"
   >
     <template #header>
       <h4 class="modal-title fw-semibold">{{ title }}</h4>

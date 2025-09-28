@@ -7,6 +7,7 @@ use App\Http\Controllers\CampaniaController;
 use App\Http\Controllers\PiscigranjaController;
 use App\Http\Controllers\CampaniaEtapaController;
 use App\Http\Controllers\CampaniaEspecieController;
+use App\Http\Controllers\ParametrosProduccionController;
 
 // PISCIGRANJAS
 Route::get('/piscigranjas', [PiscigranjaController::class, 'index'])->name('sispiscis.piscigranjas.index')->middleware('modulo:piscigranja');
@@ -64,3 +65,9 @@ Route::delete('/campanias-etapas/{id}', [CampaniaEtapaController::class, 'destro
 Route::get('/campanias-etapas/options/{campania_especie_id}', [CampaniaEtapaController::class, 'options'])->name('campanias.etapas.options');
 Route::get('/campanias-etapas/create/{campania_id}', [CampaniaEtapaController::class, 'create'])->name('campanias.etapas.create');
 Route::put('/campanias-etapas/close/{id}', [CampaniaEtapaController::class, 'updateClose'])->name('campanias.etapas.close');
+
+// ParametrosProduccionController
+Route::post('/parametros-produccion/store', [ParametrosProduccionController::class, 'store'])->name('parametros.produccion.store');
+Route::put('/parametros-produccion/update/{id}', [ParametrosProduccionController::class, 'update'])->name('parametros.produccion.update');
+
+

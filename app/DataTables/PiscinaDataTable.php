@@ -94,6 +94,7 @@ class PiscinaDataTable extends DataTable
             Column::make('descripcion')->title('Descripción'),
             Column::make('superficie_m2')->title('Superficie (m2)')->addClass('text-center'),
             Column::make('profundidad_m')->title('Profundidad (m)')->addClass('text-center'),
+            Column::make('volumen_m3')->title('Volumen (m3)')->addClass('text-center'),
             Column::computed('parametros_aguas')->title('U. Parámetro')->addClass('text-center'),
             Column::make('estado')->title('Estado'),
             Column::computed('action')->title('Acciones')->addClass('text-center min-w-100px')

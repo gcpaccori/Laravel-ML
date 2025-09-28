@@ -135,7 +135,7 @@
           @tableReady="handleTableReady"
           @action="handleDynamicAction"
         >
-            <template #column-6="props">
+            <template #column-7="props">
                 <el-button
                     :icon="View"
                     type="success"

@@ -38,6 +38,7 @@ class PiscinaRequest extends FormRequest
             "descripcion" => 'nullable',
             "superficie_m2" => 'nullable|decimal:0,2',
             "profundidad_m" => 'nullable|decimal:0,2',
+            "volumen_m3" => 'nullable|decimal:0,2',
             "estado" => 'required|string',
         ];
     }
@@ -62,6 +63,7 @@ class PiscinaRequest extends FormRequest
 
             'superficie_m2.decimal' => 'La superficie debe ser un número con hasta 2 decimales.',
             'profundidad_m.decimal' => 'La profundidad debe ser un número con hasta 2 decimales.',
+            'volumen_m3.decimal' => 'El volumen debe ser un número con hasta 2 decimales.',
 
             'estado.required' => 'El estado es obligatorio.',
             'estado.string'   => 'El estado debe ser texto.',

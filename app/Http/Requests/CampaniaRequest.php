@@ -35,6 +35,7 @@ class CampaniaRequest extends FormRequest
                               ->whereNull('deleted_at')
                 ),
             ],
+            "sistema_crianza"       => 'required|string',
             "fecha_inicio"          => 'required|date',
             "fecha_fin_estimada"    => 'nullable|date|after:fecha_inicio',
             "fecha_fin_real"        => 'nullable|date|after:fecha_inicio',
@@ -59,7 +60,8 @@ class CampaniaRequest extends FormRequest
             "especies.*.cantidad_siembra"      => 'required|integer',
             "especies.*.fecha_siembra"         => 'required|date|after_or_equal:fecha_inicio',
             "especies.*.cantidad_cosechada"    => 'nullable|integer',
-            "especies.*.peso_promedio_gr"      => 'nullable|decimal:0,2'
+            "especies.*.peso_inicial_gr"       => 'nullable|decimal:0,2',
+            "especies.*.peso_final_gr"         => 'nullable|decimal:0,2'
         ];
     }
 
@@ -88,6 +90,9 @@ class CampaniaRequest extends FormRequest
             'estado.required'                => 'El estado de la campaña es obligatorio.',
             'estado.string'                  => 'El estado debe ser un texto válido.',
 
+            'sistema_crianza.required'       => 'La crianza de la campaña es obligatorio.',
+            'sistema_crianza.string'         => 'La crianza debe ser un texto válido.',
+
             // ESPECIES
             'especies.array'                 => 'Las especies deben ser enviadas como una lista.',
 
@@ -103,7 +108,8 @@ class CampaniaRequest extends FormRequest
 
             'especies.*.cantidad_cosechada.integer' => 'La cantidad cosechada debe ser un número entero.',
 
-            'especies.*.peso_promedio_gr.decimal' => 'El peso promedio debe ser un número decimal válido.',
+            'especies.*.peso_inicial_gr.decimal' => 'El peso inicial debe ser un número decimal válido.',
+            'especies.*.peso_final_gr.decimal' => 'El peso final debe ser un número decimal válido.'
         ];
     }
 }

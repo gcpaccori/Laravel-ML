@@ -89,6 +89,7 @@
             descripcion: '',
             superficie_m2: 0,
             profundidad_m: 0,
+            volumen_m3: 0,
             estado: 'operativa',
         })
     }
@@ -251,7 +252,7 @@
                     </el-table-column>
 
                     <!-- Superficie -->
-                    <el-table-column label="Superficie (m²)">
+                    <el-table-column label="Superficie (m2)">
                         <template #default="{ row, $index }">
                             <el-form-item :error="errors[`piscinas.${$index}.superficie_m2`]?.[0]">
                                 <el-input-number v-model="row.superficie_m2" :precision="2" :step="0.01" placeholder="m²" />
@@ -264,6 +265,15 @@
                         <template #default="{ row, $index }">
                             <el-form-item :error="errors[`piscinas.${$index}.profundidad_m`]?.[0]">
                                 <el-input-number v-model="row.profundidad_m" :precision="2" :step="0.01" placeholder="m" />
+                            </el-form-item>
+                        </template>
+                    </el-table-column>
+
+                    <!-- Volumen -->
+                    <el-table-column label="Volumen (m3)">
+                        <template #default="{ row, $index }">
+                            <el-form-item :error="errors[`piscinas.${$index}.volumen_m3`]?.[0]">
+                                <el-input-number v-model="row.volumen_m3" :precision="2" :step="0.01" placeholder="m" />
                             </el-form-item>
                         </template>
                     </el-table-column>

@@ -14,15 +14,15 @@ class EtapaSeeder extends Seeder
     public function run(): void
     {
         $etapas = [
-            ['nombre' => 'Inicio', 'descripcion' => 'Etapa inicial de la crianza'],
-            ['nombre' => 'Crecimiento', 'descripcion' => 'Etapa de desarrollo y crecimiento'],
-            ['nombre' => 'Engorde', 'descripcion' => 'Etapa final antes de la cosecha'],
+            ['nombre' => 'Inicio', 'descripcion' => 'Etapa inicial de la crianza', 'orden' => 1],
+            ['nombre' => 'Crecimiento', 'descripcion' => 'Etapa de desarrollo y crecimiento', 'orden' => 2],
+            ['nombre' => 'Engorde', 'descripcion' => 'Etapa final antes de la cosecha', 'orden' => 3],
         ];
 
         foreach ($etapas as $etapa) {
-            Etapa::firstOrCreate(
+            Etapa::updateOrCreate(
                 ['nombre' => $etapa['nombre']], // evita duplicados
-                ['descripcion' => $etapa['descripcion']]
+                ['descripcion' => $etapa['descripcion'], 'orden' => $etapa['orden']]
             );
         }
     }

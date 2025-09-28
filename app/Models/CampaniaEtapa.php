@@ -29,14 +29,24 @@ class CampaniaEtapa extends Model
         return $this->belongsTo(Piscina::class);
     }
 
+    public function parametrosProduccion()
+    {
+        return $this->hasOne(ParametrosProduccion::class);
+    }
+
     protected function casts(): array
     {
         return [
-            "fecha_inicio" => 'date',
-            "fecha_fin" => 'date',
-            "cantidad_inicial" => 'integer',
-            "cantidad_final" => 'integer',
-            "peso_promedio_gr" => 'float',
+            "fecha_inicio"           => 'date',
+            "fecha_fin"              => 'date',
+            "area_piscigranja_m2"    => 'float',
+            "volumen_piscigranja_m3" => 'float',
+            "altura_piscigranja_m"   => 'float',
+            "numero_peces_inicial"   => 'integer',
+            "numero_peces_final"     => 'integer',
+            "peso_inicial_gr"        => 'float',
+            "peso_final_gr"          => 'float',
+            "densidad_siembra"       => 'float'
         ];
     }
 

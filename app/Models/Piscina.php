@@ -35,6 +35,7 @@ class Piscina extends Model
         return [
             'superficie_m2' => 'float',
             'profundidad_m' => 'float',
+            'volumen_m3' => 'float',
         ];
     }
 }

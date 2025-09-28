@@ -3,7 +3,7 @@ import { onMounted, ref } from "vue";
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Delete, Edit, Check, View } from '@element-plus/icons-vue'
 import CampaniaEtapaForm from "../Form/CampaniaEtapaForm.vue";
-import CampaniaEtapaClose from "../Form/CampaniaEtapaClose.vue";
+import ParametroProduccionForm from "../Form/ParametroProduccionForm.vue";
 
 const props = defineProps({
     title: String,
@@ -19,10 +19,10 @@ const especieEtapas = ref({});
 
 // MODAL
 const dialogVisible = ref(false);
-const dialogFinalizar = ref(false);
+const dialogProduccion = ref(false);
 
 const dataForm = ref(null);
-const dataFormClose = ref({});
+const dataFormProduccion = ref({});
 
 const showModal = ( campania_especie_id, piscigranja_id ) => {
     dialogVisible.value = true;
@@ -31,6 +31,16 @@ const showModal = ( campania_especie_id, piscigranja_id ) => {
         piscigranja_id
     };
 };
+
+const showProduccion = async (campania_etapa_id) => {
+    const { data } = await axios.get(route('campanias.etapas.edit', campania_etapa_id));
+    console.log(data);
+
+    dataFormProduccion.value.campania_etapa_id = campania_etapa_id;
+    dataFormProduccion.value.parametros_produccion = data.parametros_produccion;
+    dialogProduccion.value = true;
+};
+
 
 const loadEspecieEtapas = async (campaniaEspecieId) => {
     try {
@@ -54,8 +64,9 @@ const handleSaved = async( res ) => {
     await loadEspecieEtapas( res.campania_especie_id )
 };
 
-const handleSavedClose = async( res ) => {
-    await loadEspecieEtapas( res.campania_especie_id )
+const handleSavedProduccion = async( res ) => {
+    console.log(res);
+    // await loadEspecieEtapas( res.campania_especie_id )
 };
 
 // FUNCIONES DE ACCIONES (BOTONES)
@@ -88,11 +99,6 @@ const handleDelete = async(campania_etapa_id, campania_especie_id) => {
     } );
 };
 
-const handleClose = async (campania_etapa_id) => {
-    dataFormClose.value.campania_etapa_id = campania_etapa_id;
-    dialogFinalizar.value = true;
-};
-
 onMounted(async () => {
     for (const item of props.campania.especies) {
         await loadEspecieEtapas(item.id);
@@ -109,12 +115,13 @@ onMounted(async () => {
                     <div class="card shadow-sm">
                         <div class="card-header collapsible cursor-pointer rotate" data-bs-toggle="collapse" :data-bs-target="`#car_${item.id}`">
                             <h3 class="card-title align-items-start flex-column">
-                                <span class="card-label fs-5 fw-bold text-dark">{{ item.especie.nombre }}</span>
-                                <span class="text-gray-700 mt-2 fw-semibold fs-6">
+                                <span class="card-label fs-5 fw-bold text-dark">{{ item.especie.nombre }} - <span class="text-uppercase">{{ campania.sistema_crianza }}</span></span>
+                                <span class="text-gray-700 mt-3 fw-semibold fs-6">
                                     <span>Fecha Siembra: {{ item.fecha_siembra_formateada }}</span> |
-                                    <span>Cantidad Siembra: {{ item.cantidad_siembra }}</span> |
-                                    <span>Peso Promedio: {{ item.peso_promedio_gr }}</span> |
-                                    <span>Cantidad Cosecha: {{ item.cantidad_cosechada }}</span>
+                                    <span>N° alevines inicial: {{ item.cantidad_siembra }}</span> |
+                                    <span>N° peces final: {{ item.cantidad_cosechada }}</span> |
+                                    <span>Peso inicial Alevin: {{ item.peso_inicial_gr }} g</span> |
+                                    <span>Peso Final Pez: {{ item.peso_final_gr }} g</span>
                                 </span>
                             </h3>
                             <div class="card-toolbar rotate-180">
@@ -131,47 +138,54 @@ onMounted(async () => {
                                     style="width: 100%"
                                     v-loading="isLoadingEtapas[item.id]"
                                 >
-                                    <el-table-column label="Etapa">
+                                    <el-table-column label="Etapa" min-width="100">
                                         <template #default="{ row }">
                                             {{row.etapa?.nombre}}
                                         </template>
                                     </el-table-column>
 
-                                    <el-table-column label="Piscina">
+                                    <el-table-column label="Piscina" min-width="130">
                                         <template #default="{ row }">
                                             {{ row.piscina?.nombre }}
                                         </template>
                                     </el-table-column>
 
-                                    <el-table-column label="Fecha Inicio">
+                                    <el-table-column label="Fecha Inicio" min-width="130">
                                         <template #default="{ row }">
                                             {{ row.fecha_inicio_formato }}
                                         </template>
                                     </el-table-column>
 
-                                    <el-table-column label="Fecha Fin">
+                                    <el-table-column label="Fecha Fin" min-width="130">
                                         <template #default="{ row }">
                                             {{ row.fecha_fin_formato }}
                                         </template>
                                     </el-table-column>
 
-                                    <el-table-column class-name="text-center" prop="cantidad_inicial" label="Cantidad Inicial" width="130"/>
-                                    <el-table-column class-name="text-center" prop="cantidad_final" label="Cantidad Final" width="130" />
-                                    <el-table-column class-name="text-center" prop="peso_promedio_gr" label="Peso Promedio" width="130"/>
-                                    <el-table-column class-name="text-center" label="Estado">
+                                    <el-table-column class-name="text-center" prop="numero_peces_inicial" label="Cantidad Inicial" min-width="130"/>
+                                    <el-table-column class-name="text-center" prop="numero_peces_final" label="Cantidad Final"  min-width="130"/>
+                                    <el-table-column class-name="text-center" prop="peso_inicial_gr" label="Peso Inicial" min-width="130"/>
+                                    <el-table-column class-name="text-center" prop="peso_final_gr" label="Peso Final" min-width="130"/>
+                                    <el-table-column class-name="text-center" prop="densidad_siembra" label="Densidad (Peces/m3)" min-width="130"/>
+                                    <el-table-column class-name="text-center" label="Parámetros" min-width="130">
                                         <template #default="{ row }">
-                                            <el-tag v-if="row.estado === 'en_proceso'" type="warning" effect="dark" round>En Proceso</el-tag>
-                                            <el-tag v-if="row.estado === 'finalizada'" type="success" effect="dark" round>Finalizada</el-tag>
-                                            <el-tag v-if="row.estado === 'cancelada'" type="danger" effect="dark" round>Cancelada</el-tag>
+                                            <el-button @click="showProduccion( row.id )" icon="Setting" type="success" size="small" round>Parámetros</el-button>
+                                        </template>
+                                    </el-table-column>
+                                    <el-table-column class-name="text-center" label="Estado" min-width="130">
+                                        <template #default="{ row }">
+                                            <el-tag v-if="row.estado === 'planificada'" type="info" effect="dark" size="small" round>Planificada</el-tag>
+                                            <el-tag v-if="row.estado === 'en_proceso'" type="warning" effect="dark" size="small" round>En Proceso</el-tag>
+                                            <el-tag v-if="row.estado === 'finalizada'" type="success" effect="dark" size="small" round>Finalizada</el-tag>
+                                            <el-tag v-if="row.estado === 'cancelada'" type="danger" effect="dark" size="small" round>Cancelada</el-tag>
                                         </template>
                                     </el-table-column>
 
-                                    <el-table-column class-name="text-center" label="Opciones" width="130">
+                                    <el-table-column class-name="text-center" label="Opciones" min-width="130">
                                         <template #default="{ row }">
                                             <el-button-group class="ml-4">
-                                                <el-button v-if="row.estado !== 'finalizada'" @click="handleClose( row.id )" type="success" size="small" :icon="Check" />
-                                                <el-button @click="handleEdit( row.id, campania.piscigranja_id )" type="primary" size="small" :icon="row.estado === 'finalizada'?View:Edit" />
-                                                <el-button v-if="row.estado !== 'finalizada'" @click="handleDelete( row.id, row.campania_especie_id )" type="danger" size="small" :icon="Delete" />
+                                                <el-button @click="handleEdit( row.id, campania.piscigranja_id )" type="primary" size="small" :icon="Edit" />
+                                                <el-button @click="handleDelete( row.id, row.campania_especie_id )" type="danger" size="small" :icon="Delete" />
                                             </el-button-group>
                                         </template>
                                     </el-table-column>
@@ -198,6 +212,6 @@ onMounted(async () => {
             </div>
         </div>
         <CampaniaEtapaForm v-model="dialogVisible" :dataForm="dataForm" @saved="handleSaved"/>
-        <CampaniaEtapaClose v-model="dialogFinalizar" :dataForm="dataFormClose" @saved="handleSavedClose"/>
+        <ParametroProduccionForm v-model="dialogProduccion" :dataForm="dataFormProduccion" @saved="handleSavedProduccion"/>
     </App>
 </template>

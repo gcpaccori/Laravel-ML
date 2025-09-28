@@ -14,11 +14,12 @@ class DatabaseSeeder extends Seeder
     {
 
         $this->call([
-            SistemaSeeder::class,
-            AccionSeeder::class,
-            ModuloSeeder::class,
-            PermissionSeeder::class,
-            UserSeeder::class,
+            // SistemaSeeder::class,
+            // AccionSeeder::class,
+            // ModuloSeeder::class,
+            // PermissionSeeder::class,
+            // UserSeeder::class,
+            SistemaModuloAccionSeeder::class,
             UbigeoSeeder::class,
             ParametroBandaSeeder::class,
             EtapaSeeder::class,
