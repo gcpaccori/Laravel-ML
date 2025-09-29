@@ -32,9 +32,9 @@ class ParametroBandaSeeder extends Seeder
             ["parametro" => "oxigeno", "title" => "Alto", "color" => "#00BFFF", "low_score" => 8.0, "high_score" => 15],
 
             // Nitrato
-            ["parametro" => "nitrato", "title" => "Seguro", "color" => "#54b947", "low_score" => 0.01, "high_score" => 0.1],
-            ["parametro" => "nitrato", "title" => "Moderado", "color" => "#fdae19", "low_score" => 0.1, "high_score" => 0.2],
-            ["parametro" => "nitrato", "title" => "Crítico", "color" => "#ee1f25", "low_score" => 0.2, "high_score" => 2],
+            ["parametro" => "nitrato", "title" => "Seguro", "color" => "#54b947", "low_score" => 1, "high_score" => 50],
+            ["parametro" => "nitrato", "title" => "Moderado", "color" => "#fdae19", "low_score" => 50, "high_score" => 200],
+            ["parametro" => "nitrato", "title" => "Crítico", "color" => "#ee1f25", "low_score" => 200, "high_score" => 2000],
         ]);
 
     }

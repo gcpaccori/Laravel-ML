@@ -36,4 +36,7 @@ Route::middleware(['auth:sanctum', config('jetstream.auth_session'),'verified'])
     // S. MONITOREO
     require __DIR__.'/system/monitoreo.php';
 
+    // S. PRODUCCION
+    require __DIR__.'/system/produccion.php';
+
 });

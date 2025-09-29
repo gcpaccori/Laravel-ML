@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class CampaniaEtapa extends Model
@@ -32,6 +33,14 @@ class CampaniaEtapa extends Model
     public function parametrosProduccion()
     {
         return $this->hasOne(ParametrosProduccion::class);
+    }
+
+    /**
+     * Relación: Una etapa puede tener muchas biometrias
+     */
+    public function biometrias() : HasMany
+    {
+        return $this->hasMany(Biometria::class);
     }
 
     protected function casts(): array
