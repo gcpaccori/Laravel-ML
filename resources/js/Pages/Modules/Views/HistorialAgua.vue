@@ -245,7 +245,7 @@ onMounted(async () => {
                                     class="col-lg-3"
                                     v-if="form.tipo_tiempo === 'D'"
                                 >
-                                    <el-form-item label="Fecha">
+                                    <el-form-item label="Fecha Medición">
                                         <el-date-picker
                                             class="w-100"
                                             type="date"
@@ -262,7 +262,7 @@ onMounted(async () => {
                                     class="col-lg-3"
                                     v-if="form.tipo_tiempo === 'M'"
                                 >
-                                    <el-form-item label="Mes">
+                                    <el-form-item label="Mes Medición">
                                         <el-date-picker
                                             class="w-100"
                                             v-model="form.mes"
@@ -279,7 +279,7 @@ onMounted(async () => {
                                     class="col-lg-3"
                                     v-if="form.tipo_tiempo === 'Y'"
                                 >
-                                    <el-form-item label="Año">
+                                    <el-form-item label="Año Medición">
                                         <el-date-picker
                                             class="w-100"
                                             type="year"
@@ -319,11 +319,20 @@ onMounted(async () => {
                 </div>
             </div>
 
+            <div class="d-flex justify-content-end mb-3">
+                <a
+                    :href="route('parametrosagua.csv', form)"
+                    class="btn btn-success btn-sm"
+                >
+                    <i class="fa fa-file-excel"></i> Exportar a CSV
+                </a>
+            </div>
             <div class="col-lg-12">
                 <BaseDataTable
                     :ajax-url="ajaxUrl"
                     :columns="columns"
                     :filters="form"
+                    :buttons="['csv', 'excel', 'pdf', 'print']"
                     @tableReady="handleTableReady"
                 ></BaseDataTable>
             </div>

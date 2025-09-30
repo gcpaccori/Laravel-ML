@@ -3,38 +3,31 @@ export const useDate = () => {
   const tz = "America/Lima"
 
   const getNow = () => {
-    return new Date(
-      new Intl.DateTimeFormat("en-US", {
-        timeZone: tz,
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        hour12: false,
-      }).format(new Date())
-    )
+    return new Date().toLocaleString("sv-SE", { timeZone: tz })
+    // sv-SE → formato ISO-like: "2025-09-29 14:05:33"
   }
 
   const getToday = () => {
-    const now = getNow()
-    return now.toISOString().substring(0, 10) // YYYY-MM-DD
+    const now = new Date().toLocaleDateString("sv-SE", { timeZone: tz })
+    return now // YYYY-MM-DD
   }
 
   const getMonth = () => {
-    const now = getNow()
-    return now.toISOString().substring(0, 7) // YYYY-MM
+    const now = new Date().toLocaleDateString("sv-SE", { timeZone: tz })
+    return now.substring(0, 7) // YYYY-MM
   }
 
   const getYear = () => {
-    const now = getNow()
-    return String(now.getFullYear()) // 🔹 retorna string
+    const now = new Date().toLocaleDateString("sv-SE", { timeZone: tz })
+    return now.substring(0, 4) // YYYY
   }
 
   const getDateTime = () => {
-    const now = getNow()
-    return now.toISOString().replace("T", " ").substring(0, 19) // YYYY-MM-DD HH:mm:ss
+    return new Date().toLocaleString("sv-SE", {
+      timeZone: tz,
+      hour12: false
+    }).replace(" ", "T") // "YYYY-MM-DDTHH:mm:ss"
+      .replace("T", " ") // => "YYYY-MM-DD HH:mm:ss"
   }
 
   return {

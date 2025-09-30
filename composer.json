@@ -16,6 +16,8 @@
         "laravel/reverb": "^1.5",
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^2.10.1",
+        "maatwebsite/excel": "^3.1",
+        "phpoffice/phpspreadsheet": "1.29.10",
         "spatie/laravel-permission": "^6.17",
         "stevebauman/location": "^7.5",
         "tightenco/ziggy": "^2.0",

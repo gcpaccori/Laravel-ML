@@ -133,7 +133,7 @@
                 <a href="#" class="card bg-danger hoverable card-xl-stretch mb-xl-3">
                     <div class="card-body">
                         <div class="text-gray-100 fw-bold fs-3">{{ parametros_agua.piscigranja?.nombre ?? '-' }}</div>
-                        <div class="fw-semibold text-gray-100">Última registro</div>
+                        <div class="fw-semibold text-gray-100">Piscigranja</div>
                     </div>
                 </a>
             </div>
@@ -141,7 +141,7 @@
                 <a href="#" class="card bg-dark hoverable card-xl-stretch mb-xl-3">
                     <div class="card-body">
                         <div class="text-gray-100 fw-bold fs-3">{{ parametros_agua.piscina?.nombre ?? '-' }}</div>
-                        <div class="fw-semibold text-gray-100">Última registro</div>
+                        <div class="fw-semibold text-gray-100">Piscina</div>
                     </div>
                 </a>
             </div>
@@ -149,7 +149,7 @@
                 <a href="#" class="card bg-success hoverable card-xl-stretch mb-xl-3">
                     <div class="card-body">
                         <div class="text-white fw-bold fs-3">{{ parametros_agua?.fecha_medicion ?? '-' }}</div>
-                        <div class="fw-semibold text-white">Última fecha de medición</div>
+                        <div class="fw-semibold text-white">Última fecha de medición sensor</div>
                     </div>
                 </a>
             </div>
@@ -157,7 +157,7 @@
                 <a href="#" class="card bg-info hoverable card-xl-stretch mb-5 mb-xl-3">
                     <div class="card-body">
                         <div class="text-white fw-bold fs-3">{{ parametros_agua?.fecha_registro ?? '-' }}</div>
-                        <div class="fw-semibold text-white">Última fecha de registro</div>
+                        <div class="fw-semibold text-white">Última fecha de registro sistema</div>
                     </div>
                 </a>
             </div>

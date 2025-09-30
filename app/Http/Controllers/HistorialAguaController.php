@@ -8,6 +8,8 @@ use Illuminate\Http\Request;
 use App\Models\ParametroAgua;
 use App\Helpers\DataTableHelper;
 use Illuminate\Support\Facades\DB;
+use App\Exports\ParametroAguaExport;
+use Maatwebsite\Excel\Facades\Excel;
 use App\DataTables\ParametroAguaDataTable;
 
 class HistorialAguaController extends Controller
@@ -159,5 +161,12 @@ class HistorialAguaController extends Controller
             'tooltips' => $tooltips,
             'series' => $series,
         ]);
+    }
+
+    public function export_csv( Request $request )
+    {
+        $fechaHora = Carbon::now()->format('Y-m-d_H-i-s'); // 2025-09-30_07-15-30
+        $nombreArchivo = "parametros_agua_{$fechaHora}.csv";
+        return Excel::download(new ParametroAguaExport($request), $nombreArchivo, \Maatwebsite\Excel\Excel::CSV);
     }
 }
