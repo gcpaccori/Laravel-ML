@@ -184,6 +184,7 @@ watch(
                 await campaniasOptions();
                 await especiesOptions();
                 await etapasOptions();
+                await parametrosEtapa();
             } else {
                 resetForm();
             }
