@@ -59,6 +59,7 @@ const piscigranjasOptions = async () => {
 const campaniasOptions = async () => {
     optionsEspecies.value = null;
     optionsEtapas.value = null;
+    etapaParametros.value = null;
     const response = await axios.get(
         route("campania.active.show", form.value.piscigranja_id)
     );
@@ -67,6 +68,7 @@ const campaniasOptions = async () => {
 
 const especiesOptions = async () => {
     optionsEtapas.value = null;
+    etapaParametros.value = null;
     const response = await axios.get(
         route("especie.active.show", form.value.campania_id)
     );
@@ -74,6 +76,8 @@ const especiesOptions = async () => {
 };
 
 const etapasOptions = async () => {
+    etapaParametros.value = null;
+
     const response = await axios.get(
         route("etapa.active.show", form.value.campania_especie_id)
     );
@@ -173,9 +177,9 @@ watch(
             if (props.dataForm) {
                 setFormValues({
                     ...props.dataForm,
-                    campania_especie_id: 1,
-                    campania_id: 1,
-                    piscigranja_id: 1,
+                    piscigranja_id: props.dataForm.campania_etapa?.campania_especie?.campania?.piscigranja_id ?? null,
+                    campania_id: props.dataForm.campania_etapa?.campania_especie?.campania_id ?? null,
+                    campania_especie_id: props.dataForm.campania_etapa?.campania_especie_id,
                 });
                 await campaniasOptions();
                 await especiesOptions();
