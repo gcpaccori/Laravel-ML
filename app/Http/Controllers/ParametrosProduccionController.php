@@ -27,11 +27,13 @@ class ParametrosProduccionController extends Controller
             "campania_etapa_id"          => $data['campania_etapa_id'],
             "dias_alimentacion"          => $data['dias_alimentacion'],
             "dias_muestreo"              => $data['dias_muestreo'],
-            "numero_muestreos"           => $data['numero_muestreos'], // (dias_alimentacion / dias_muestreo)
+            "foto_periodo_horas_dia"     => $data['foto_periodo_horas_dia'],
+            "foto_periodo_horas_noche"   => $data['foto_periodo_horas_noche'],
+            "numero_muestreos"           => $data['numero_muestreos'],             // (dias_alimentacion / dias_muestreo)
             "cantidad_alimento_total_kg" => $data['cantidad_alimento_total_kg'],
-            "racion_diaria_gr"           => $data['racion_diaria_gr'], // (cantidad_alimento_total_kg / dias_alimentacion)*1000
-            "frecuencia_diaria"          => $data['frecuencia_diaria'], // numero de veces
-            "cantidad_por_frecuencia_gr" => $data['cantidad_por_frecuencia_gr'] // (racion_diaria_gr / frecuencia_diaria)
+            "racion_diaria_gr"           => $data['racion_diaria_gr'],             // (cantidad_alimento_total_kg / dias_alimentacion)*1000
+            "frecuencia_diaria"          => $data['frecuencia_diaria'],            // numero de veces
+            "cantidad_por_frecuencia_gr" => $data['cantidad_por_frecuencia_gr']    // (racion_diaria_gr / frecuencia_diaria)
         ]);
 
         return response()->json([
@@ -51,11 +53,13 @@ class ParametrosProduccionController extends Controller
             "campania_etapa_id"          => $data['campania_etapa_id'],
             "dias_alimentacion"          => $data['dias_alimentacion'],
             "dias_muestreo"              => $data['dias_muestreo'],
-            "numero_muestreos"           => $data['numero_muestreos'], // (dias_alimentacion / dias_muestreo)
+            "foto_periodo_horas_dia"     => $data['foto_periodo_horas_dia'],
+            "foto_periodo_horas_noche"   => $data['foto_periodo_horas_noche'],
+            "numero_muestreos"           => $data['numero_muestreos'],             // (dias_alimentacion / dias_muestreo)
             "cantidad_alimento_total_kg" => $data['cantidad_alimento_total_kg'],
-            "racion_diaria_gr"           => $data['racion_diaria_gr'], // (cantidad_alimento_total_kg / dias_alimentacion)*1000
-            "frecuencia_diaria"          => $data['frecuencia_diaria'], // numero de veces
-            "cantidad_por_frecuencia_gr" => $data['cantidad_por_frecuencia_gr'] // (racion_diaria_gr / frecuencia_diaria)
+            "racion_diaria_gr"           => $data['racion_diaria_gr'],             // (cantidad_alimento_total_kg / dias_alimentacion)*1000
+            "frecuencia_diaria"          => $data['frecuencia_diaria'],            // numero de veces
+            "cantidad_por_frecuencia_gr" => $data['cantidad_por_frecuencia_gr']    // (racion_diaria_gr / frecuencia_diaria)
         ]);
 
         return response()->json([

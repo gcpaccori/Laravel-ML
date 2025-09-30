@@ -18,6 +18,8 @@
     const formInitial = ref({
         campania_etapa_id         : '',
         dias_alimentacion         : 0,
+        foto_periodo_horas_dia    : 0,
+        foto_periodo_horas_noche  : 0,
         dias_muestreo             : 0,
         numero_muestreos          : 0,
         cantidad_alimento_total_kg: 0.0,
@@ -155,13 +157,29 @@
             </div>
         </div>
 
-        <div class="row mb-5">
+        <div class="row mb-3">
             <div class="col-lg-4">
                 <el-form-item label="Frecuencia de alimentación (g)" :error="errors.cantidad_por_frecuencia_gr?.[0]">
                     <el-input-number class="w-100" v-model="form.cantidad_por_frecuencia_gr" :precision="6" :step="0.01" :min="0" disabled/>
                 </el-form-item>
             </div>
         </div>
+
+        <h6 class="text-muted">Fotoperiodo</h6>
+        <div class="separator separator-dotted mb-5"></div>
+        <div class="row mb-5">
+            <div class="col-lg-4">
+                <el-form-item label="Día (Horas)" :error="errors.foto_periodo_horas_dia?.[0]">
+                    <el-input-number class="w-100" v-model="form.foto_periodo_horas_dia" :min="0" :max="24" :step="1" />
+                </el-form-item>
+            </div>
+            <div class="col-lg-4">
+                <el-form-item label="Noche (Horas)" :error="errors.foto_periodo_horas_noche?.[0]">
+                    <el-input-number class="w-100" v-model="form.foto_periodo_horas_noche" :min="0" :max="24" :step="1" />
+                </el-form-item>
+            </div>
+        </div>
+
         <template #footer>
             <div class="dialog-footer">
                 <el-button size="small" type="success" native-type="submit" :loading="loading">{{props.dataForm?.parametros_produccion ? 'Actualizar' : 'Registrar'}}</el-button>

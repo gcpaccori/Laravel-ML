@@ -21,6 +21,8 @@ return new class extends Migration
             $table->decimal('racion_diaria_gr', 10, 6)->nullable();
             $table->integer('frecuencia_diaria')->default(3); // Número de veces al día
             $table->decimal('cantidad_por_frecuencia_gr', 10, 6)->nullable();
+            $table->integer('foto_periodo_horas_dia')->nullable();   // Horas de luz
+            $table->integer('foto_periodo_horas_noche')->nullable(); // Horas de oscuridad
             $table->timestamps();
             $table->softDeletes();
         });

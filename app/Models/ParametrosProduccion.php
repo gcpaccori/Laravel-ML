@@ -14,12 +14,14 @@ class ParametrosProduccion extends Model
     protected function casts(): array
     {
         return [
+            "foto_periodo_horas_dia"     => 'integer',
+            "foto_periodo_horas_noche"   => 'integer',
             "dias_alimentacion"          => 'integer',
             "dias_muestreo"              => 'integer',
             "numero_muestreos"           => 'integer',
             "cantidad_alimento_total_kg" => 'float',
             "racion_diaria_gr"           => 'float',
-            "frecuencia_diaria"          => 'float', // Número de veces
+            "frecuencia_diaria"          => 'float',     // Número de veces
             "cantidad_por_frecuencia_gr" => 'float',
         ];
     }
