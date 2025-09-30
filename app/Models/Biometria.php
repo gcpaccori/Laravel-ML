@@ -49,15 +49,17 @@ class Biometria extends Model
     protected function casts(): array
     {
         return [
-            "fecha_muestreo"                       => 'date',
-            "numero_muestreo"                      => 'integer',
-            "peso_inicial_gr"                      => 'float',
-            "peso_final_gr"                        => 'float',
-            "tamanio_inicial_cm"                   => 'float',
-            "tamanio_final_cm"                     => 'float',
-            "biomasa_inicial_kg"                   => 'float',
-            "biomasa_final_kg"                     => 'float',
-            "tasa_supervivencia_porcentaje"        => 'float',
+            "fecha_muestreo"                         => 'date',
+            "numero_muestreo"                        => 'integer',
+            "cantidad_peces_inicial"                 => 'integer',
+            "cantidad_peces_final"                   => 'integer',
+            "peso_inicial_gr"                        => 'float',
+            "peso_final_gr"                          => 'float',
+            "tamanio_inicial_cm"                     => 'float',
+            "tamanio_final_cm"                       => 'float',
+            "biomasa_inicial_kg"                     => 'float',
+            "biomasa_final_kg"                       => 'float',
+            "tasa_supervivencia_porcentaje"          => 'float',
             "tasa_crecimiento_especifico_porcentaje" => 'float',
         ];
     }

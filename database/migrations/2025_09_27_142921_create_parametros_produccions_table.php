@@ -17,7 +17,7 @@ return new class extends Migration
             $table->integer('dias_alimentacion')->nullable();
             $table->integer('dias_muestreo')->nullable();
             $table->integer('numero_muestreos')->nullable();
-            $table->decimal('cantidad_alimento_total_kg', 10, 2)->nullable();
+            $table->decimal('cantidad_alimento_total_kg', 10, 6)->nullable();
             $table->decimal('racion_diaria_gr', 10, 6)->nullable();
             $table->integer('frecuencia_diaria')->default(3); // Número de veces al día
             $table->decimal('cantidad_por_frecuencia_gr', 10, 6)->nullable();

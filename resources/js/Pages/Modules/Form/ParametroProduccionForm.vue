@@ -113,6 +113,8 @@
 <template>
   <el-form @submit.prevent="submitFormulario" :model="form" label-position="top">
     <DialogForm v-model="dialogVisible" :title="props.dataForm?.parametros_produccion ? 'Editar Parámetros' : 'Registrar Parámetros'" width="50%">
+        <h6 class="text-muted">Muestreo y Alimentación</h6>
+        <div class="separator separator-dotted mb-5"></div>
         <div class="row mb-5">
             <div class="col-lg-4">
                 <el-form-item label="Tiempo de alimentación (Días)" :error="errors.dias_alimentacion?.[0]">
@@ -128,7 +130,7 @@
 
             <div class="col-lg-4">
                 <el-form-item label="N° de muestreos" :error="errors.numero_muestreos?.[0]">
-                    <el-input-number class="w-100" v-model="form.numero_muestreos" :min="0" :step="1" readonly/>
+                    <el-input-number class="w-100" v-model="form.numero_muestreos" :min="0" :step="1" disabled/>
                 </el-form-item>
             </div>
         </div>
@@ -142,7 +144,7 @@
 
             <div class="col-lg-4">
                 <el-form-item label="Ración diaria (g/día)" :error="errors.racion_diaria_gr?.[0]">
-                    <el-input-number @change="calcularFrecuencia" class="w-100" v-model="form.racion_diaria_gr" :precision="6" :step="0.01" :min="0" readonly/>
+                    <el-input-number @change="calcularFrecuencia" class="w-100" v-model="form.racion_diaria_gr" :precision="6" :step="0.01" :min="0" disabled/>
                 </el-form-item>
             </div>
 
@@ -156,7 +158,7 @@
         <div class="row mb-5">
             <div class="col-lg-4">
                 <el-form-item label="Frecuencia de alimentación (g)" :error="errors.cantidad_por_frecuencia_gr?.[0]">
-                    <el-input-number class="w-100" v-model="form.cantidad_por_frecuencia_gr" :precision="6" :step="0.01" :min="0" readonly/>
+                    <el-input-number class="w-100" v-model="form.cantidad_por_frecuencia_gr" :precision="6" :step="0.01" :min="0" disabled/>
                 </el-form-item>
             </div>
         </div>

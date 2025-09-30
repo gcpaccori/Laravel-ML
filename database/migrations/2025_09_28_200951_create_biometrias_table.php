@@ -17,20 +17,24 @@ return new class extends Migration
             $table->date('fecha_muestreo');
             $table->integer('numero_muestreo')->nullable(); // 1er muestreo, 2do muestreo, etc.
 
+            // Datos de cantidad
+            $table->integer('cantidad_peces_inicial')->nullable();
+            $table->integer('cantidad_peces_final')->nullable();
+
             // Datos de peso
-            $table->decimal('peso_inicial_gr', 8, 2)->nullable();
-            $table->decimal('peso_final_gr', 8, 2)->nullable();
+            $table->decimal('peso_inicial_gr', 8, 4)->nullable();
+            $table->decimal('peso_final_gr', 8, 4)->nullable();
 
             // Datos de tamaño
-            $table->decimal('tamanio_inicial_cm', 8, 2)->nullable();
-            $table->decimal('tamanio_final_cm', 8, 2)->nullable();
+            $table->decimal('tamanio_inicial_cm', 8, 4)->nullable();
+            $table->decimal('tamanio_final_cm', 8, 4)->nullable();
 
             // Biomasa
-            $table->decimal('biomasa_inicial_kg', 10, 2)->nullable();
-            $table->decimal('biomasa_final_kg', 10, 2)->nullable();
+            $table->decimal('biomasa_inicial_kg', 8, 4)->nullable();
+            $table->decimal('biomasa_final_kg', 8, 4)->nullable();
 
             // Indicadores
-            $table->decimal('tasa_supervivencia_porcentaje', 5, 2)->nullable();
+            $table->decimal('tasa_supervivencia_porcentaje', 8, 4)->nullable();
             $table->decimal('tasa_crecimiento_especifico_porcentaje', 8, 4)->nullable();
 
             $table->text('observaciones')->nullable();

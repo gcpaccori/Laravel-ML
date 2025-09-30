@@ -164,8 +164,8 @@ onMounted(async () => {
 
                                     <el-table-column class-name="text-center" prop="numero_peces_inicial" label="Cantidad Inicial" min-width="130"/>
                                     <el-table-column class-name="text-center" prop="numero_peces_final" label="Cantidad Final"  min-width="130"/>
-                                    <el-table-column class-name="text-center" prop="peso_inicial_gr" label="Peso Inicial" min-width="130"/>
-                                    <el-table-column class-name="text-center" prop="peso_final_gr" label="Peso Final" min-width="130"/>
+                                    <el-table-column class-name="text-center" prop="peso_inicial_gr" label="Peso Inicial (g)" min-width="130"/>
+                                    <el-table-column class-name="text-center" prop="peso_final_gr" label="Peso Final (g)" min-width="130"/>
                                     <el-table-column class-name="text-center" prop="densidad_siembra" label="Densidad (Peces/m3)" min-width="130"/>
                                     <el-table-column class-name="text-center" label="Parámetros" min-width="130">
                                         <template #default="{ row }">
