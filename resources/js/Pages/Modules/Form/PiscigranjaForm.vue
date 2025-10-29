@@ -255,7 +255,7 @@
                     <el-table-column label="Superficie (m2)">
                         <template #default="{ row, $index }">
                             <el-form-item :error="errors[`piscinas.${$index}.superficie_m2`]?.[0]">
-                                <el-input-number v-model="row.superficie_m2" :precision="2" :step="0.01" placeholder="m²" />
+                                <el-input type="number" v-model="row.superficie_m2" step="any" placeholder="m²" />
                             </el-form-item>
                         </template>
                     </el-table-column>
@@ -264,7 +264,7 @@
                     <el-table-column label="Profundidad (m)">
                         <template #default="{ row, $index }">
                             <el-form-item :error="errors[`piscinas.${$index}.profundidad_m`]?.[0]">
-                                <el-input-number v-model="row.profundidad_m" :precision="2" :step="0.01" placeholder="m" />
+                                <el-input type="number" v-model="row.profundidad_m" step="any" placeholder="m" />
                             </el-form-item>
                         </template>
                     </el-table-column>
@@ -273,7 +273,7 @@
                     <el-table-column label="Volumen (m3)">
                         <template #default="{ row, $index }">
                             <el-form-item :error="errors[`piscinas.${$index}.volumen_m3`]?.[0]">
-                                <el-input-number v-model="row.volumen_m3" :precision="2" :step="0.01" placeholder="m" />
+                                <el-input type="number" v-model="row.volumen_m3" step="any" placeholder="m3" />
                             </el-form-item>
                         </template>
                     </el-table-column>

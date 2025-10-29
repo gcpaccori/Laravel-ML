@@ -335,11 +335,12 @@ onMounted(async () => {
                         label="N° Peces Iniciales"
                         :error="errors.cantidad_peces_inicial?.[0]"
                     >
-                        <el-input-number
+                        <el-input
+                            type="number"
                             class="w-100"
                             v-model="form.cantidad_peces_inicial"
                             :min="0"
-                            :step="1"
+                            step="any"
                             @change="calcularBiomasaInicial"
                         />
                     </el-form-item>
@@ -350,11 +351,12 @@ onMounted(async () => {
                         label="N° Peces Finales"
                         :error="errors.cantidad_peces_final?.[0]"
                     >
-                        <el-input-number
+                        <el-input
+                            type="number"
                             class="w-100"
                             v-model="form.cantidad_peces_final"
                             :min="0"
-                            :step="1"
+                            step="any"
                             @change="calcularBiomasaFinal"
                         />
                     </el-form-item>
@@ -365,12 +367,12 @@ onMounted(async () => {
                         label="Peso Inicial (g)"
                         :error="errors.peso_inicial_gr?.[0]"
                     >
-                        <el-input-number
+                        <el-input
+                            type="number"
                             class="w-100"
                             v-model="form.peso_inicial_gr"
                             :min="0"
-                            :precision="4"
-                            :step="0.01"
+                            step="any"
                             @change="calcularBiomasaInicial"
                         />
                     </el-form-item>
@@ -381,12 +383,12 @@ onMounted(async () => {
                         label="Peso Final (g)"
                         :error="errors.peso_final_gr?.[0]"
                     >
-                        <el-input-number
+                        <el-input
+                            type="number"
                             class="w-100"
                             v-model="form.peso_final_gr"
                             :min="0"
-                            :precision="4"
-                            :step="0.01"
+                            step="any"
                             @change="calcularBiomasaFinal"
                         />
                     </el-form-item>
@@ -397,12 +399,12 @@ onMounted(async () => {
                         label="Tamaño Inicial (cm)"
                         :error="errors.tamanio_inicial_cm?.[0]"
                     >
-                        <el-input-number
+                        <el-input
+                            type="number"
                             class="w-100"
                             v-model="form.tamanio_inicial_cm"
                             :min="0"
-                            :precision="4"
-                            :step="0.01"
+                            step="any"
                         />
                     </el-form-item>
                 </div>
@@ -412,12 +414,12 @@ onMounted(async () => {
                         label="Tamaño Final (cm)"
                         :error="errors.tamanio_final_cm?.[0]"
                     >
-                        <el-input-number
+                        <el-input
+                            type="number"
                             class="w-100"
                             v-model="form.tamanio_final_cm"
                             :min="0"
-                            :precision="4"
-                            :step="0.01"
+                            step="any"
                         />
                     </el-form-item>
                 </div>
@@ -431,12 +433,12 @@ onMounted(async () => {
                         label="Biomasa Inicial (Kg)"
                         :error="errors.biomasa_inicial_kg?.[0]"
                     >
-                        <el-input-number
+                        <el-input
+                            type="number"
                             class="w-100"
                             v-model="form.biomasa_inicial_kg"
                             :min="0"
-                            :precision="4"
-                            :step="0.01"
+                            step="any"
                             disabled
                         />
                     </el-form-item>
@@ -447,12 +449,12 @@ onMounted(async () => {
                         label="Biomasa Final (Kg)"
                         :error="errors.biomasa_final_kg?.[0]"
                     >
-                        <el-input-number
+                        <el-input
+                            type="number"
                             class="w-100"
                             v-model="form.biomasa_final_kg"
                             :min="0"
-                            :precision="4"
-                            :step="0.01"
+                            step="any"
                             disabled
                         />
                     </el-form-item>
@@ -463,12 +465,12 @@ onMounted(async () => {
                         label="Tasa de supervivencia (%)"
                         :error="errors.tasa_supervivencia_porcentaje?.[0]"
                     >
-                        <el-input-number
+                        <el-input
+                            type="number"
                             class="w-100"
                             v-model="form.tasa_supervivencia_porcentaje"
                             :min="0"
-                            :precision="4"
-                            :step="0.01"
+                            step="any"
                             disabled
                         />
                     </el-form-item>
@@ -481,14 +483,14 @@ onMounted(async () => {
                             errors.tasa_crecimiento_especifico_porcentaje?.[0]
                         "
                     >
-                        <el-input-number
+                        <el-input
+                            type="number"
                             class="w-100"
                             v-model="
                                 form.tasa_crecimiento_especifico_porcentaje
                             "
                             :min="0"
-                            :precision="4"
-                            :step="0.01"
+                            step="any"
                             disabled
                         />
                     </el-form-item>

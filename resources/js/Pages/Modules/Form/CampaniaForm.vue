@@ -266,7 +266,7 @@
                     <el-table-column label="N° alevines inicial">
                         <template #default="{ row, $index }">
                             <el-form-item :error="errors[`especies.${$index}.cantidad_siembra`]?.[0]">
-                                <el-input-number class="w-100" v-model="row.cantidad_siembra" :min="0" :step="1" />
+                                <el-input type="any" class="w-100" v-model="row.cantidad_siembra" :min="0" step="any" />
                             </el-form-item>
                         </template>
                     </el-table-column>
@@ -274,7 +274,7 @@
                     <el-table-column label="N° peces final">
                         <template #default="{ row, $index }">
                             <el-form-item :error="errors[`especies.${$index}.cantidad_cosechada`]?.[0]">
-                                <el-input-number class="w-100" v-model="row.cantidad_cosechada" :min="0" :step="1" />
+                                <el-input type="any" class="w-100" v-model="row.cantidad_cosechada" :min="0" step="any" />
                             </el-form-item>
                         </template>
                     </el-table-column>
@@ -282,7 +282,7 @@
                     <el-table-column label="Peso inicial Alevin(g)">
                         <template #default="{ row, $index }">
                             <el-form-item :error="errors[`especies.${$index}.peso_inicial_gr`]?.[0]">
-                                <el-input-number class="w-100" v-model="row.peso_inicial_gr" :precision="2" :step="0.01" />
+                                <el-input type="any" class="w-100" v-model="row.peso_inicial_gr" :precision="2" step="any" />
                             </el-form-item>
                         </template>
                     </el-table-column>
@@ -290,7 +290,7 @@
                     <el-table-column label="Peso Final Pez(g)">
                         <template #default="{ row, $index }">
                             <el-form-item :error="errors[`especies.${$index}.peso_final_gr`]?.[0]">
-                                <el-input-number class="w-100" v-model="row.peso_final_gr" :precision="2" :step="0.01" />
+                                <el-input type="any" class="w-100" v-model="row.peso_final_gr" :precision="2" step="any" />
                             </el-form-item>
                         </template>
                     </el-table-column>

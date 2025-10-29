@@ -257,13 +257,13 @@ onMounted(async () => {
                         label="Área (m2)"
                         :error="errors.area_piscigranja_m2?.[0]"
                     >
-                        <el-input-number
+                        <el-input
+                            type="number"
                             @change="calcularVolumen"
                             class="w-100"
                             v-model="form.area_piscigranja_m2"
                             :min="0"
-                            :precision="2"
-                            :step="0.01"
+                            step="any"
                             placeholder="m2"
                         />
                     </el-form-item>
@@ -273,13 +273,13 @@ onMounted(async () => {
                         label="Altura (m)"
                         :error="errors.altura_piscigranja_m?.[0]"
                     >
-                        <el-input-number
+                        <el-input
+                            type="number"
                             @change="calcularVolumen"
                             class="w-100"
                             v-model="form.altura_piscigranja_m"
                             :min="0"
-                            :precision="2"
-                            :step="0.01"
+                            step="any"
                             placeholder="m"
                         />
                     </el-form-item>
@@ -289,12 +289,12 @@ onMounted(async () => {
                         label="Volumen (m3)"
                         :error="errors.volumen_piscigranja_m3?.[0]"
                     >
-                        <el-input-number
+                        <el-input
+                            type="number"
                             class="w-100"
                             v-model="form.volumen_piscigranja_m3"
                             :min="0"
-                            :precision="2"
-                            :step="0.01"
+                            step="any"
                             disabled
                         />
                     </el-form-item>
@@ -310,7 +310,8 @@ onMounted(async () => {
                         :error="errors.numero_peces_inicial?.[0]"
                         required
                     >
-                        <el-input-number
+                        <el-input
+                            type="number"
                             @change="calcularDensidad"
                             class="w-100"
                             v-model="form.numero_peces_inicial"
@@ -324,7 +325,8 @@ onMounted(async () => {
                         label="Cantidad Final"
                         :error="errors.numero_peces_final?.[0]"
                     >
-                        <el-input-number
+                        <el-input
+                            type="number"
                             class="w-100"
                             v-model="form.numero_peces_final"
                             :min="0"
@@ -338,11 +340,11 @@ onMounted(async () => {
                         :error="errors.peso_inicial_gr?.[0]"
                         required
                     >
-                        <el-input-number
+                        <el-input
+                            type="number"
                             class="w-100"
                             v-model="form.peso_inicial_gr"
-                            :precision="2"
-                            :step="0.01"
+                            step="any"
                             :min="0"
                         />
                     </el-form-item>
@@ -352,11 +354,11 @@ onMounted(async () => {
                         label="Peso Final (g)"
                         :error="errors.peso_final_gr?.[0]"
                     >
-                        <el-input-number
+                        <el-input
+                            type="number"
                             class="w-100"
                             v-model="form.peso_final_gr"
-                            :precision="2"
-                            :step="0.01"
+                            step="any"
                             :min="0"
                         />
                     </el-form-item>
@@ -368,12 +370,12 @@ onMounted(async () => {
                         label="Densidad (Peces/m3)"
                         :error="errors.densidad_siembra?.[0]"
                     >
-                        <el-input-number
+                        <el-input
+                            type="number"
                             class="w-100"
                             v-model="form.densidad_siembra"
                             :min="0"
-                            :precision="2"
-                            :step="0.01"
+                            step="any"
                             disabled
                         />
                     </el-form-item>

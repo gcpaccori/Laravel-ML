@@ -120,19 +120,19 @@
 
             <div class="col-lg-4">
                 <el-form-item label="Superficie (m2)" :error="errors.superficie_m2?.[0]">
-                    <el-input-number style="width: 100%" v-model="form.superficie_m2" :min="0" :precision="2" :step="0.01" placeholder="m2" />
+                    <el-input type="number" style="width: 100%" v-model="form.superficie_m2" :min="0" step="any" placeholder="m2" />
                 </el-form-item>
             </div>
 
             <div class="col-lg-4">
                 <el-form-item label="Profundidad (m)" :error="errors.profundidad_m?.[0]">
-                    <el-input-number style="width: 100%" v-model="form.profundidad_m" :min="0" :precision="2" :step="0.01" placeholder="m" />
+                    <el-input type="number" style="width: 100%" v-model="form.profundidad_m" :min="0" step="any" placeholder="m" />
                 </el-form-item>
             </div>
 
             <div class="col-lg-4">
                 <el-form-item label="Volumen (m3)" :error="errors.volumen_m3?.[0]">
-                    <el-input-number style="width: 100%" v-model="form.volumen_m3" :min="0" :precision="2" :step="0.01" placeholder="m3" />
+                    <el-input type="number" style="width: 100%" v-model="form.volumen_m3" :min="0" step="any" placeholder="m3" />
                 </el-form-item>
             </div>
 
