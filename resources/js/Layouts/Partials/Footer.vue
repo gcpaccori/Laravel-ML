@@ -5,7 +5,7 @@
             <!--begin::Copyright-->
             <div class="text-dark">
                 <span class="text-muted fw-semibold me-1">2025&copy;</span>
-                <a href="https://keenthemes.com" target="_blank" class="text-gray-800 text-hover-primary">DESYSAPP</a>
+                <a href="#" target="_blank" class="text-gray-800 text-hover-primary">SISMA PISCIS</a>
             </div>
             <!--end::Copyright-->
         </div>

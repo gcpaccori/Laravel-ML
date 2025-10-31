@@ -322,9 +322,17 @@ onMounted(async () => {
             <div class="d-flex justify-content-end mb-3">
                 <a
                     :href="route('parametrosagua.csv', form)"
-                    class="btn btn-success btn-sm"
+                    class="btn btn-success btn-sm me-2"
+                    target="_blank"
                 >
                     <i class="fa fa-file-excel"></i> Exportar a CSV
+                </a>
+                <a
+                    :href="route('parametrosagua.excel', form)"
+                    class="btn btn-success btn-sm"
+                    target="_blank"
+                >
+                    <i class="fa fa-file-excel"></i> Exportar a EXCEL
                 </a>
             </div>
             <div class="col-lg-12">
@@ -332,7 +340,6 @@ onMounted(async () => {
                     :ajax-url="ajaxUrl"
                     :columns="columns"
                     :filters="form"
-                    :buttons="['csv', 'excel', 'pdf', 'print']"
                     @tableReady="handleTableReady"
                 ></BaseDataTable>
             </div>

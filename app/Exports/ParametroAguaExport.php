@@ -23,7 +23,7 @@ class ParametroAguaExport implements FromQuery, WithHeadings, WithMapping, WithC
         $query = ParametroAgua::with(['piscina.piscigranja'])
             ->orderBy('fecha_medicion', 'desc');
 
-        // 🔹 Aplicar filtros como en DataTable
+        // Aplicar filtros como en DataTable
         $piscigranjaId = $this->request->piscigranja_id;
         $piscinaId = $this->request->piscina_id;
         $tipoTiempo = $this->request->tipo_tiempo ?? 'D';

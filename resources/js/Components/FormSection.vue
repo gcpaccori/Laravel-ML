@@ -1,38 +1,36 @@
 <script setup>
 import { computed, useSlots } from 'vue';
-import SectionTitle from './SectionTitle.vue';
 
 defineEmits(['submitted']);
 
 const hasActions = computed(() => !! useSlots().actions);
+const hasTitle = computed(() => !! useSlots().title);
+const hasDescription = computed(() => !! useSlots().description);
+const hasToolbar = computed(() => !! useSlots().toolbar);
 </script>
 
 <template>
-    <div class="md:grid md:grid-cols-3 md:gap-6">
-        <SectionTitle>
-            <template #title>
-                <slot name="title" />
-            </template>
-            <template #description>
-                <slot name="description" />
-            </template>
-        </SectionTitle>
-
-        <div class="mt-5 md:mt-0 md:col-span-2">
-            <form @submit.prevent="$emit('submitted')">
-                <div
-                    class="px-4 py-5 bg-white sm:p-6 shadow"
-                    :class="hasActions ? 'sm:rounded-tl-md sm:rounded-tr-md' : 'sm:rounded-md'"
-                >
-                    <div class="grid grid-cols-6 gap-6">
-                        <slot name="form" />
-                    </div>
+    <div class="card shadow-sm">
+        <el-form @submit.prevent="$emit('submitted')" label-position="top">
+            <div class="card-header" v-if="hasTitle || hasDescription || hasToolbar" >
+                <h3 class="card-title align-items-start flex-column">
+                    <span class="card-label fw-bold text-dark">
+                        <slot name="title" />
+                    </span>
+                    <span class="text-gray-400 mt-1 fw-semibold fs-6">
+                        <slot name="description" />
+                    </span>
+                </h3>
+                <div class="card-toolbar">
+                    <slot name="toolbar" />
                 </div>
-
-                <div v-if="hasActions" class="flex items-center justify-end px-4 py-3 bg-gray-50 text-end sm:px-6 shadow sm:rounded-bl-md sm:rounded-br-md">
-                    <slot name="actions" />
-                </div>
-            </form>
-        </div>
+            </div>
+            <div class="card-body">
+                <slot name="form" />
+            </div>
+            <div v-if="hasActions" class="card-footer">
+                <slot name="actions" />
+            </div>
+        </el-form>
     </div>
 </template>

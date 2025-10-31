@@ -8,7 +8,9 @@ use App\Models\Biometria;
 use Illuminate\Http\Request;
 use App\Models\CampaniaEtapa;
 use App\Models\CampaniaEspecie;
+use Barryvdh\DomPDF\Facade\Pdf;
 use App\Helpers\DataTableHelper;
+use Illuminate\Support\Facades\DB;
 use App\Models\ParametrosProduccion;
 use App\DataTables\BiometriaDataTable;
 use App\Http\Requests\BiometriaRequest;
@@ -45,25 +47,56 @@ class BiometriaController extends Controller
     {
         $data = $this->calculateBiometriaData($request->all());
 
-        $biometria = Biometria::create([
-            "campania_etapa_id"                      => $data['campania_etapa_id'],
-            "fecha_muestreo"                         => $data['fecha_muestreo'],
-            "cantidad_peces_inicial"                 => $data['cantidad_peces_inicial'],
-            "cantidad_peces_final"                   => $data['cantidad_peces_final'],
-            "peso_inicial_gr"                        => $data['peso_inicial_gr'],
-            "peso_final_gr"                          => $data['peso_final_gr'],
-            "tamanio_inicial_cm"                     => $data['tamanio_inicial_cm'],
-            "tamanio_final_cm"                       => $data['tamanio_final_cm'],
-            "biomasa_inicial_kg"                     => $data['biomasa_inicial_kg'],
-            "biomasa_final_kg"                       => $data['biomasa_final_kg'],
-            "tasa_supervivencia_porcentaje"          => $data['tasa_supervivencia_porcentaje'],
-            "tasa_crecimiento_especifico_porcentaje" => $data['tasa_crecimiento_especifico_porcentaje'],
-            "observaciones"                          => $data['observaciones']
-        ]);
+        $reg = DB::transaction(function () use ($data, $request) {
+            $biometria = Biometria::create([
+                "campania_etapa_id"                      => $data['campania_etapa_id'],
+                "fecha_muestreo"                         => $data['fecha_muestreo'],
+                "cantidad_muestreo"                      => $data['cantidad_muestreo'],
+                "cantidad_peces_inicial"                 => $data['cantidad_peces_inicial'],
+                "cantidad_peces_final"                   => $data['cantidad_peces_final'],
+                "peso_inicial_gr"                        => $data['peso_inicial_gr'],
+                "peso_final_gr"                          => $data['peso_final_gr'],
+                "tamanio_inicial_cm"                     => $data['tamanio_inicial_cm'],
+                "tamanio_final_cm"                       => $data['tamanio_final_cm'],
+                "biomasa_inicial_kg"                     => $data['biomasa_inicial_kg'],
+                "biomasa_final_kg"                       => $data['biomasa_final_kg'],
+                "tasa_supervivencia_porcentaje"          => $data['tasa_supervivencia_porcentaje'],
+                "tasa_crecimiento_especifico_porcentaje" => $data['tasa_crecimiento_especifico_porcentaje'],
+                "observaciones"                          => $data['observaciones']
+            ]);
+
+            // Registrar los detalles individuales (peso/tamaño de cada pez)
+            if (!empty($request->detalles)) {
+                foreach ($request->detalles as $detalle) {
+                    $biometria->detalles()->create([
+                        'peso_gr'        => $detalle['peso_gr'],
+                        'tamanio_cm'     => $detalle['tamanio_cm'],
+                        'numero_muestra' => $detalle['numero_muestra'],
+                        'observacion'    => $detalle['observacion'] ?? null,
+                        'fecha_registro' => $data['fecha_muestreo']
+                    ]);
+                }
+            }
+
+            return $biometria;
+        });
+
 
         return response()->json([
             'message' => 'Biometría registrada con éxito',
-            'data' => $biometria,
+            'data' => $reg,
+        ]);
+    }
+
+    public function create()
+    {
+        return Inertia::render('Modules/Form/BiometriaForm', [
+            'title' => 'Registrar Biométrias',
+            'toolbar' => [
+                ['label' => 'Inicio', 'route' => 'dashboard'],
+                ['label' => 'Gestionar Biométrias', 'route' => 'produccion.biometrias.index'],
+                ['label' => 'Registrar Biométrias']
+            ],
         ]);
     }
 
@@ -72,8 +105,16 @@ class BiometriaController extends Controller
      */
     public function edit( string $id )
     {
-        $biometria = Biometria::find($id);
-        return response()->json( $biometria );
+        $biometria = Biometria::with(['detalles'])->findOrFail($id);
+        return Inertia::render('Modules/Form/BiometriaForm', [
+            'title' => 'Editar Biométrias',
+            'toolbar' => [
+                ['label' => 'Inicio', 'route' => 'dashboard'],
+                ['label' => 'Gestionar Biométrias', 'route' => 'produccion.biometrias.index'],
+                ['label' => 'Editar Biométrias']
+            ],
+            'dataForm' => $biometria
+        ]);
     }
 
     /**
@@ -83,25 +124,53 @@ class BiometriaController extends Controller
     {
         $data = $this->calculateBiometriaData($request->all());
 
-        $id->update([
-            "campania_etapa_id"                      => $data['campania_etapa_id'],
-            "fecha_muestreo"                         => $data['fecha_muestreo'],
-            "cantidad_peces_inicial"                 => $data['cantidad_peces_inicial'],
-            "cantidad_peces_final"                   => $data['cantidad_peces_final'],
-            "peso_inicial_gr"                        => $data['peso_inicial_gr'],
-            "peso_final_gr"                          => $data['peso_final_gr'],
-            "tamanio_inicial_cm"                     => $data['tamanio_inicial_cm'],
-            "tamanio_final_cm"                       => $data['tamanio_final_cm'],
-            "biomasa_inicial_kg"                     => $data['biomasa_inicial_kg'],
-            "biomasa_final_kg"                       => $data['biomasa_final_kg'],
-            "tasa_supervivencia_porcentaje"          => $data['tasa_supervivencia_porcentaje'],
-            "tasa_crecimiento_especifico_porcentaje" => $data['tasa_crecimiento_especifico_porcentaje'],
-            "observaciones"                          => $data['observaciones']
-        ]);
+        $reg = DB::transaction(function () use ($data, $request, $id) {
+
+            $id->update([
+                "campania_etapa_id"                      => $data['campania_etapa_id'],
+                "fecha_muestreo"                         => $data['fecha_muestreo'],
+                "cantidad_peces_inicial"                 => $data['cantidad_peces_inicial'],
+                "cantidad_peces_final"                   => $data['cantidad_peces_final'],
+                "peso_inicial_gr"                        => $data['peso_inicial_gr'],
+                "peso_final_gr"                          => $data['peso_final_gr'],
+                "tamanio_inicial_cm"                     => $data['tamanio_inicial_cm'],
+                "tamanio_final_cm"                       => $data['tamanio_final_cm'],
+                "biomasa_inicial_kg"                     => $data['biomasa_inicial_kg'],
+                "biomasa_final_kg"                       => $data['biomasa_final_kg'],
+                "tasa_supervivencia_porcentaje"          => $data['tasa_supervivencia_porcentaje'],
+                "tasa_crecimiento_especifico_porcentaje" => $data['tasa_crecimiento_especifico_porcentaje'],
+                "observaciones"                          => $data['observaciones']
+            ]);
+
+            // Manejar detalles: actualizar, crear y eliminar según sea necesario
+            $detallesRequest = collect($request->detalles ?? []);
+
+            // IDs recibidos desde el frontend (si existen)
+            $detalleIds = $detallesRequest->pluck('id')->filter()->toArray();
+
+            // Eliminar los detalles que ya no están en la solicitud
+            $id->detalles()->whereNotIn('id', $detalleIds)->delete();
+
+            // Recorrer y actualizar/crear los detalles enviados
+            foreach ($detallesRequest as $detalle) {
+                $id->detalles()->updateOrCreate(
+                    ['id' => $detalle['id'] ?? null],
+                    [
+                        'peso_gr'        => $detalle['peso_gr'],
+                        'tamanio_cm'     => $detalle['tamanio_cm'],
+                        'numero_muestra' => $detalle['numero_muestra'],
+                        'observacion'    => $detalle['observacion'] ?? null,
+                        'fecha_registro' => $data['fecha_muestreo']
+                    ]
+                );
+            }
+
+            return $id;
+        });
 
         return response()->json([
             'message' => 'Biometría actualizada con éxito',
-            'data' => $id,
+            'data' => $reg,
         ]);
     }
 
@@ -148,27 +217,45 @@ class BiometriaController extends Controller
      */
     private function calculateBiometriaData(array $data): array
     {
+        // Obtener datos base
         $cantidadInicial = $data['cantidad_peces_inicial'] ?? 0;
         $cantidadFinal   = $data['cantidad_peces_final'] ?? 0;
         $pesoInicial     = $data['peso_inicial_gr'] ?? 0;
         $pesoFinal       = $data['peso_final_gr'] ?? 0;
+        $tamanioInicial  = $data['tamanio_inicial_cm'] ?? 0;
+        $tamanioFinal    = $data['tamanio_final_cm'] ?? 0;
 
-        // 1. Biomasa Inicial (Kg) = N° Peces Inicial * Peso Inicial / 1000
+        // Si hay detalles, recalcular promedios de peso y tamaño
+        if (!empty($data['detalles']) && is_array($data['detalles'])) {
+            $detallesValidos = collect($data['detalles'])
+                ->filter(fn ($d) => isset($d['peso_gr'], $d['tamanio_cm']) && $d['peso_gr'] > 0 && $d['tamanio_cm'] > 0);
+
+            if ($detallesValidos->isNotEmpty()) {
+                $pesoFinal = round($detallesValidos->avg('peso_gr'), 4);
+                $tamanioFinal = round($detallesValidos->avg('tamanio_cm'), 4);
+
+                // Actualizar también en el arreglo principal
+                $data['peso_final_gr'] = $pesoFinal;
+                $data['tamanio_final_cm'] = $tamanioFinal;
+            }
+        }
+
+        // Biomasa Inicial (Kg) = N° Peces Inicial * Peso Inicial / 1000
         $data['biomasa_inicial_kg'] = ($cantidadInicial > 0 && $pesoInicial > 0)
             ? round(($cantidadInicial * $pesoInicial) / 1000, 4)
             : 0;
 
-        // 2. Biomasa Final (Kg) = N° Peces Final * Peso Final / 1000
+        // Biomasa Final (Kg) = N° Peces Final * Peso Final / 1000
         $data['biomasa_final_kg'] = ($cantidadFinal > 0 && $pesoFinal > 0)
             ? round(($cantidadFinal * $pesoFinal) / 1000, 4)
             : 0;
 
-        // 3. Tasa Supervivencia (%) = (N° Peces Final / N° Peces Inicial) * 100
+        // Tasa Supervivencia (%) = (N° Peces Final / N° Peces Inicial) * 100
         $data['tasa_supervivencia_porcentaje'] = ($cantidadInicial > 0 && $cantidadFinal > 0)
             ? round(($cantidadFinal / $cantidadInicial) * 100, 4)
             : 0;
 
-        // 4. Tasa Crecimiento Específico (%) = (Peso Final - Peso Inicial) / Días
+        // Tasa Crecimiento Específico (%) = (Peso Final - Peso Inicial) / Días
         $diasMuestreo = $this->showParametrosEtapa($data['campania_especie_id'] ?? null);
         $dias = $diasMuestreo?->dias_muestreo ?? 0;
 
@@ -178,4 +265,18 @@ class BiometriaController extends Controller
 
         return $data;
     }
+
+    public function exportPdf($id)
+    {
+        // $biometria = Biometria::with('detalles', 'campaniaEtapa.campaniaEspecie.especie')->findOrFail($id);
+        $biometria = Biometria::with(['detalles', 'campaniaEtapa.campaniaEspecie.campania.piscigranja', 'campaniaEtapa.etapa', 'campaniaEtapa.piscina'])->findOrFail($id);
+
+        // return response()->json($biometria, 200);
+
+        $pdf = Pdf::loadView('biometrias.pdf', compact('biometria'))
+                ->setPaper('a4', 'landscape');
+        // return $pdf->download("ficha_biometria_{$id}.pdf");
+        return $pdf->stream("Ficha de Biometría - ".$biometria->nombre_piscigranja."_".$biometria->nombre_campania.".pdf");
+    }
+
 }

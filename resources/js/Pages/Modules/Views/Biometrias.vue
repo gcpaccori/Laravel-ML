@@ -1,8 +1,8 @@
 <script setup>
+    import { router } from "@inertiajs/vue3";
     import { onMounted, onBeforeUnmount, ref } from "vue";
     import { ElMessage, ElMessageBox } from 'element-plus';
     import { useDynamicAction } from '@/Composables/useDynamicAction';
-    import BiometriaForm from "../Form/BiometriaForm.vue";
 
     const props = defineProps({
         title: String,
@@ -23,14 +23,9 @@
 
     const tableInstance = ref(null);
     const ajaxUrl = route('datatable.biometrias');
-    const dataForm = ref(null);
-
-    // MODAL
-    const dialogVisible = ref(false);
 
     const showModal = () => {
-        dialogVisible.value = true;
-        dataForm.value = null;
+        router.visit(route('biometrias.create'));
     };
 
     // Inicializar Tabla
@@ -42,17 +37,9 @@
         tableInstance.value.ajax.reload(null, true) // Recargar y regresa a la primera pagina;
     };
 
-    // RECUPERAR DATOS GUARDADOS
-    const handleSaved = ( res ) => {
-        // Para recargar formulario desde otra vista
-        reloadTable();
-    };
-
     // FUNCIONES DE ACCIONES (BOTONES)
-    const handleEdit = async (id) => {
-        const { data } = await axios.get(route('biometrias.edit', id));
-        dataForm.value = data;
-        dialogVisible.value = true;
+    const handleEdit = (id) => {
+        router.visit(route('biometrias.edit', id));
     };
 
     const handleDelete = async(id) => {
@@ -77,10 +64,16 @@
         } );
     };
 
+    const handlePdf = (id) => {
+        const url = route('biometrias.pdf', id);
+        window.open(url, '_blank');
+    };
+
     // FUNCIONES EXPUESTAS DEL BASEDATATABLE
     const methods = {
         handleEdit,
-        handleDelete
+        handleDelete,
+        handlePdf
     };
 
     const { handleDynamicAction } = useDynamicAction(methods);
@@ -127,7 +120,5 @@
           @tableReady="handleTableReady"
           @action="handleDynamicAction"
         ></BaseDataTable>
-
-        <BiometriaForm v-model="dialogVisible" :dataForm="dataForm" @saved="handleSaved"/>
     </App>
 </template>

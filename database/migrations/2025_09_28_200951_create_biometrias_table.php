@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('campania_etapa_id')->constrained('campania_etapas');
             $table->date('fecha_muestreo');
-            $table->integer('numero_muestreo')->nullable(); // 1er muestreo, 2do muestreo, etc.
+            $table->integer('cantidad_muestreo')->nullable(); // cantidad de muestras
 
             // Datos de cantidad
             $table->integer('cantidad_peces_inicial')->nullable();

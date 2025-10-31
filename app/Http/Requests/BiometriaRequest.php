@@ -28,23 +28,23 @@ class BiometriaRequest extends FormRequest
 
             'campania_etapa_id' => ['required', 'exists:campania_etapas,id'],
             'fecha_muestreo'    => ['required', 'date'],
-            // 'numero_muestreo'   => ['nullable', 'integer', 'min:1'],
+            'cantidad_muestreo' => ['nullable', 'integer', 'min:1'],
 
             // Cantidad de peces
-            'cantidad_peces_inicial' => ['nullable', 'integer', 'min:0'],
-            'cantidad_peces_final'   => ['nullable', 'integer', 'min:0'],
+            'cantidad_peces_inicial' => ['nullable', 'integer', 'min:1'],
+            'cantidad_peces_final'   => ['nullable', 'integer', 'min:1'],
 
             // Peso
-            'peso_inicial_gr' => ['nullable', 'numeric', 'min:0'],
-            'peso_final_gr'   => ['nullable', 'numeric', 'min:0'],
+            'peso_inicial_gr' => ['nullable', 'numeric', 'min:1'],
+            'peso_final_gr'   => ['nullable', 'numeric', 'min:1'],
 
             // Tamaño
-            'tamanio_inicial_cm' => ['nullable', 'numeric', 'min:0'],
-            'tamanio_final_cm'   => ['nullable', 'numeric', 'min:0'],
+            'tamanio_inicial_cm' => ['nullable', 'numeric', 'min:0.1'],
+            'tamanio_final_cm'   => ['nullable', 'numeric', 'min:0.1'],
 
             // Biomasa
-            'biomasa_inicial_kg' => ['nullable', 'numeric', 'min:0'],
-            'biomasa_final_kg'   => ['nullable', 'numeric', 'min:0'],
+            'biomasa_inicial_kg' => ['nullable', 'numeric', 'min:0.1'],
+            'biomasa_final_kg'   => ['nullable', 'numeric', 'min:0.1'],
 
             // Indicadores
             'tasa_supervivencia_porcentaje'          => ['nullable', 'numeric', 'between:0,100'],
@@ -62,7 +62,7 @@ class BiometriaRequest extends FormRequest
             'campania_especie_id'                    => 'especie',
             'campania_etapa_id'                      => 'etapa de campaña',
             'fecha_muestreo'                         => 'fecha de muestreo',
-            // 'numero_muestreo'                        => 'número de muestreo',
+            'cantidad_muestreo'                      => 'número de muestreo',
             'cantidad_peces_inicial'                 => 'cantidad de peces inicial',
             'cantidad_peces_final'                   => 'cantidad de peces final',
             'peso_inicial_gr'                        => 'peso inicial (g)',
@@ -90,8 +90,8 @@ class BiometriaRequest extends FormRequest
             'fecha_muestreo.required' => 'La :attribute es obligatoria.',
             'fecha_muestreo.date'     => 'La :attribute debe ser una fecha válida.',
 
-            // 'numero_muestreo.integer' => 'El :attribute debe ser un número entero.',
-            // 'numero_muestreo.min'     => 'El :attribute debe ser al menos 1.',
+            'cantidad_muestreo.integer' => 'El :attribute debe ser un número entero.',
+            'cantidad_muestreo.min'     => 'El :attribute debe ser al menos 1.',
 
             'cantidad_peces_inicial.integer' => 'La :attribute debe ser un número entero.',
             'cantidad_peces_inicial.min'     => 'La :attribute no puede ser negativa.',

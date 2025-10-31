@@ -169,4 +169,12 @@ class HistorialAguaController extends Controller
         $nombreArchivo = "parametros_agua_{$fechaHora}.csv";
         return Excel::download(new ParametroAguaExport($request), $nombreArchivo, \Maatwebsite\Excel\Excel::CSV);
     }
+
+    public function export_excel(Request $request)
+    {
+        $fechaHora = now()->format('Y-m-d_H-i-s'); // 2025-09-30_07-15-30
+        $nombreArchivo = "parametros_agua_{$fechaHora}.xlsx"; // Cambiado a XLSX
+
+        return Excel::download(new ParametroAguaExport($request), $nombreArchivo, \Maatwebsite\Excel\Excel::XLSX);
+    }
 }

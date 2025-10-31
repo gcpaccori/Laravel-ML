@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Biometria extends Model
@@ -46,11 +47,16 @@ class Biometria extends Model
         return $this->belongsTo(CampaniaEtapa::class);
     }
 
+    public function detalles() : HasMany
+    {
+        return $this->hasMany(BiometriaDetalle::class);
+    }
+
     protected function casts(): array
     {
         return [
             "fecha_muestreo"                         => 'date',
-            "numero_muestreo"                        => 'integer',
+            "cantidad_muestreo"                      => 'integer',
             "cantidad_peces_inicial"                 => 'integer',
             "cantidad_peces_final"                   => 'integer',
             "peso_inicial_gr"                        => 'float',

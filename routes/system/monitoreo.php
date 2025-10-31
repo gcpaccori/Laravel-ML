@@ -12,3 +12,4 @@ Route::get('/historialaguas', [HistorialAguaController::class, 'index'])->name('
 Route::get('datatable/historialaguas', [HistorialAguaController::class, 'datatable'])->name('datatable.historialaguas');
 Route::get('/chart-historialaguas', [HistorialAguaController::class, 'getChartData'])->name('chart.historialaguas');
 Route::get('/parametros-agua/csv', [HistorialAguaController::class, 'export_csv'])->name('parametrosagua.csv');
+Route::get('/parametros-agua/excel', [HistorialAguaController::class, 'export_excel'])->name('parametrosagua.excel');

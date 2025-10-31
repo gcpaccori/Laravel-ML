@@ -94,7 +94,7 @@ class BiometriaDataTable extends DataTable
             // Column::make('observaciones')->title('observaciones'),
             Column::computed('action')
             ->title('Acciones')
-            ->addClass('text-center min-w-100px')
+            ->addClass('text-center min-w-125px')
         ];
     }
 
