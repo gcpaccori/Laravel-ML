@@ -120,19 +120,19 @@
         <div class="row mb-5">
             <div class="col-lg-4">
                 <el-form-item label="Tiempo de alimentación (Días)" :error="errors.dias_alimentacion?.[0]">
-                    <el-input-number @change="calcularDiasMuestreo" class="w-100" v-model="form.dias_alimentacion" :min="0" :step="1" />
+                    <el-input @change="calcularDiasMuestreo" class="w-100" v-model="form.dias_alimentacion" :min="0" />
                 </el-form-item>
             </div>
 
             <div class="col-lg-4">
                 <el-form-item label="Tiempo de muestreo (Días)" :error="errors.dias_muestreo?.[0]">
-                    <el-input-number @change="calcularDiasMuestreo" class="w-100" v-model="form.dias_muestreo" :min="0" :step="1" />
+                    <el-input @change="calcularDiasMuestreo" class="w-100" v-model="form.dias_muestreo" :min="0" />
                 </el-form-item>
             </div>
 
             <div class="col-lg-4">
                 <el-form-item label="N° de muestreos" :error="errors.numero_muestreos?.[0]">
-                    <el-input-number class="w-100" v-model="form.numero_muestreos" :min="0" :step="1" disabled/>
+                    <el-input class="w-100" v-model="form.numero_muestreos" :min="0" disabled/>
                 </el-form-item>
             </div>
         </div>
@@ -140,19 +140,19 @@
         <div class="row mb-5">
             <div class="col-lg-4">
                 <el-form-item label="Alimento total (Kg)" :error="errors.cantidad_alimento_total_kg?.[0]">
-                    <el-input-number @change="calcularRacionDia" class="w-100" v-model="form.cantidad_alimento_total_kg" :precision="2" :step="0.01" :min="0"/>
+                    <el-input @change="calcularRacionDia" class="w-100" v-model="form.cantidad_alimento_total_kg" :precision="2" :step="0.01" :min="0"/>
                 </el-form-item>
             </div>
 
             <div class="col-lg-4">
                 <el-form-item label="Ración diaria (g/día)" :error="errors.racion_diaria_gr?.[0]">
-                    <el-input-number @change="calcularFrecuencia" class="w-100" v-model="form.racion_diaria_gr" :precision="6" :step="0.01" :min="0" disabled/>
+                    <el-input @change="calcularFrecuencia" class="w-100" v-model="form.racion_diaria_gr" :precision="6" :step="0.01" :min="0" disabled/>
                 </el-form-item>
             </div>
 
             <div class="col-lg-4">
                 <el-form-item label="N° de veces" :error="errors.frecuencia_diaria?.[0]">
-                    <el-input-number @change="calcularFrecuencia" class="w-100" v-model="form.frecuencia_diaria" :min="0" :step="1" />
+                    <el-input @change="calcularFrecuencia" class="w-100" v-model="form.frecuencia_diaria" :min="0" />
                 </el-form-item>
             </div>
         </div>
@@ -160,7 +160,7 @@
         <div class="row mb-3">
             <div class="col-lg-4">
                 <el-form-item label="Frecuencia de alimentación (g)" :error="errors.cantidad_por_frecuencia_gr?.[0]">
-                    <el-input-number class="w-100" v-model="form.cantidad_por_frecuencia_gr" :precision="6" :step="0.01" :min="0" disabled/>
+                    <el-input class="w-100" v-model="form.cantidad_por_frecuencia_gr" :precision="6" :step="0.01" :min="0" disabled/>
                 </el-form-item>
             </div>
         </div>
@@ -170,12 +170,12 @@
         <div class="row mb-5">
             <div class="col-lg-4">
                 <el-form-item label="Día (Horas)" :error="errors.foto_periodo_horas_dia?.[0]">
-                    <el-input-number class="w-100" v-model="form.foto_periodo_horas_dia" :min="0" :max="24" :step="1" />
+                    <el-input class="w-100" v-model="form.foto_periodo_horas_dia" :min="0" :max="24" />
                 </el-form-item>
             </div>
             <div class="col-lg-4">
                 <el-form-item label="Noche (Horas)" :error="errors.foto_periodo_horas_noche?.[0]">
-                    <el-input-number class="w-100" v-model="form.foto_periodo_horas_noche" :min="0" :max="24" :step="1" />
+                    <el-input class="w-100" v-model="form.foto_periodo_horas_noche" :min="0" :max="24" />
                 </el-form-item>
             </div>
         </div>

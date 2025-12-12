@@ -34,7 +34,7 @@ const showModal = ( campania_especie_id, piscigranja_id ) => {
 
 const showProduccion = async (campania_etapa_id) => {
     const { data } = await axios.get(route('campanias.etapas.edit', campania_etapa_id));
-    console.log(data);
+    // console.log(data);
 
     dataFormProduccion.value.campania_etapa_id = campania_etapa_id;
     dataFormProduccion.value.parametros_produccion = data.parametros_produccion;
@@ -65,7 +65,7 @@ const handleSaved = async( res ) => {
 };
 
 const handleSavedProduccion = async( res ) => {
-    console.log(res);
+    // console.log(res);
     // await loadEspecieEtapas( res.campania_especie_id )
 };
 
