@@ -65,19 +65,6 @@ class BiometriaController extends Controller
                 "observaciones"                          => $data['observaciones']
             ]);
 
-            // Registrar los detalles individuales (peso/tamaño de cada pez)
-            if (!empty($request->detalles)) {
-                foreach ($request->detalles as $detalle) {
-                    $biometria->detalles()->create([
-                        'peso_gr'        => $detalle['peso_gr'],
-                        'tamanio_cm'     => $detalle['tamanio_cm'],
-                        'numero_muestra' => $detalle['numero_muestra'],
-                        'observacion'    => $detalle['observacion'] ?? null,
-                        'fecha_registro' => $data['fecha_muestreo']
-                    ]);
-                }
-            }
-
             return $biometria;
         });
 
@@ -129,6 +116,7 @@ class BiometriaController extends Controller
             $id->update([
                 "campania_etapa_id"                      => $data['campania_etapa_id'],
                 "fecha_muestreo"                         => $data['fecha_muestreo'],
+                "cantidad_muestreo"                      => $data['cantidad_muestreo'],
                 "cantidad_peces_inicial"                 => $data['cantidad_peces_inicial'],
                 "cantidad_peces_final"                   => $data['cantidad_peces_final'],
                 "peso_inicial_gr"                        => $data['peso_inicial_gr'],
@@ -141,29 +129,6 @@ class BiometriaController extends Controller
                 "tasa_crecimiento_especifico_porcentaje" => $data['tasa_crecimiento_especifico_porcentaje'],
                 "observaciones"                          => $data['observaciones']
             ]);
-
-            // Manejar detalles: actualizar, crear y eliminar según sea necesario
-            $detallesRequest = collect($request->detalles ?? []);
-
-            // IDs recibidos desde el frontend (si existen)
-            $detalleIds = $detallesRequest->pluck('id')->filter()->toArray();
-
-            // Eliminar los detalles que ya no están en la solicitud
-            $id->detalles()->whereNotIn('id', $detalleIds)->delete();
-
-            // Recorrer y actualizar/crear los detalles enviados
-            foreach ($detallesRequest as $detalle) {
-                $id->detalles()->updateOrCreate(
-                    ['id' => $detalle['id'] ?? null],
-                    [
-                        'peso_gr'        => $detalle['peso_gr'],
-                        'tamanio_cm'     => $detalle['tamanio_cm'],
-                        'numero_muestra' => $detalle['numero_muestra'],
-                        'observacion'    => $detalle['observacion'] ?? null,
-                        'fecha_registro' => $data['fecha_muestreo']
-                    ]
-                );
-            }
 
             return $id;
         });
@@ -269,7 +234,7 @@ class BiometriaController extends Controller
     public function exportPdf($id)
     {
         // $biometria = Biometria::with('detalles', 'campaniaEtapa.campaniaEspecie.especie')->findOrFail($id);
-        $biometria = Biometria::with(['detalles', 'campaniaEtapa.campaniaEspecie.campania.piscigranja', 'campaniaEtapa.etapa', 'campaniaEtapa.piscina'])->findOrFail($id);
+        $biometria = Biometria::with(['campaniaEtapa.campaniaEspecie.campania.piscigranja', 'campaniaEtapa.etapa', 'campaniaEtapa.piscina'])->findOrFail($id);
 
         // return response()->json($biometria, 200);
 

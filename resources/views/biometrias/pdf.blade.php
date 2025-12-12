@@ -133,35 +133,6 @@
         </table>
     </div>
 
-    {{-- === 3. DETALLES DE MUESTRAS === --}}
-    <div class="section">
-        <h2>3. DETALLES DE MUESTRAS</h2>
-        <table>
-            <thead>
-                <tr>
-                    <th>#</th>
-                    <th>Fecha Registro</th>
-                    <th>N° Muestra</th>
-                    <th>Tamaño (cm)</th>
-                    <th>Peso (gr)</th>
-                    <th>Observación</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach ($biometria->detalles as $detalle)
-                    <tr>
-                        <td>{{ $loop->iteration }}</td>
-                        <td>{{ \Carbon\Carbon::parse($detalle->fecha_registro)->format('d/m/Y') }}</td>
-                        <td>{{ $detalle->numero_muestra }}</td>
-                        <td>{{ $detalle->tamanio_cm }}</td>
-                        <td>{{ $detalle->peso_gr }}</td>
-                        <td>{{ $detalle->observacion ?? '-' }}</td>
-                    </tr>
-                @endforeach
-            </tbody>
-        </table>
-    </div>
-
     {{-- === 4. OBSERVACIONES === --}}
     <div class="section">
         <h2>4. OBSERVACIONES</h2>

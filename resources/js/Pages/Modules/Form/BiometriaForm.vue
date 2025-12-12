@@ -1,8 +1,8 @@
 <script setup>
     import { router } from "@inertiajs/vue3";
-    import { onMounted, ref, watch } from "vue";
+    import { onMounted, ref } from "vue";
     import useSubmitForm from "@/Composables/useSubmitForm";
-    import { ElMessage, ElMessageBox } from "element-plus";
+    import { ElMessageBox } from "element-plus";
     import { useFormReset } from "@/Composables/useFormReset";
     import FormSection from "@/Components/FormSection.vue";
 
@@ -45,7 +45,6 @@
         tasa_crecimiento_especifico_porcentaje: 0.0,
         observaciones: null,
         cantidad_muestreo: 0,
-        detalles: [],
     });
 
     const { loading, progress, errors, submitForm } = useSubmitForm();
@@ -111,7 +110,7 @@
         calcularTasaSupervivencia();
     };
 
-    // Biomasa Inicial (Kg) = Numero Peces Final * Peso Final / 1000
+    // Biomasa Final (Kg) = Numero Peces Final * Peso Final / 1000
     const calcularBiomasaFinal = () => {
         const cantidad_peces_final = form.value.cantidad_peces_final;
         const peso_final_gr = form.value.peso_final_gr;
@@ -148,48 +147,6 @@
         }
     };
 
-    // --------------------------------
-    // Agregar manualmente una fila
-    const addMuestra = () => {
-        const cantidad = parseInt(form.value.cantidad_muestreo);
-        if (!cantidad || cantidad <= 0) {
-            ElMessage.warning('Ingrese una cantidad válida de muestras.');
-            return;
-        }
-
-        const cantidadActual = form.value.detalles.length;
-        const cantidadNueva = parseInt(cantidad);
-
-        // Si aumenta la cantidad, agrega nuevas filas vacías
-        if (cantidadNueva > cantidadActual) {
-            for (let i = cantidadActual; i < cantidadNueva; i++) {
-                form.value.detalles.push({
-                    numero_muestra: i + 1,
-                    tamanio_cm: 0.0,
-                    peso_gr: 0.0,
-                    observacion: ''
-                });
-            }
-        }
-
-        // Si disminuye, elimina las últimas filas
-        if (cantidadNueva < cantidadActual) {
-            form.value.detalles.splice(cantidadNueva);
-        }
-
-        // form.value.cantidad_muestreo = form.value.detalles.length;
-    };
-
-    // Eliminar una muestra
-    const removeMuestra = (index) => {
-        form.value.detalles.splice(index, 1);
-        // Reordenar numeración
-        form.value.detalles.forEach((d, i) => d.numero_muestra = i + 1);
-        form.value.cantidad_muestreo = form.value.detalles.length;
-    };
-
-    // --------------------------------
-
     const resetForm = () => {
         resetFormValues();
         errors.value = {};
@@ -209,7 +166,6 @@
             data: form.value,
             method: props.dataForm ? "put" : "post",
             onSuccess: (response) => {
-                // Si el controlador retorna el ID en response.data.id:
                 const biometriaId = response.data.data.id;
 
                 ElMessageBox.confirm(
@@ -226,7 +182,6 @@
                     }
                 )
                 .then(() => {
-                    // Abrir el PDF en una nueva pestaña
                     window.open(route('biometrias.pdf', biometriaId), '_blank');
                 })
                 .catch(() => {
@@ -237,40 +192,6 @@
             },
         });
     };
-
-    // ---------------------------------------------
-    // Promediar Tamaño y Peso de los Detalles
-    // ---------------------------------------------
-    watch(
-        () => form.value.detalles,
-        (detalles) => {
-            if (!detalles || detalles.length === 0) {
-                form.value.peso_final_gr = 0;
-                form.value.tamanio_final_cm = 0;
-                calcularBiomasaFinal();
-                return;
-            }
-
-            // Filtra solo valores numéricos válidos (>0)
-            const pesos = detalles.map(d => parseFloat(d.peso_gr) || 0);
-            const tamanios = detalles.map(d => parseFloat(d.tamanio_cm) || 0);
-
-            const totalPesos = pesos.reduce((a, b) => a + b, 0);
-            const totalTamanios = tamanios.reduce((a, b) => a + b, 0);
-
-            const promedioPeso = totalPesos / detalles.length;
-            const promedioTamanio = totalTamanios / detalles.length;
-
-            // Actualiza los campos finales del formulario principal
-            form.value.peso_final_gr = parseFloat(promedioPeso.toFixed(2));
-            form.value.tamanio_final_cm = parseFloat(promedioTamanio.toFixed(2));
-
-            // Recalcular biomasa y tasas
-            calcularBiomasaFinal();
-        },
-        { deep: true } // 👈 necesario para detectar cambios internos en los objetos del array
-    );
-
 
     onMounted(async () => {
         await piscigranjasOptions();
@@ -419,6 +340,22 @@
                     <div class="row mb-2">
                         <div class="col-lg-2">
                             <el-form-item
+                                label="N° de Muestras"
+                                :error="errors.cantidad_muestreo?.[0]"
+                            >
+                                <el-input
+                                    type="number"
+                                    class="w-100"
+                                    v-model="form.cantidad_muestreo"
+                                    :min="0"
+                                    step="any"
+                                    @change="calcularBiomasaInicial"
+                                />
+                            </el-form-item>
+                        </div>
+
+                        <div class="col-lg-2">
+                            <el-form-item
                                 label="N° Peces Iniciales"
                                 :error="errors.cantidad_peces_inicial?.[0]"
                             >
@@ -495,7 +432,9 @@
                                 />
                             </el-form-item>
                         </div>
+                    </div>
 
+                    <div class="row mb-2">
                         <div class="col-lg-2">
                             <el-form-item
                                 label="Tamaño Final (cm)"
@@ -599,91 +538,6 @@
                             </el-form-item>
                         </div>
                     </div>
-
-                    <h6 class="text-muted">Registro de las Muestras</h6>
-                    <div class="separator separator-dotted mb-3"></div>
-
-                    <div class="row mb-3">
-                        <div class="col-lg-3">
-                            <el-form-item label="Cantidad de Muestras" :error="errors.cantidad_muestreo?.[0]">
-                                <el-input
-                                    type="number"
-                                    v-model="form.cantidad_muestreo"
-                                    :min="0"
-                                    step="1"
-                                >
-                                    <template #append>
-                                        <el-button class="bg-primary text-white" type="primary" @click="addMuestra">
-                                            + Agregar Muestra
-                                        </el-button>
-                                    </template>
-                                </el-input>
-                            </el-form-item>
-                        </div>
-                    </div>
-
-                    <el-table
-                        :data="form.detalles"
-                        border
-                        style="width: 100%"
-                        v-if="form.detalles.length > 0"
-                    >
-                        <el-table-column label="N°" prop="numero_muestra" width="50" align="center">
-                            <template #default="{ row }">
-                                <span>{{ row.numero_muestra }}</span>
-                            </template>
-                        </el-table-column>
-
-                        <el-table-column label="Tamaño (cm)" align="center">
-                            <template #default="{ row, $index }">
-                                <el-input
-                                    type="number"
-                                    v-model="form.detalles[$index].tamanio_cm"
-                                    step="any"
-                                    :min="0"
-                                    class="w-100"
-                                />
-                            </template>
-                        </el-table-column>
-
-                        <el-table-column label="Peso (g)" align="center">
-                            <template #default="{ row, $index }">
-                                <el-input
-                                    type="number"
-                                    v-model="form.detalles[$index].peso_gr"
-                                    step="any"
-                                    :min="0"
-                                    class="w-100"
-                                />
-                            </template>
-                        </el-table-column>
-
-                        <el-table-column label="Observaciones" align="center">
-                            <template #default="{ row, $index }">
-                                <el-input
-                                    type="textarea"
-                                    v-model="form.detalles[$index].observacion"
-                                    class="w-100"
-                                    :rows="1"
-                                />
-                            </template>
-                        </el-table-column>
-
-                        <el-table-column label="Acciones" width="100" align="center">
-                            <template #default="{ $index }">
-                                <el-button
-                                    type="danger"
-                                    size="small"
-                                    icon="Delete"
-                                    @click="removeMuestra($index)"
-                                />
-                            </template>
-                        </el-table-column>
-                    </el-table>
-
-                    <template v-else>
-                        <p class="text-muted fst-italic">No se han agregado muestras aún.</p>
-                    </template>
                 </template>
                 <template #actions>
                     <div class="d-flex justify-content-center">

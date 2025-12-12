@@ -47,11 +47,6 @@ class Biometria extends Model
         return $this->belongsTo(CampaniaEtapa::class);
     }
 
-    public function detalles() : HasMany
-    {
-        return $this->hasMany(BiometriaDetalle::class);
-    }
-
     protected function casts(): array
     {
         return [
