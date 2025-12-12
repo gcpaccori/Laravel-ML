@@ -104,7 +104,8 @@ class CalidadAguaController extends Controller
         // 2) Obtener el último parámetro global filtrado
         // ======================
         $parametroQuery = ParametroAgua::with(['piscina.piscigranja'])
-            ->latest('fecha_medicion');
+            // ->latest('fecha_medicion');
+            ->latest('created_at');
 
         // Filtro por piscigranja
         if ($request->has('piscigranja_id') && $request->piscigranja_id !== 'T') {
