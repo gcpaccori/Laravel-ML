@@ -44,7 +44,7 @@ class HistorialAguaController extends Controller
         $tipoTiempo = $request->tipo_tiempo ?? 'D'; // D=diario, M=mensual, Y=anual
 
         $query = ParametroAgua::with(['piscina.piscigranja'])
-            ->orderBy('fecha_medicion', 'asc');
+            ->orderBy('created_at', 'asc');
 
         if ($piscigranjaId !== 'T') {
             $query->whereHas('piscina', function ($q) use ($piscigranjaId) {
@@ -58,12 +58,12 @@ class HistorialAguaController extends Controller
 
         // Filtro por rango de tiempo
         if ($tipoTiempo === 'D' && $request->filled('fecha')) {
-            $query->whereDate('fecha_medicion', $request->fecha);
+            $query->whereDate('created_at', $request->fecha);
         } elseif ($tipoTiempo === 'M' && $request->filled('mes')) {
-            $query->whereYear('fecha_medicion', substr($request->mes, 0, 4))
-                ->whereMonth('fecha_medicion', substr($request->mes, 5, 2));
+            $query->whereYear('created_at', substr($request->mes, 0, 4))
+                ->whereMonth('created_at', substr($request->mes, 5, 2));
         } elseif ($tipoTiempo === 'Y' && $request->filled('anio')) {
-            $query->whereYear('fecha_medicion', $request->anio);
+            $query->whereYear('created_at', $request->anio);
         }
 
         $parametros = $query->get();
