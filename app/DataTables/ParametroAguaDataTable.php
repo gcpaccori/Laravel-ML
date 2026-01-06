@@ -86,7 +86,7 @@ class ParametroAguaDataTable extends DataTable
     {
         $query = $model->newQuery()
             ->with(['piscina.piscigranja'])
-            ->orderBy('fecha_medicion', 'desc');
+            ->orderBy('created_at', 'desc');
 
         // Filtros que vienen del request
         $piscigranjaId = request('piscigranja_id');
@@ -105,13 +105,13 @@ class ParametroAguaDataTable extends DataTable
 
         // Filtros de tiempo
         if ($tipoTiempo === 'D' && request()->filled('fecha')) {
-            $query->whereDate('fecha_medicion', request('fecha'));
+            $query->whereDate('created_at', request('fecha'));
         } elseif ($tipoTiempo === 'M' && request()->filled('mes')) {
             $mes = request('mes');
-            $query->whereYear('fecha_medicion', substr($mes, 0, 4))
-                ->whereMonth('fecha_medicion', substr($mes, 5, 2));
+            $query->whereYear('created_at', substr($mes, 0, 4))
+                ->whereMonth('created_at', substr($mes, 5, 2));
         } elseif ($tipoTiempo === 'Y' && request()->filled('anio')) {
-            $query->whereYear('fecha_medicion', request('anio'));
+            $query->whereYear('created_at', request('anio'));
         }
 
         return $query;

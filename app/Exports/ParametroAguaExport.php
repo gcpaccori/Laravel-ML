@@ -21,7 +21,7 @@ class ParametroAguaExport implements FromQuery, WithHeadings, WithMapping, WithC
     public function query()
     {
         $query = ParametroAgua::with(['piscina.piscigranja'])
-            ->orderBy('fecha_medicion', 'desc');
+            ->orderBy('created_at', 'desc');
 
         // Aplicar filtros como en DataTable
         $piscigranjaId = $this->request->piscigranja_id;
@@ -39,13 +39,13 @@ class ParametroAguaExport implements FromQuery, WithHeadings, WithMapping, WithC
         }
 
         if ($tipoTiempo === 'D' && $this->request->filled('fecha')) {
-            $query->whereDate('fecha_medicion', $this->request->fecha);
+            $query->whereDate('created_at', $this->request->fecha);
         } elseif ($tipoTiempo === 'M' && $this->request->filled('mes')) {
             $mes = $this->request->mes;
-            $query->whereYear('fecha_medicion', substr($mes, 0, 4))
-                  ->whereMonth('fecha_medicion', substr($mes, 5, 2));
+            $query->whereYear('created_at', substr($mes, 0, 4))
+                  ->whereMonth('created_at', substr($mes, 5, 2));
         } elseif ($tipoTiempo === 'Y' && $this->request->filled('anio')) {
-            $query->whereYear('fecha_medicion', $this->request->anio);
+            $query->whereYear('created_at', $this->request->anio);
         }
 
         return $query;

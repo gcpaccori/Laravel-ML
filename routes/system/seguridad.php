@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\LogController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\AccionController;
 use App\Http\Controllers\ModuloController;
@@ -61,3 +62,12 @@ use App\Http\Controllers\SessionLogController;
     // SESSION LOG
     Route::get('column/sessionlogs', [SessionLogController::class, 'columns'])->name('column.sessionlogs');
     Route::get('datatable/sessionlogs', [SessionLogController::class, 'datatable'])->name('datatable.sessionlogs');
+
+    Route::prefix('logs')->name('seguridad.logs.')->group(function () {
+        Route::get('/', [LogController::class, 'index'])->name('index');
+        Route::get('/datatable', [LogController::class, 'datatable'])->name('datatable');
+        // Route::get('/data', [LogController::class, 'getData'])->name('data');
+        // Route::get('/show/{id}', [LogController::class, 'show'])->name('show');
+        Route::post('/clear', [LogController::class, 'clear'])->name('clear');
+        Route::get('/download', [LogController::class, 'download'])->name('download');
+    });

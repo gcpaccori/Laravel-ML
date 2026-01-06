@@ -92,9 +92,31 @@ class SistemaModuloAccionSeeder extends Seeder
                         'icon'     => 'TurnOff',
                         'order'    => 5,
                         'acciones' => ['new','edit','delete'],
+                    ],
+                    [
+                        'name'     => 'Logs',
+                        'url'      => 'log',
+                        'icon'     => 'Cpu',
+                        'order'    => 6,
+                        'acciones' => [],
                     ]
                 ],
             ],
+            // [
+            //     'name'    => 'Configuraciones',
+            //     'icon'    => 'Setting',
+            //     'url'     => 'configuracion',
+            //     'order'   => 20,
+            //     'modulos' => [
+            //         [
+            //             'name'     => 'Logs',
+            //             'url'      => 'log',
+            //             'icon'     => 'Cpu',
+            //             'order'    => 1,
+            //             'acciones' => ['new','edit','delete'],
+            //         ]
+            //     ],
+            // ],
             [
                 'name'    => 'Panel de Monitoreo',
                 'icon'    => 'Monitor',
