@@ -1,5 +1,5 @@
 <script setup>
-    import { onMounted, onUnmounted, ref } from "vue";
+    import { onMounted, computed, ref } from "vue";
     import GaugeChart from "@/Components/GaugeChart.vue";
     import PiscigranjasMap from "@/Components/PiscigranjasMap.vue";
     import ServerTime from "@/Components/ServerTime.vue";
@@ -26,6 +26,14 @@
     const piscigranjasMapList = ref([]);
 
     const piscinasList = ref(null);
+
+    const gauges = computed(() =>
+        Object.entries(props.bands).map(([key, config]) => ({
+            key,
+            value: parametros_agua.value[key],
+            ...config,
+        }))
+    );
 
     const piscigranjasOptions = async() => {
         const {data} = await axios.get(route('piscigranjas.options'));
@@ -187,6 +195,27 @@
                         </h3>
                     </div>
                     <div class="card-body pt-0">
+                        <div class="row">
+                            <div
+                                v-for="gauge in gauges"
+                                :key="gauge.key"
+                                class="col-lg-6 mb-5"
+                            >
+                                <h5 class="text-center fw-bold mb-2">
+                                    {{ gauge.label }}
+                                </h5>
+
+                                <GaugeChart
+                                    :value="gauge.value"
+                                    :min="gauge.min"
+                                    :max="gauge.max"
+                                    :bandsData="gauge.bands"
+                                    :unit="gauge.unit"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                    <!-- <div class="card-body pt-0">
                         <div class="row mb-5">
                             <div class="col-lg-6">
                                 <h5 class="text-center font-bold mb-2">Temperatura</h5>
@@ -231,7 +260,7 @@
                                 />
                             </div>
                         </div>
-                    </div>
+                    </div> -->
                 </div>
             </div>
         </div>

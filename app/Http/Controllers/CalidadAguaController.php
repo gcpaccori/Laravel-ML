@@ -18,52 +18,52 @@ class CalidadAguaController extends Controller
      */
     public function index()
     {
-        $bands = [
-            "bandsTemperatura" => [
-                "bands" => ParametroBanda::where('parametro', 'temperatura')->get()
-                    ->map(fn($item) => [
-                        "title"     => $item->title,
-                        "color"     => $item->color,
-                        "lowScore"  => $item->low_score,
-                        "highScore" => $item->high_score,
-                    ]),
-                "min" => 0,
-                "max" => 40,
+        $config = [
+            'temperatura' => [
+                'label' => 'Temperatura',
+                'unit'  => '°C',
             ],
-            "bandsPh" => [
-                "bands" => ParametroBanda::where('parametro', 'ph')->get()
-                    ->map(fn($item) => [
-                        "title"     => $item->title,
-                        "color"     => $item->color,
-                        "lowScore"  => $item->low_score,
-                        "highScore" => $item->high_score,
-                    ]),
-                "min" => 0,
-                "max" => 14,
+            'ph' => [
+                'label' => 'Grado de Acidez',
+                'unit'  => 'pH',
             ],
-            "bandsOxigeno" => [
-                "bands" => ParametroBanda::where('parametro', 'oxigeno')->get()
-                    ->map(fn($item) => [
-                        "title"     => $item->title,
-                        "color"     => $item->color,
-                        "lowScore"  => $item->low_score,
-                        "highScore" => $item->high_score,
-                    ]),
-                "min" => 0,
-                "max" => 15,
+            'oxigeno_disuelto' => [
+                'label' => 'Oxígeno Disuelto',
+                'unit'  => 'mg/L',
             ],
-            "bandsNitrato" => [
-                "bands" => ParametroBanda::where('parametro', 'nitrato')->get()
-                    ->map(fn($item) => [
-                        "title"     => $item->title,
-                        "color"     => $item->color,
-                        "lowScore"  => $item->low_score,
-                        "highScore" => $item->high_score,
-                    ]),
-                "min" => 0,
-                "max" => 2000,
+            'ion_nitrato' => [
+                'label' => 'Ion de Nitrato',
+                'unit'  => 'mg/L',
             ],
         ];
+
+        $parametros = ParametroBanda::orderBy('parametro')
+            ->orderBy('low_score')
+            ->get()
+            ->groupBy('parametro');
+
+
+        $bands = [];
+
+        foreach ($config as $parametro => $item) {
+
+            $items = $parametros[$parametro] ?? [];
+
+            $bands[$parametro] = [
+                'label' => $item['label'],
+                'unit'  => $item['unit'],
+
+                'min' => $items->min('low_score'),
+                'max' => $items->max('high_score'),
+
+                'bands' => $items->map(fn ($band) => [
+                    'title'     => $band->title,
+                    'color'     => $band->color,
+                    'lowScore'  => $band->low_score,
+                    'highScore' => $band->high_score,
+                ])->values(),
+            ];
+        }
 
         return Inertia::render('Modules/Views/CalidadAgua', [
             'title' => 'Monitoreo de Calidad del Agua',
@@ -135,8 +135,8 @@ class CalidadAguaController extends Controller
             'parametros' => [
                 'temperatura'    => $ultimo?->temperatura ?? 0,
                 'ph'             => $ultimo?->ph ?? 0,
-                'oxigeno'        => $ultimo?->oxigeno_disuelto ?? 0,
-                'nitrato'        => $ultimo?->ion_nitrato ?? 0,
+                'oxigeno_disuelto'        => $ultimo?->oxigeno_disuelto ?? 0,
+                'ion_nitrato'        => $ultimo?->ion_nitrato ?? 0,
                 'fecha_medicion' => $ultimo?->fecha_medicion?->format('d/m/Y H:i:s'),
                 'fecha_registro' => $ultimo?->created_at?->format('d/m/Y H:i:s'),
                 'piscina' => $ultimo?->piscina ? [

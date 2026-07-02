@@ -92,7 +92,7 @@ class BiometriaController extends Controller
      */
     public function edit( string $id )
     {
-        $biometria = Biometria::with(['detalles'])->findOrFail($id);
+        $biometria = Biometria::with(['campaniaEtapa'])->findOrFail($id);
         return Inertia::render('Modules/Form/BiometriaForm', [
             'title' => 'Editar Biométrias',
             'toolbar' => [

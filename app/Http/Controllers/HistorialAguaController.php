@@ -2,15 +2,15 @@
 
 namespace App\Http\Controllers;
 
-use Carbon\Carbon;
-use Inertia\Inertia;
-use Illuminate\Http\Request;
-use App\Models\ParametroAgua;
-use App\Helpers\DataTableHelper;
-use Illuminate\Support\Facades\DB;
-use App\Exports\ParametroAguaExport;
-use Maatwebsite\Excel\Facades\Excel;
 use App\DataTables\ParametroAguaDataTable;
+use App\Exports\ParametroAguaExport;
+use App\Helpers\DataTableHelper;
+use App\Models\ParametroAgua;
+use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Inertia\Inertia;
+use Maatwebsite\Excel\Facades\Excel;
 
 class HistorialAguaController extends Controller
 {
@@ -39,128 +39,236 @@ class HistorialAguaController extends Controller
 
     public function getChartData(Request $request)
     {
-        $piscigranjaId = $request->piscigranja_id;
-        $piscinaId = $request->piscina_id;
         $tipoTiempo = $request->tipo_tiempo ?? 'D'; // D=diario, M=mensual, Y=anual
 
-        $query = ParametroAgua::with(['piscina.piscigranja'])
-            ->orderBy('created_at', 'asc');
+        $config          = $this->getParametrosConfig();
+        $axisDefinitions = $this->getAxisDefinitions();
+        $axisIndexMap    = $this->buildAxisIndexMap($config);
+        $yAxis           = $this->buildYAxis($config, $axisDefinitions);
 
-        if ($piscigranjaId !== 'T') {
-            $query->whereHas('piscina', function ($q) use ($piscigranjaId) {
-                $q->where('piscigranja_id', $piscigranjaId);
-            });
-        }
+        $query   = $this->buildParametrosQuery($request, $tipoTiempo);
+        $grouped = $tipoTiempo === 'D'
+            ? $this->fetchRawData($query, $config)
+            : $this->fetchAggregatedData($query, $config, $tipoTiempo);
 
-        if ($piscinaId !== 'T') {
-            $query->where('piscina_id', $piscinaId);
-        }
+        [$labels, $series, $tooltips] = $this->buildChartDatasets(
+            $grouped, $config, $axisIndexMap, $tipoTiempo
+        );
 
-        // Filtro por rango de tiempo
-        if ($tipoTiempo === 'D' && $request->filled('fecha')) {
-            $query->whereDate('created_at', $request->fecha);
-        } elseif ($tipoTiempo === 'M' && $request->filled('mes')) {
-            $query->whereYear('created_at', substr($request->mes, 0, 4))
+        return response()->json([
+            'chart' => [
+                'tooltip' => [
+                    'trigger'   => 'axis',
+                    'textStyle' => ['fontSize' => 12],
+                    'data'      => $tooltips,
+                ],
+                'legend' => ['top' => 40],
+                'grid'   => ['top' => 100, 'bottom' => 60, 'left' => 60, 'right' => 60],
+                'xAxis'  => ['type' => 'category', 'data' => $labels],
+                'yAxis'  => $yAxis,
+                'series' => $series,
+            ],
+        ]);
+    }
+
+    /**
+     * Config de parámetros a graficar.
+     * TODO: reemplazar por consulta a BD (con Cache::remember).
+     */
+
+    private function getParametrosConfig(): Collection
+    {
+        return collect([
+            'temperatura' => [
+                'label'      => 'Temperatura',
+                'unit'       => '°C',
+                'axis_group' => 'principal',
+            ],
+            'ph' => [
+                'label'      => 'Grado de Acidez',
+                'unit'       => 'pH',
+                'axis_group' => 'principal',
+            ],
+            'oxigeno_disuelto' => [
+                'label'      => 'Oxígeno Disuelto',
+                'unit'       => 'mg/L',
+                'axis_group' => 'principal',
+            ],
+            'ion_nitrato' => [
+                'label'      => 'Ion Nitrato',
+                'unit'       => 'mg/L',
+                'axis_group' => 'nitrato',
+            ],
+        ]);
+    }
+
+    /**
+     * Definición visual de cada grupo de eje.
+     */
+    private function getAxisDefinitions(): array
+    {
+        return [
+            'principal' => [
+                'name' => 'Temperatura / Grado de Acidez / Oxígeno Disuelto',
+                'type' => 'value',
+                'min'  => 0,
+                'max'  => 100,
+            ],
+            'nitrato' => [
+                'name'     => 'Ion Nitrato',
+                'type'     => 'log',
+                'position' => 'right',
+                'min'      => 0.1,
+                'max'      => 20000,
+                'logBase'  => 10,
+            ],
+        ];
+    }
+
+    /**
+     * Mapa axis_group => yAxisIndex, calculado por orden de aparición.
+     */
+    private function buildAxisIndexMap(Collection $config): Collection
+    {
+        return $config->pluck('axis_group')->unique()->values()->flip();
+    }
+
+    private function buildYAxis(Collection $config, array $axisDefinitions): Collection
+    {
+        return $config->pluck('axis_group')
+            ->unique()
+            ->values()
+            ->map(fn ($group) => $axisDefinitions[$group] ?? ['type' => 'value'])
+            ->values();
+    }
+
+    /**
+     * Query base con los filtros de piscigranja, piscina y rango de tiempo.
+     */
+    private function buildParametrosQuery(Request $request, string $tipoTiempo)
+    {
+        $piscigranjaId = $request->piscigranja_id;
+        $piscinaId     = $request->piscina_id;
+
+        return ParametroAgua::with(['piscina.piscigranja'])
+            ->when($piscigranjaId !== 'T', fn ($q) =>
+                $q->whereHas('piscina', fn ($q2) => $q2->where('piscigranja_id', $piscigranjaId))
+            )
+            ->when($piscinaId !== 'T', fn ($q) =>
+                $q->where('piscina_id', $piscinaId)
+            )
+            ->when($tipoTiempo === 'D' && $request->filled('fecha'), fn ($q) =>
+                $q->whereDate('created_at', $request->fecha)
+            )
+            ->when($tipoTiempo === 'M' && $request->filled('mes'), function ($q) use ($request) {
+                $q->whereYear('created_at', substr($request->mes, 0, 4))
                 ->whereMonth('created_at', substr($request->mes, 5, 2));
-        } elseif ($tipoTiempo === 'Y' && $request->filled('anio')) {
-            $query->whereYear('created_at', $request->anio);
-        }
+            })
+            ->when($tipoTiempo === 'Y' && $request->filled('anio'), fn ($q) =>
+                $q->whereYear('created_at', $request->anio)
+            );
+    }
 
-        $parametros = $query->get();
-
-        // Agrupación dinámica según filtro
-        if ($tipoTiempo === 'D') {
-            // Sin agrupar, muestra variación en el día
-            $grouped = $parametros->map(function ($item) {
-                return [
-                    'fecha' => $item->fecha_medicion,
-                    'temperatura' => $item->temperatura,
-                    'ph' => $item->ph,
-                    'oxigeno_disuelto' => $item->oxigeno_disuelto,
-                    'ion_nitrato' => $item->ion_nitrato,
-                    'piscina' => $item->piscina->nombre ?? '',
+    /**
+     * Datos crudos (vista diaria), sin agregación.
+     */
+    private function fetchRawData($query, \Illuminate\Support\Collection $config): \Illuminate\Support\Collection
+    {
+        return $query
+            ->orderBy('created_at')
+            ->get()
+            ->map(function ($item) use ($config) {
+                $row = [
+                    'fecha'       => $item->fecha_medicion,
+                    'piscina'     => $item->piscina->nombre ?? '',
                     'piscigranja' => $item->piscina->piscigranja->nombre ?? '',
                 ];
-            });
-        } elseif ($tipoTiempo === 'M') {
-            // Agrupar por día y promediar
-            $grouped = $parametros->groupBy(function ($item) {
-                return $item->fecha_medicion->format('Y-m-d');
-            })->map(function ($items) {
-                return [
-                    'fecha' => $items->first()->fecha_medicion->startOfDay(),
-                    'temperatura' => $items->avg('temperatura'),
-                    'ph' => $items->avg('ph'),
-                    'oxigeno_disuelto' => $items->avg('oxigeno_disuelto'),
-                    'ion_nitrato' => $items->avg('ion_nitrato'),
-                ];
-            });
-        } else { // Y = anual
-            // Agrupar por mes y promediar
-            $grouped = $parametros->groupBy(function ($item) {
-                return $item->fecha_medicion->format('Y-m');
-            })->map(function ($items) {
-                return [
-                    'fecha' => $items->first()->fecha_medicion->startOfMonth(),
-                    'temperatura' => $items->avg('temperatura'),
-                    'ph' => $items->avg('ph'),
-                    'oxigeno_disuelto' => $items->avg('oxigeno_disuelto'),
-                    'ion_nitrato' => $items->avg('ion_nitrato'),
-                ];
-            });
-        }
 
-        // Preparar datos para el gráfico
-        $labels = $grouped->map(fn($item) =>
-            $item['fecha']->translatedFormat(
-                $tipoTiempo === 'Y' ? 'M Y' : ($tipoTiempo === 'M' ? 'd M Y' : 'H:i')
-            )
-        )->values();
+                foreach ($config as $campo => $cfg) {
+                    $row[$campo] = $item->$campo;
+                }
 
-        $tooltips = $grouped->map(function ($item) use ($tipoTiempo) {
-            $base = $item['fecha']->translatedFormat(
+                return $row;
+            });
+    }
+
+    /**
+     * Promedios agregados en SQL (vista mensual/anual).
+     */
+    private function fetchAggregatedData($query, \Illuminate\Support\Collection $config, string $tipoTiempo): \Illuminate\Support\Collection
+    {
+        $formatoFecha = $tipoTiempo === 'M' ? '%Y-%m-%d' : '%Y-%m';
+
+        $selects = $config->keys()
+            ->map(fn ($campo) => "ROUND(AVG($campo), 2) as $campo")
+            ->implode(', ');
+
+        return $query
+            ->selectRaw("DATE_FORMAT(created_at, '{$formatoFecha}') as periodo, {$selects}")
+            ->groupBy('periodo')
+            ->orderBy('periodo')
+            ->get()
+            ->map(function ($row) use ($tipoTiempo) {
+                $row->fecha = $tipoTiempo === 'M'
+                    ? Carbon::createFromFormat('Y-m-d', $row->periodo)->startOfDay()
+                    : Carbon::createFromFormat('Y-m', $row->periodo)->startOfMonth();
+
+                return collect($row->toArray());
+            });
+    }
+
+    private function buildChartDatasets( Collection $grouped, Collection $config, Collection $axisIndexMap, string $tipoTiempo): array {
+        $formato = match ($tipoTiempo) {
+            'D' => 'H:i',
+            'M' => 'd M Y',
+            'Y' => 'M Y',
+        };
+
+        $seriesData = $config->keys()->mapWithKeys(fn ($campo) => [$campo => []])->all();
+        $labels     = [];
+        $tooltips   = [];
+
+        foreach ($grouped as $item) {
+            $labels[] = $item['fecha']->translatedFormat($formato);
+
+            $tooltipItems = [];
+            foreach ($config as $campo => $cfg) {
+                $valor = $item[$campo] ?? null;
+                $seriesData[$campo][] = $valor;
+
+                $tooltipItems[] = [
+                    'field' => $campo,
+                    'label' => $cfg['label'],
+                    'value' => number_format($valor, 2) . ' ' . $cfg['unit'],
+                    'unit'  => $cfg['unit'],
+                ];
+            }
+
+            $title = $item['fecha']->translatedFormat(
                 $tipoTiempo === 'D' ? 'l, d M Y H:i:s' : 'l, d M Y'
             );
 
             if ($tipoTiempo === 'D') {
-                $base .= " | {$item['piscigranja']} | {$item['piscina']}";
+                $title .= " | {$item['piscigranja']} | {$item['piscina']}";
             }
 
-            return $base;
-        })->values();
+            $tooltips[] = [
+                'title' => $title,
+                'items' => $tooltipItems,
+            ];
+        }
 
-        $series = [
-            [
-                'name' => 'Temperatura (°C)',
-                'type' => 'line',
-                'smooth' => true,
-                'data' => $grouped->pluck('temperatura')->values(),
-            ],
-            [
-                'name' => 'pH',
-                'type' => 'line',
-                'smooth' => true,
-                'data' => $grouped->pluck('ph')->values(),
-            ],
-            [
-                'name' => 'Oxígeno disuelto (mg/L)',
-                'type' => 'line',
-                'smooth' => true,
-                'data' => $grouped->pluck('oxigeno_disuelto')->values(),
-            ],
-            [
-                'name' => 'Ion Nitrato (mg/L)',
-                'type' => 'line',
-                'smooth' => true,
-                'data' => $grouped->pluck('ion_nitrato')->values(),
-            ],
-        ];
+        $series = $config
+            ->map(fn ($cfg, $campo) => [
+                'name'       => "{$cfg['label']} ({$cfg['unit']})",
+                'type'       => 'line',
+                'smooth'     => true,
+                'data'       => $seriesData[$campo],
+                'yAxisIndex' => $axisIndexMap[$cfg['axis_group']],
+            ])
+            ->values();
 
-        return response()->json([
-            'labels' => $labels,
-            'tooltips' => $tooltips,
-            'series' => $series,
-        ]);
+        return [$labels, $series, $tooltips];
     }
 
     public function export_csv( Request $request )

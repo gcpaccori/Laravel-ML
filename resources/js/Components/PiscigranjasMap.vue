@@ -150,7 +150,13 @@ function dibujarMarcadores() {
         .filter((p) => p.latitud && p.longitud)
         .map((p) => L.marker([parseFloat(p.latitud), parseFloat(p.longitud)]))
     );
-    map.fitBounds(group.getBounds().pad(0.2));
+
+    map.flyToBounds(group.getBounds().pad(0.2), {
+        duration: 3,
+        padding: [40, 40],
+        easeLinearity: 0.2
+    });
+
   }
 }
 

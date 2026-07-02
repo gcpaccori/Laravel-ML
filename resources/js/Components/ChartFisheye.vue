@@ -9,9 +9,7 @@ import * as echarts from "echarts";
 type EChartsOption = echarts.EChartsOption;
 
 const props = defineProps<{
-    labels: string[];
-    tooltips: string[];
-    series: any[];
+    options: any
 }>();
 
 const chartRef = ref<HTMLDivElement | null>(null);
@@ -19,30 +17,18 @@ let myChart: echarts.ECharts | null = null;
 
 function getOption(): EChartsOption {
     return {
+        ...props.options,
         tooltip: {
-            trigger: "axis",
-            textStyle: {
-                fontSize: 12
-            },
-            formatter: function (params) {
-                let index = params[0].dataIndex;
-                let dateTitle = props.tooltips[index]; // viene de Laravel
-                let html = `<strong>${dateTitle}</strong><br/>`;
-                params.forEach((p) => {
-                    const val =
-                        p.data !== null && p.data !== undefined
-                            ? Number(p.data).toFixed(2)
-                            : "-";
-                    html += `${p.marker} ${p.seriesName}: ${val}<br/>`;
+            ...props.options?.tooltip,
+            formatter(params: any) {
+                const tooltip = props.options.tooltip.data[params[0].dataIndex];
+                let html = `<strong>${tooltip.title}</strong><br/>`;
+                tooltip.items.forEach((item: any, index: number) => {
+                    html += `${params[index]?.marker ?? ""} ${item.label}: ${item.value}<br/>`;
                 });
                 return html;
-            },
-        },
-        legend: { top: 40 },
-        grid: { top: 100, bottom: 60, left: 60, right: 60 },
-        xAxis: { type: "category", data: props.labels },
-        yAxis: { type: "value" },
-        series: props.series,
+            }
+        }
     };
 }
 
@@ -63,7 +49,7 @@ onBeforeUnmount(() => {
 });
 
 watch(
-    () => [props.labels, props.series],
+    () => [props.options],
     () => {
         if (myChart) {
             myChart.setOption(getOption(), true);

@@ -131,14 +131,12 @@ const changeTiempo = async () => {
     reloadTable();
 };
 
+const chart = ref(null);
 const loadParametros = async () => {
     const { data } = await axios.get(route("chart.historialaguas"), {
         params: form.value,
     });
-    labels.value = data.labels;
-    tooltips.value = data.tooltips;
-    series.value = data.series;
-    // console.log(data);
+    chart.value = data.chart;
 
     if (form.value.piscigranja_id == "T") {
         piscinasList.value = [];
@@ -310,11 +308,7 @@ onMounted(async () => {
                         </h3>
                     </div>
                     <div class="card-body pt-0">
-                        <ChartFisheye
-                            :labels="labels"
-                            :series="series"
-                            :tooltips="tooltips"
-                        />
+                        <ChartFisheye :options="chart" />
                     </div>
                 </div>
             </div>
