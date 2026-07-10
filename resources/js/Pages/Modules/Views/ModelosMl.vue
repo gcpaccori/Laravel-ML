@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import ChartFisheye from "@/Components/ChartFisheye.vue";
 
-const props = defineProps({
+defineProps({
     title: String,
     toolbar: {
         type: Array,
@@ -26,30 +26,62 @@ const form = ref({
 const horizontes = [
     { id: "24h", name: "24 horas" },
     { id: "72h", name: "72 horas" },
-    { id: "7d", name: "7 días" },
-    { id: "30d", name: "30 días" },
+    { id: "7d", name: "7 dias" },
+    { id: "30d", name: "30 dias" },
 ];
 
 const ventanas = [
-    { id: "7d", name: "Últimos 7 días" },
-    { id: "30d", name: "Últimos 30 días" },
-    { id: "90d", name: "Últimos 90 días" },
-    { id: "all", name: "Todo el histórico" },
+    { id: "7d", name: "Ultimos 7 dias" },
+    { id: "30d", name: "Ultimos 30 dias" },
+    { id: "90d", name: "Ultimos 90 dias" },
+    { id: "all", name: "Todo el historico" },
 ];
 
 const latest = computed(() => response.value?.latest ?? {});
 const summary = computed(() => response.value?.summary ?? {});
 const models = computed(() => response.value?.models ?? []);
+const warnings = computed(() => response.value?.warnings ?? []);
+const traceability = computed(() => response.value?.traceability ?? {});
+const lifecycle = computed(() => response.value?.lifecycle ?? {});
+const activeAssets = computed(() => response.value?.active_assets ?? []);
 
 const formatValue = (value, unit = "") => {
     if (value === null || value === undefined || value === "") return "-";
-    return `${Number(value).toLocaleString("es-PE", { maximumFractionDigits: 3 })}${unit ? ` ${unit}` : ""}`;
+    const number = Number(value);
+    if (!Number.isFinite(number)) return "-";
+    return `${number.toLocaleString("es-PE", { maximumFractionDigits: 3 })}${unit ? ` ${unit}` : ""}`;
+};
+
+const metricValue = (value) => {
+    if (value === null || value === undefined || value === "") return "N/D";
+    const number = Number(value);
+    if (!Number.isFinite(number)) return "N/D";
+    return number.toLocaleString("es-PE", { maximumFractionDigits: 4 });
+};
+
+const statusLabel = (status) => {
+    const labels = {
+        asset_activo: "Asset ML activo",
+        gemelo_digital: "Gemelo digital",
+        escenario_sin_asset: "Escenario sin asset",
+        disponible: "Disponible",
+        sin_datos: "Sin datos",
+    };
+    return labels[status] ?? status ?? "N/D";
 };
 
 const statusClass = (status) => {
-    if (status === "disponible") return "badge-light-success";
-    if (status === "sin_datos") return "badge-light-warning";
-    return "badge-light-primary";
+    if (status === "asset_activo") return "badge-light-success";
+    if (status === "gemelo_digital") return "badge-light-primary";
+    if (status === "escenario_sin_asset") return "badge-light-warning";
+    if (status === "sin_datos") return "badge-light-danger";
+    return "badge-light-info";
+};
+
+const shortId = (value) => {
+    if (!value) return "N/D";
+    const text = String(value);
+    return text.length > 18 ? `${text.slice(0, 18)}...` : text;
 };
 
 const piscigranjasOptions = async () => {
@@ -76,7 +108,10 @@ const loadModelos = async () => {
         response.value = data;
     } catch (error) {
         response.value = null;
-        errorMessage.value = error?.response?.data?.message ?? "No se pudo cargar la información de modelos.";
+        errorMessage.value =
+            error?.response?.data?.message ??
+            error?.response?.data?.detail ??
+            "No se pudo cargar la informacion de modelos.";
     } finally {
         loading.value = false;
     }
@@ -103,12 +138,12 @@ onMounted(async () => {
     <App :title="title" :toolbar="toolbar">
         <div class="row g-5 g-xl-8">
             <div class="col-xl-12">
-                <div class="card bg-body hoverable card-xl-stretch mb-xl-1">
+                <div class="card bg-body card-xl-stretch mb-xl-1">
                     <div class="card-body">
                         <el-form :model="form" label-position="top" class="w-100">
                             <div class="row">
                                 <div class="col-lg-3">
-                                    <el-form-item label="Piscigranjas">
+                                    <el-form-item label="Piscigranja">
                                         <el-select filterable v-model="form.piscigranja_id" @change="changePiscigranja">
                                             <el-option label="Todos" value="T" />
                                             <el-option
@@ -122,7 +157,7 @@ onMounted(async () => {
                                 </div>
 
                                 <div class="col-lg-3">
-                                    <el-form-item label="Piscinas">
+                                    <el-form-item label="Piscina">
                                         <el-select filterable v-model="form.piscina_id" @change="changeFiltro">
                                             <el-option label="Todos" value="T" />
                                             <el-option
@@ -176,21 +211,45 @@ onMounted(async () => {
             :closable="false"
         />
 
+        <el-alert
+            v-if="response"
+            class="mb-5"
+            type="info"
+            show-icon
+            :closable="false"
+        >
+            <template #title>
+                Backend usado: {{ response.backend_engine }} | Flask legacy: {{ response.legacy_flask_used ? "si" : "no" }} | Metodo:
+                {{ traceability.projection_method ?? "N/D" }}
+            </template>
+        </el-alert>
+
+        <div v-if="warnings.length" class="card card-flush border border-warning mb-5">
+            <div class="card-body py-4">
+                <div class="fw-bold text-warning mb-2">Notas de calidad y trazabilidad</div>
+                <div v-for="warning in warnings" :key="warning" class="text-gray-700 fs-7 mb-1">
+                    {{ warning }}
+                </div>
+            </div>
+        </div>
+
         <div class="row g-5 g-xl-8 mb-5">
             <div class="col-xl-3">
                 <div class="card card-flush h-xl-100">
                     <div class="card-body">
-                        <span class="fs-7 text-gray-500 fw-semibold">Muestras usadas</span>
+                        <span class="fs-7 text-gray-500 fw-semibold">Mediciones limpias</span>
                         <div class="fs-2hx fw-bold text-dark">{{ summary.samples ?? "-" }}</div>
-                        <span class="text-gray-500">Ventana seleccionada</span>
+                        <span class="text-gray-500">Fuente: aquaculture_backend</span>
                     </div>
                 </div>
             </div>
             <div class="col-xl-3">
                 <div class="card card-flush h-xl-100">
                     <div class="card-body">
-                        <span class="fs-7 text-gray-500 fw-semibold">Ion Nitrato actual</span>
-                        <div class="fs-2hx fw-bold text-info">{{ formatValue(latest.ion_nitrato, "mg/L") }}</div>
+                        <span class="fs-7 text-gray-500 fw-semibold">Ion nitrato actual</span>
+                        <div class="fs-2hx fw-bold text-info">
+                            {{ formatValue(latest.ion_nitrato, latest.ion_nitrato_unit) }}
+                        </div>
                         <span class="text-gray-500">{{ latest.timestamp ?? "-" }}</span>
                     </div>
                 </div>
@@ -198,8 +257,10 @@ onMounted(async () => {
             <div class="col-xl-3">
                 <div class="card card-flush h-xl-100">
                     <div class="card-body">
-                        <span class="fs-7 text-gray-500 fw-semibold">Oxígeno disuelto actual</span>
-                        <div class="fs-2hx fw-bold text-success">{{ formatValue(latest.oxigeno_disuelto, "mg/L") }}</div>
+                        <span class="fs-7 text-gray-500 fw-semibold">Oxigeno disuelto actual</span>
+                        <div class="fs-2hx fw-bold text-success">
+                            {{ formatValue(latest.oxigeno_disuelto, latest.oxigeno_disuelto_unit) }}
+                        </div>
                         <span class="text-gray-500">{{ latest.piscina ?? "Todas las piscinas" }}</span>
                     </div>
                 </div>
@@ -207,9 +268,62 @@ onMounted(async () => {
             <div class="col-xl-3">
                 <div class="card card-flush h-xl-100">
                     <div class="card-body">
-                        <span class="fs-7 text-gray-500 fw-semibold">Modelos disponibles</span>
-                        <div class="fs-2hx fw-bold text-primary">{{ summary.available_models ?? 0 }}</div>
+                        <span class="fs-7 text-gray-500 fw-semibold">Assets activos</span>
+                        <div class="fs-2hx fw-bold text-primary">{{ lifecycle.active_model_assets ?? summary.active_assets ?? 0 }}</div>
                         <span class="text-gray-500">{{ response?.filters?.horizonte_label ?? "-" }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-5 g-xl-8 mb-5">
+            <div class="col-xl-8">
+                <div class="card card-flush h-xl-100">
+                    <div class="card-header py-4">
+                        <h3 class="card-title fw-bold text-dark">Trazabilidad MLOps</h3>
+                    </div>
+                    <div class="card-body pt-0">
+                        <div class="row g-4">
+                            <div class="col-md-4">
+                                <div class="border border-dashed border-gray-300 rounded px-5 py-4 h-100">
+                                    <div class="text-gray-500 fw-semibold">Datasets / training / assets</div>
+                                    <div class="fw-bold text-dark mt-2">
+                                        {{ lifecycle.datasets_enabled ? "datasets" : "sin datasets" }} /
+                                        {{ lifecycle.training_enabled ? "training" : "sin training" }} /
+                                        {{ lifecycle.model_assets_enabled ? "assets" : "sin assets" }}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="border border-dashed border-gray-300 rounded px-5 py-4 h-100">
+                                    <div class="text-gray-500 fw-semibold">Assets totales</div>
+                                    <div class="fw-bold text-dark mt-2">{{ lifecycle.total_model_assets ?? summary.total_assets ?? "N/D" }}</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="border border-dashed border-gray-300 rounded px-5 py-4 h-100">
+                                    <div class="text-gray-500 fw-semibold">Decision grade</div>
+                                    <div class="fw-bold text-dark mt-2">{{ traceability.decision_grade ? "si" : "no" }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xl-4">
+                <div class="card card-flush h-xl-100">
+                    <div class="card-header py-4">
+                        <h3 class="card-title fw-bold text-dark">Assets en uso</h3>
+                    </div>
+                    <div class="card-body pt-0">
+                        <div v-if="!activeAssets.length" class="text-gray-500">Sin assets activos reportados.</div>
+                        <div v-for="asset in activeAssets.slice(0, 5)" :key="asset.asset_id" class="d-flex justify-content-between py-2 border-bottom border-gray-200">
+                            <div>
+                                <div class="fw-bold text-dark fs-7">{{ asset.model_code }}</div>
+                                <div class="text-gray-500 fs-8">target: {{ asset.target_variable ?? "N/D" }}</div>
+                            </div>
+                            <span class="badge badge-light-primary align-self-center">{{ asset.version }}</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -219,8 +333,8 @@ onMounted(async () => {
             <div class="col-xl-12" v-if="!loading && !models.length && !errorMessage">
                 <div class="card card-flush">
                     <div class="card-body text-center py-15">
-                        <div class="fs-3 fw-bold text-gray-700">Sin mediciones suficientes para los filtros seleccionados</div>
-                        <div class="text-gray-500 mt-2">Prueba otra piscina, horizonte o ventana de datos.</div>
+                        <div class="fs-3 fw-bold text-gray-700">Sin modelos disponibles para los filtros seleccionados</div>
+                        <div class="text-gray-500 mt-2">Revisa el backend MLOps o cambia piscina/horizonte.</div>
                     </div>
                 </div>
             </div>
@@ -233,7 +347,7 @@ onMounted(async () => {
                             <span class="text-gray-500 mt-1 fw-semibold fs-6">{{ model.message }}</span>
                         </h3>
                         <div class="card-toolbar">
-                            <span :class="['badge', statusClass(model.status)]">{{ model.status }}</span>
+                            <span :class="['badge', statusClass(model.status)]">{{ statusLabel(model.status) }}</span>
                         </div>
                     </div>
                     <div class="card-body pt-0">
@@ -242,24 +356,38 @@ onMounted(async () => {
                                 <ChartFisheye :options="model.chart" />
                             </div>
                             <div class="col-xl-3">
-                                <div class="border border-dashed border-gray-300 rounded px-5 py-4 mb-5">
+                                <div class="border border-dashed border-gray-300 rounded px-5 py-4 mb-4">
                                     <div class="text-gray-500 fw-semibold">Valor actual</div>
                                     <div class="fs-2 fw-bold text-dark">{{ formatValue(model.current_value, model.unit) }}</div>
                                 </div>
-                                <div class="border border-dashed border-gray-300 rounded px-5 py-4 mb-5">
-                                    <div class="text-gray-500 fw-semibold">Error medio reciente</div>
-                                    <div class="fs-4 fw-bold text-dark">{{ model.mae ? formatValue(model.mae, model.unit) : "N/D" }}</div>
+                                <div class="border border-dashed border-gray-300 rounded px-5 py-4 mb-4">
+                                    <div class="text-gray-500 fw-semibold">Motor / fuente</div>
+                                    <div class="fw-bold text-dark">{{ model.engine }}</div>
+                                    <div class="text-gray-500 fs-8">{{ model.source }}</div>
+                                </div>
+                                <div class="border border-dashed border-gray-300 rounded px-5 py-4 mb-4">
+                                    <div class="text-gray-500 fw-semibold">Asset / version</div>
+                                    <div class="fw-bold text-dark">{{ shortId(model.asset_id) }}</div>
+                                    <div class="text-gray-500 fs-8">{{ model.version ?? "sin version" }}</div>
+                                </div>
+                                <div class="border border-dashed border-gray-300 rounded px-5 py-4 mb-4">
+                                    <div class="text-gray-500 fw-semibold">Metricas</div>
+                                    <div class="fw-bold text-dark">MAE: {{ metricValue(model.metrics?.mae ?? model.mae) }}</div>
+                                    <div class="text-gray-500 fs-8">R2: {{ metricValue(model.metrics?.r2) }}</div>
+                                </div>
+                                <div class="text-gray-600 fs-7 mb-4">
+                                    {{ model.traceability?.quality_note ?? model.traceability?.explanation ?? "Trazabilidad disponible en backend." }}
                                 </div>
                                 <div class="table-responsive">
                                     <table class="table table-row-dashed table-row-gray-300 align-middle gs-0 gy-3">
                                         <thead>
                                             <tr class="fw-bold text-muted">
                                                 <th>Tiempo</th>
-                                                <th class="text-end">Proyección</th>
+                                                <th class="text-end">Valor</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            <tr v-for="item in (model.forecast ?? []).slice(0, 6)" :key="item.timestamp">
+                                            <tr v-for="item in (model.forecast ?? []).slice(0, 6)" :key="`${model.code}-${item.timestamp}-${item.hour}`">
                                                 <td>{{ item.label }}</td>
                                                 <td class="text-end fw-bold">{{ formatValue(item.value, model.unit) }}</td>
                                             </tr>
