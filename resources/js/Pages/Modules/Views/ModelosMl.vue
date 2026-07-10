@@ -20,7 +20,7 @@ const form = ref({
     piscigranja_id: "T",
     piscina_id: "T",
     horizonte: "72h",
-    ventana: "30d",
+    ventana: "all",
 });
 
 const horizontes = [
@@ -43,7 +43,7 @@ const models = computed(() => response.value?.models ?? []);
 const warnings = computed(() => response.value?.warnings ?? []);
 const traceability = computed(() => response.value?.traceability ?? {});
 const lifecycle = computed(() => response.value?.lifecycle ?? {});
-const activeAssets = computed(() => response.value?.active_assets ?? []);
+const lifecycleModels = computed(() => response.value?.lifecycle?.models ?? []);
 
 const formatValue = (value, unit = "") => {
     if (value === null || value === undefined || value === "") return "-";
@@ -64,6 +64,8 @@ const statusLabel = (status) => {
         asset_activo: "Asset ML activo",
         gemelo_digital: "Gemelo digital",
         escenario_sin_asset: "Escenario sin asset",
+        entrenado: "Entrenado",
+        calculado: "Calculado",
         disponible: "Disponible",
         sin_datos: "Sin datos",
     };
@@ -72,6 +74,8 @@ const statusLabel = (status) => {
 
 const statusClass = (status) => {
     if (status === "asset_activo") return "badge-light-success";
+    if (status === "entrenado") return "badge-light-success";
+    if (status === "calculado") return "badge-light-primary";
     if (status === "gemelo_digital") return "badge-light-primary";
     if (status === "escenario_sin_asset") return "badge-light-warning";
     if (status === "sin_datos") return "badge-light-danger";
@@ -219,7 +223,7 @@ onMounted(async () => {
             :closable="false"
         >
             <template #title>
-                Backend usado: {{ response.backend_engine }} | Flask legacy: {{ response.legacy_flask_used ? "si" : "no" }} | Metodo:
+                Backend usado: {{ response.backend_engine }} | Fuente: {{ traceability.source ?? "Flask" }} | Metodo:
                 {{ traceability.projection_method ?? "N/D" }}
             </template>
         </el-alert>
@@ -239,7 +243,7 @@ onMounted(async () => {
                     <div class="card-body">
                         <span class="fs-7 text-gray-500 fw-semibold">Mediciones limpias</span>
                         <div class="fs-2hx fw-bold text-dark">{{ summary.samples ?? "-" }}</div>
-                        <span class="text-gray-500">Fuente: aquaculture_backend</span>
+                        <span class="text-gray-500">{{ summary.from ?? "-" }} -> {{ summary.to ?? "-" }}</span>
                     </div>
                 </div>
             </div>
@@ -268,8 +272,8 @@ onMounted(async () => {
             <div class="col-xl-3">
                 <div class="card card-flush h-xl-100">
                     <div class="card-body">
-                        <span class="fs-7 text-gray-500 fw-semibold">Assets activos</span>
-                        <div class="fs-2hx fw-bold text-primary">{{ lifecycle.active_model_assets ?? summary.active_assets ?? 0 }}</div>
+                        <span class="fs-7 text-gray-500 fw-semibold">Puntos graficados</span>
+                        <div class="fs-2hx fw-bold text-primary">{{ summary.historical_points ?? 0 }}</div>
                         <span class="text-gray-500">{{ response?.filters?.horizonte_label ?? "-" }}</span>
                     </div>
                 </div>
@@ -286,24 +290,24 @@ onMounted(async () => {
                         <div class="row g-4">
                             <div class="col-md-4">
                                 <div class="border border-dashed border-gray-300 rounded px-5 py-4 h-100">
-                                    <div class="text-gray-500 fw-semibold">Datasets / training / assets</div>
+                                    <div class="text-gray-500 fw-semibold">Datos / entrenamiento / artefactos</div>
                                     <div class="fw-bold text-dark mt-2">
-                                        {{ lifecycle.datasets_enabled ? "datasets" : "sin datasets" }} /
-                                        {{ lifecycle.training_enabled ? "training" : "sin training" }} /
-                                        {{ lifecycle.model_assets_enabled ? "assets" : "sin assets" }}
+                                        {{ traceability.uses_all_points ? "todos los puntos" : "ventana" }} /
+                                        {{ lifecycle.status ?? "N/D" }} /
+                                        {{ lifecycleModels.length }} modelos
                                     </div>
                                 </div>
                             </div>
                             <div class="col-md-4">
                                 <div class="border border-dashed border-gray-300 rounded px-5 py-4 h-100">
-                                    <div class="text-gray-500 fw-semibold">Assets totales</div>
-                                    <div class="fw-bold text-dark mt-2">{{ lifecycle.total_model_assets ?? summary.total_assets ?? "N/D" }}</div>
+                                    <div class="text-gray-500 fw-semibold">Filas de entrenamiento</div>
+                                    <div class="fw-bold text-dark mt-2">{{ Object.values(summary.training_rows ?? {}).join(" / ") || "N/D" }}</div>
                                 </div>
                             </div>
                             <div class="col-md-4">
                                 <div class="border border-dashed border-gray-300 rounded px-5 py-4 h-100">
-                                    <div class="text-gray-500 fw-semibold">Decision grade</div>
-                                    <div class="fw-bold text-dark mt-2">{{ traceability.decision_grade ? "si" : "no" }}</div>
+                                    <div class="text-gray-500 fw-semibold">Proyecciones</div>
+                                    <div class="fw-bold text-dark mt-2">{{ summary.forecast_points ?? 0 }} puntos futuros</div>
                                 </div>
                             </div>
                         </div>
@@ -313,17 +317,33 @@ onMounted(async () => {
             <div class="col-xl-4">
                 <div class="card card-flush h-xl-100">
                     <div class="card-header py-4">
-                        <h3 class="card-title fw-bold text-dark">Assets en uso</h3>
+                        <h3 class="card-title fw-bold text-dark">Artefactos en uso</h3>
                     </div>
                     <div class="card-body pt-0">
-                        <div v-if="!activeAssets.length" class="text-gray-500">Sin assets activos reportados.</div>
-                        <div v-for="asset in activeAssets.slice(0, 5)" :key="asset.asset_id" class="d-flex justify-content-between py-2 border-bottom border-gray-200">
+                        <div v-if="!lifecycleModels.length" class="text-gray-500">Sin artefactos reportados.</div>
+                        <div v-for="asset in lifecycleModels.slice(0, 5)" :key="asset.model_code ?? asset.artifact_path" class="d-flex justify-content-between py-2 border-bottom border-gray-200">
                             <div>
-                                <div class="fw-bold text-dark fs-7">{{ asset.model_code }}</div>
-                                <div class="text-gray-500 fs-8">target: {{ asset.target_variable ?? "N/D" }}</div>
+                                <div class="fw-bold text-dark fs-7">{{ asset.model_code ?? asset.status }}</div>
+                                <div class="text-gray-500 fs-8">filas: {{ asset.training_rows ?? "N/D" }}</div>
                             </div>
-                            <span class="badge badge-light-primary align-self-center">{{ asset.version }}</span>
+                            <span class="badge badge-light-primary align-self-center">{{ asset.algorithm ?? asset.status }}</span>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div v-if="response?.combined_chart" class="row g-5 g-xl-8 mb-5">
+            <div class="col-xl-12">
+                <div class="card card-flush overflow-hidden">
+                    <div class="card-header py-5">
+                        <h3 class="card-title align-items-start flex-column">
+                            <span class="card-label fw-bold text-dark">Datos reales y proyecciones</span>
+                            <span class="text-gray-500 mt-1 fw-semibold fs-6">Historico completo de la base combinado con los modelos entrenados.</span>
+                        </h3>
+                    </div>
+                    <div class="card-body pt-0">
+                        <ChartFisheye :options="response.combined_chart" />
                     </div>
                 </div>
             </div>
