@@ -19,15 +19,12 @@ const piscinasList = ref([]);
 const form = ref({
     piscigranja_id: "T",
     piscina_id: "T",
-    horizonte: "72h",
+    horizonte: "1h",
     ventana: "all",
 });
 
 const horizontes = [
-    { id: "24h", name: "24 horas" },
-    { id: "72h", name: "72 horas" },
-    { id: "7d", name: "7 dias" },
-    { id: "30d", name: "30 dias" },
+    { id: "1h", name: "Proyeccion a 1 hora" },
 ];
 
 const ventanas = [
@@ -223,7 +220,7 @@ onMounted(async () => {
             :closable="false"
         >
             <template #title>
-                Backend usado: {{ response.backend_engine }} | Fuente: {{ traceability.source ?? "Flask" }} | Metodo:
+                Backend usado: {{ response.backend_engine }} | Fuente: {{ traceability.source ?? "FastAPI local" }} | Metodo:
                 {{ traceability.projection_method ?? "N/D" }}
             </template>
         </el-alert>

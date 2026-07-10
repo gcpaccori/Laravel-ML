@@ -21,20 +21,19 @@ class ModeloMlController extends Controller
 
     public function proyecciones(Request $request)
     {
-        $baseUrl = rtrim(env('FLASK_MODELOS_ML_URL', 'http://flask_sismapiscis:5000'), '/');
+        $baseUrl = rtrim(env('AQUACULTURE_BACKEND_URL', 'http://aquaculture_backend:8000/api/v1'), '/');
+        $pondId = (string) $request->input('piscina_id', '1');
+        $pondId = $pondId === 'T' ? '1' : $pondId;
 
-        $response = Http::acceptJson()->timeout(120)->get("{$baseUrl}/api/modelos-ml/proyecciones", [
-            'piscigranja_id' => $request->input('piscigranja_id', 'T'),
-            'piscina_id' => $request->input('piscina_id', 'T'),
-            'horizonte' => $request->input('horizonte', '72h'),
-            'ventana' => $request->input('ventana', 'all'),
-            'retrain' => $request->boolean('retrain') ? '1' : null,
-        ]);
+        $response = Http::acceptJson()
+            ->connectTimeout(5)
+            ->timeout(45)
+            ->get("{$baseUrl}/ponds/{$pondId}/ai/dashboard");
 
         if ($response->failed()) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'No se pudo consultar el backend Python de modelos.',
+                'message' => 'No se pudo consultar el backend FastAPI local de modelos.',
                 'backend_url' => $baseUrl,
                 'backend_status' => $response->status(),
                 'detail' => $response->body(),
