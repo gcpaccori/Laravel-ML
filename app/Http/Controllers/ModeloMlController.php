@@ -46,7 +46,7 @@ class ModeloMlController extends Controller
 
     public function suite()
     {
-        $url = env('MODELOS_ML_SUITE_URL', 'https://proyecto-prociencia-inictel-uni-crianza-de-tilapia-jb2imc0an.vercel.app');
+        $url = env('MODELOS_ML_SUITE_URL', 'https://acuicola-frontend.vercel.app');
 
         return Inertia::location($url);
     }
