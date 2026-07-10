@@ -46,7 +46,7 @@ class ModeloMlController extends Controller
 
     public function suite()
     {
-        $url = env('MODELOS_ML_SUITE_URL', 'https://acuicola-frontend.vercel.app');
+        $url = env('MODELOS_ML_SUITE_URL', 'http://37.60.226.53:3031');
 
         return Inertia::location($url);
     }

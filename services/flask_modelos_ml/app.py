@@ -34,9 +34,10 @@ WINDOWS = {
 }
 
 NUMERIC_FIELDS = ["temperatura", "ph", "oxigeno_disuelto", "ion_nitrato"]
-NORMALIZATION_VERSION = "nitrogen-domain-v2"
+NORMALIZATION_VERSION = "nitrogen-domain-v3-created-at"
 NITRATE_RAW_SENSOR_THRESHOLD = 1000.0
 NITRATE_DOMAIN_MAX = 80.0
+MODEL_RETRAIN_ROW_DELTA = 500
 
 MODEL_SPECS = [
     {
@@ -87,7 +88,7 @@ def fetch_measurements(piscigranja_id=None, piscina_id=None, window_key="all"):
         params.append(piscigranja_id)
 
     where_sql = " AND ".join(filters)
-    timestamp_sql = "COALESCE(pa.fecha_medicion, pa.created_at)"
+    timestamp_sql = "pa.created_at"
 
     with db_connection() as db:
         cursor = db.cursor(dictionary=True)
@@ -234,16 +235,16 @@ def time_features(dates, origin):
 
 
 def model_for_spec(spec):
-    rows_leaf = 4
+    rows_leaf = 8
     if spec["algorithm"] == "ExtraTreesRegressor":
         return ExtraTreesRegressor(
-            n_estimators=240,
+            n_estimators=90,
             min_samples_leaf=rows_leaf,
             random_state=42,
             n_jobs=-1,
         )
     return RandomForestRegressor(
-        n_estimators=220,
+        n_estimators=80,
         min_samples_leaf=rows_leaf,
         random_state=42,
         n_jobs=-1,
@@ -296,8 +297,19 @@ def train_or_load_model(df, spec, force_retrain=False):
     path = artifact_path(spec["code"])
     if path.exists() and not force_retrain:
         artifact = joblib.load(path)
-        if artifact.get("fingerprint") == fingerprint:
+        cached_fingerprint = artifact.get("fingerprint", {})
+        row_delta = abs(int(fingerprint["rows"]) - int(cached_fingerprint.get("rows", 0)))
+        retrain_threshold = max(MODEL_RETRAIN_ROW_DELTA, int(fingerprint["rows"] * 0.05))
+        compatible_cache = (
+            cached_fingerprint.get("field") == field
+            and cached_fingerprint.get("normalization_version") == NORMALIZATION_VERSION
+            and row_delta < retrain_threshold
+        )
+        if artifact.get("fingerprint") == fingerprint or compatible_cache:
+            artifact["fingerprint_current"] = fingerprint
+            artifact["latest_actual"] = float(data[field].astype(float).iloc[-1])
             artifact["loaded_from_cache"] = True
+            artifact["cache_row_delta"] = row_delta
             return artifact, artifact["metadata"]
 
     start = time.time()
@@ -723,6 +735,7 @@ def modelos_ml_proyecciones():
                 "step_hours": horizon["step_hours"],
                 "ventana": window_key,
                 "ventana_label": "Todo el historico" if window_key == "all" else f"Ultimos {WINDOWS[window_key]} dias",
+                "timestamp_field": "created_at",
             },
             "latest": {
                 "timestamp": format_ts(latest["measured_at"]),
@@ -768,6 +781,7 @@ def modelos_ml_proyecciones():
                 "model_lifecycle": "fetch_db -> train_or_load_artifact -> holdout_metrics -> anchored_projection",
                 "selected_models": [model["code"] for model in models],
                 "projection_method": "supervised_time_features_with_latest_observation_anchor",
+                "timestamp_field": "parametro_aguas.created_at",
             },
             "combined_chart": build_combined_chart(models),
             "models": models,
