@@ -1,5 +1,13 @@
 <script setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import {
+    Connection,
+    DataAnalysis,
+    Odometer,
+    RefreshRight,
+    SetUp,
+    TrendCharts,
+} from "@element-plus/icons-vue";
 import ChartFisheye from "@/Components/ChartFisheye.vue";
 import LatexFormula from "@/Components/LatexFormula.vue";
 
@@ -11,23 +19,80 @@ defineProps({
     },
 });
 
+const MODEL_CODES = {
+    svm: "SVM_OD_FORECAST_1H",
+    oxygen: "OXYGEN_STATUS_MODEL",
+    growth: "TILAPIA_GROWTH_TEMPERATURE",
+    water: "WATER_QUALITY_INDEX_ICA",
+};
+
+const catalog = [
+    {
+        code: MODEL_CODES.svm,
+        name: "Oxigeno disuelto a una hora",
+        description: "Anticipa el OD de la proxima hora a partir de la serie real de sensores.",
+        importance: "Ayuda a observar cambios de oxigeno antes de que afecten a los peces.",
+        inputs: ["Temperatura", "pH", "OD", "Ion nitrato", "Historial temporal"],
+        horizon: "1 hora",
+        icon: DataAnalysis,
+    },
+    {
+        code: MODEL_CODES.oxygen,
+        name: "Estado de oxigeno",
+        description: "Calcula la saturacion y el deficit de oxigeno del agua.",
+        importance: "Muestra cuan cerca esta el estanque de la capacidad de oxigeno que permite su temperatura.",
+        inputs: ["Temperatura", "Oxigeno disuelto"],
+        horizon: "Lectura actual",
+        icon: Odometer,
+    },
+    {
+        code: MODEL_CODES.growth,
+        name: "Crecimiento de tilapia",
+        description: "Proyecta la ganancia de longitud y peso desde la biometria real del estanque.",
+        importance: "Permite revisar la evolucion esperada del lote y su biometria de referencia.",
+        inputs: ["Temperatura", "Biometria real"],
+        horizon: "1 a 365 dias",
+        icon: TrendCharts,
+    },
+    {
+        code: MODEL_CODES.water,
+        name: "Calidad de agua",
+        description: "Resume temperatura, pH, oxigeno disuelto e ion nitrato en un indice ICA.",
+        importance: "Da una lectura unica y explicable de la condicion actual del agua.",
+        inputs: ["Temperatura", "pH", "OD", "Ion nitrato"],
+        horizon: "Lectura actual",
+        icon: Connection,
+    },
+];
+
 const loading = ref(false);
 const errorMessage = ref("");
 const response = ref(null);
 const piscigranjas = ref([]);
 const piscinasList = ref([]);
+const currentView = ref("catalog");
+const selectedCode = ref(null);
+const requestController = ref(null);
+const reloadTimer = ref(null);
+const scenarioLoading = ref(false);
+const scenarioError = ref("");
+const scenarioResult = ref(null);
 
 const form = ref({
     piscigranja_id: "T",
     piscina_id: "T",
-    horizonte: "1h",
     ventana: "7d",
     proyeccion_dias: 7,
 });
 
-const horizontes = [
-    { id: "1h", name: "Proyeccion a 1 hora" },
-];
+const scenarioForm = ref({
+    temperature_c: null,
+    ph: null,
+    dissolved_oxygen_mg_l: null,
+    nitrate_ion: null,
+    projection_days: 7,
+    active_models: [MODEL_CODES.water, MODEL_CODES.oxygen, MODEL_CODES.growth],
+});
 
 const ventanas = [
     { id: "6h", name: "Ultimas 6 horas" },
@@ -42,14 +107,18 @@ const proyeccionesCrecimiento = [
     { id: 7, name: "7 dias" },
     { id: 30, name: "30 dias" },
     { id: 90, name: "90 dias" },
+    { id: 180, name: "180 dias" },
 ];
 
 const latest = computed(() => response.value?.latest ?? {});
 const summary = computed(() => response.value?.summary ?? {});
 const models = computed(() => response.value?.models ?? []);
 const warnings = computed(() => response.value?.warnings ?? []);
-const aiModel = computed(() => response.value?.ai_model ?? {});
 const lifecycle = computed(() => response.value?.lifecycle ?? {});
+const activeMeta = computed(() => catalog.find((item) => item.code === selectedCode.value) ?? null);
+const activeModel = computed(() => models.value.find((item) => item.code === selectedCode.value) ?? null);
+const growthProjection = computed(() => response.value?.tilapia_growth?.length_projection ?? null);
+const selectedBiometrics = computed(() => activeModel.value?.biometric_context ?? response.value?.biometrics ?? null);
 
 const formatValue = (value, unit = "") => {
     if (value === null || value === undefined || value === "") return "-";
@@ -61,37 +130,7 @@ const formatValue = (value, unit = "") => {
 const metricValue = (value) => {
     if (value === null || value === undefined || value === "") return "N/D";
     const number = Number(value);
-    if (!Number.isFinite(number)) return "N/D";
-    return number.toLocaleString("es-PE", { maximumFractionDigits: 4 });
-};
-
-const statusLabel = (status) => {
-    const labels = {
-        asset_activo: "Asset ML activo",
-        gemelo_digital: "Gemelo digital",
-        escenario_sin_asset: "Escenario sin asset",
-        entrenado: "Entrenado",
-        calculado: "Calculado",
-        disponible: "Disponible",
-        sin_datos: "Sin datos",
-        candidato_bloqueado: "Modelo entrenado en evaluacion",
-        calculo_parcial: "Calculo parcial",
-        fuera_de_dominio: "Fuera del dominio",
-    };
-    return labels[status] ?? status ?? "N/D";
-};
-
-const statusClass = (status) => {
-    if (status === "asset_activo") return "badge-light-success";
-    if (status === "entrenado") return "badge-light-success";
-    if (status === "calculado") return "badge-light-primary";
-    if (status === "gemelo_digital") return "badge-light-primary";
-    if (status === "escenario_sin_asset") return "badge-light-warning";
-    if (status === "candidato_bloqueado") return "badge-light-warning";
-    if (status === "calculo_parcial") return "badge-light-warning";
-    if (status === "fuera_de_dominio") return "badge-light-danger";
-    if (status === "sin_datos") return "badge-light-danger";
-    return "badge-light-info";
+    return Number.isFinite(number) ? number.toLocaleString("es-PE", { maximumFractionDigits: 4 }) : "N/D";
 };
 
 const shortId = (value) => {
@@ -100,14 +139,22 @@ const shortId = (value) => {
     return text.length > 18 ? `${text.slice(0, 18)}...` : text;
 };
 
-const hasMetrics = (model) => Object.keys(model.metrics ?? {}).length > 0;
+const statusLabel = (status) => ({
+    asset_activo: "Modelo activo",
+    entrenado: "Entrenado",
+    calculado: "Calculado",
+    candidato_bloqueado: "Entrenado en evaluacion",
+    calculo_parcial: "Calculo parcial",
+    fuera_de_dominio: "Fuera del dominio",
+    sin_datos: "Sin datos",
+}[status] ?? status ?? "Disponible");
 
-const formulaTone = (code) => ({
-    SVM_OD_FORECAST_1H: "formula-svm",
-    OXYGEN_STATUS_MODEL: "formula-oxygen",
-    TILAPIA_GROWTH_TEMPERATURE: "formula-growth",
-    WATER_QUALITY_INDEX_ICA: "formula-ica",
-})[code] ?? "formula-default";
+const statusClass = (status) => {
+    if (["asset_activo", "entrenado", "calculado"].includes(status)) return "badge-light-success";
+    if (["candidato_bloqueado", "calculo_parcial"].includes(status)) return "badge-light-warning";
+    if (["fuera_de_dominio", "sin_datos"].includes(status)) return "badge-light-danger";
+    return "badge-light-primary";
+};
 
 const interpretationRange = (item) => {
     if (item.range) return item.range;
@@ -116,6 +163,17 @@ const interpretationRange = (item) => {
     if (!Number.isFinite(minimum) || !Number.isFinite(maximum)) return "-";
     return `${minimum.toLocaleString("es-PE", { maximumFractionDigits: 1 })} a ${maximum.toLocaleString("es-PE", { maximumFractionDigits: 1 })}`;
 };
+
+const hasMetrics = (model) => Object.keys(model?.metrics ?? {}).length > 0;
+
+const modelFormulaTone = (code) => ({
+    [MODEL_CODES.svm]: "formula-svm",
+    [MODEL_CODES.oxygen]: "formula-oxygen",
+    [MODEL_CODES.growth]: "formula-growth",
+    [MODEL_CODES.water]: "formula-water",
+})[code] ?? "formula-default";
+
+const metaFor = (code) => catalog.find((item) => item.code === code);
 
 const piscigranjasOptions = async () => {
     const { data } = await axios.get(route("piscigranjas.options"));
@@ -132,402 +190,748 @@ const piscinasOptions = async () => {
 };
 
 const loadModelos = async () => {
+    requestController.value?.abort();
+    const controller = new AbortController();
+    requestController.value = controller;
     loading.value = true;
     errorMessage.value = "";
     try {
         const { data } = await axios.get(route("monitoreo.modelosmls.proyecciones"), {
             params: form.value,
+            signal: controller.signal,
         });
         response.value = data;
     } catch (error) {
-        response.value = null;
-        errorMessage.value =
-            error?.response?.data?.message ??
-            error?.response?.data?.detail ??
-            "No se pudo cargar la informacion de modelos.";
+        if (error?.code !== "ERR_CANCELED") {
+            errorMessage.value = error?.response?.data?.message ?? "Los datos aun se estan preparando. Puedes actualizar en unos segundos.";
+        }
     } finally {
-        loading.value = false;
+        if (requestController.value === controller) loading.value = false;
     }
+};
+
+const scheduleReload = () => {
+    clearTimeout(reloadTimer.value);
+    reloadTimer.value = setTimeout(loadModelos, 250);
 };
 
 const changePiscigranja = async () => {
     form.value.piscina_id = "T";
     await piscinasOptions();
-    await loadModelos();
+    scheduleReload();
 };
 
-const changeFiltro = async () => {
-    await loadModelos();
+const selectModel = (code) => {
+    selectedCode.value = code;
+    currentView.value = "detail";
+};
+
+const showCatalog = () => {
+    currentView.value = "catalog";
+    selectedCode.value = null;
+};
+
+const openTwin = () => {
+    const measurements = response.value?.latest_measurement ?? {};
+    scenarioForm.value = {
+        temperature_c: measurements.water_temperature_c ?? null,
+        ph: measurements.ph ?? null,
+        dissolved_oxygen_mg_l: measurements.dissolved_oxygen_mg_l ?? null,
+        nitrate_ion: measurements.nitrate_ion ?? null,
+        projection_days: form.value.proyeccion_dias,
+        active_models: [MODEL_CODES.water, MODEL_CODES.oxygen, MODEL_CODES.growth],
+    };
+    scenarioError.value = "";
+    currentView.value = "twin";
+};
+
+const runScenario = async () => {
+    scenarioLoading.value = true;
+    scenarioError.value = "";
+    try {
+        const { data } = await axios.post(route("monitoreo.modelosmls.simulacion"), {
+            piscina_id: form.value.piscina_id,
+            ...scenarioForm.value,
+        });
+        scenarioResult.value = data;
+    } catch (error) {
+        scenarioError.value = error?.response?.data?.message ?? "No se pudo calcular este escenario.";
+    } finally {
+        scenarioLoading.value = false;
+    }
 };
 
 onMounted(async () => {
-    await piscigranjasOptions();
-    await piscinasOptions();
-    await loadModelos();
+    try {
+        await piscigranjasOptions();
+        await piscinasOptions();
+    } finally {
+        loadModelos();
+    }
+});
+
+onBeforeUnmount(() => {
+    requestController.value?.abort();
+    clearTimeout(reloadTimer.value);
 });
 </script>
 
 <template>
     <App :title="title" :toolbar="toolbar">
-        <div class="row g-5 g-xl-8">
-            <div class="col-xl-12">
-                <div class="card bg-body card-xl-stretch mb-xl-1">
-                    <div class="card-body">
-                        <el-form :model="form" label-position="top" class="w-100">
-                            <div class="row">
-                                <div class="col-lg-2">
-                                    <el-form-item label="Piscigranja">
-                                        <el-select filterable v-model="form.piscigranja_id" @change="changePiscigranja">
-                                            <el-option label="Todos" value="T" />
-                                            <el-option
-                                                v-for="item in piscigranjas"
-                                                :key="item.id"
-                                                :label="item.nombre"
-                                                :value="item.id"
-                                            />
-                                        </el-select>
-                                    </el-form-item>
-                                </div>
+        <section class="module-intro mb-6">
+            <div>
+                <div class="text-gray-500 fs-7 mb-1">Piscina, datos reales y proyecciones</div>
+                <h2 class="fs-2 fw-bold text-dark mb-2">Modelos de aprendizaje automatico</h2>
+                <p class="text-gray-600 fs-6 mb-0">Elige un modelo para revisar su proyeccion o abre el gemelo digital para explorar un escenario de la piscina.</p>
+            </div>
+            <div class="module-intro__actions">
+                <el-button :icon="RefreshRight" :loading="loading" @click="loadModelos">Actualizar datos</el-button>
+            </div>
+        </section>
 
-                                <div class="col-lg-3">
-                                    <el-form-item label="Piscina">
-                                        <el-select filterable v-model="form.piscina_id" @change="changeFiltro">
-                                            <el-option label="Todos" value="T" />
-                                            <el-option
-                                                v-for="item in piscinasList"
-                                                :key="item.id"
-                                                :label="item.nombre"
-                                                :value="item.id"
-                                            />
-                                        </el-select>
-                                    </el-form-item>
-                                </div>
-
-                                <div class="col-lg-3">
-                                    <el-form-item label="Horizonte">
-                                        <el-select v-model="form.horizonte" disabled>
-                                            <el-option
-                                                v-for="item in horizontes"
-                                                :key="item.id"
-                                                :label="item.name"
-                                                :value="item.id"
-                                            />
-                                        </el-select>
-                                        <div class="text-gray-500 fs-8 mt-1">La SVM se valido exclusivamente a una hora.</div>
-                                    </el-form-item>
-                                </div>
-
-                                <div class="col-lg-2">
-                                    <el-form-item label="Ventana de datos">
-                                        <el-select v-model="form.ventana" @change="changeFiltro">
-                                            <el-option
-                                                v-for="item in ventanas"
-                                                :key="item.id"
-                                                :label="item.name"
-                                                :value="item.id"
-                                            />
-                                        </el-select>
-                                    </el-form-item>
-                                </div>
-
-                                <div class="col-lg-2">
-                                    <el-form-item label="Proyeccion de crecimiento">
-                                        <el-select v-model="form.proyeccion_dias" @change="changeFiltro">
-                                            <el-option
-                                                v-for="item in proyeccionesCrecimiento"
-                                                :key="item.id"
-                                                :label="item.name"
-                                                :value="item.id"
-                                            />
-                                        </el-select>
-                                    </el-form-item>
-                                </div>
-                            </div>
-                        </el-form>
+        <section class="filter-strip mb-6">
+            <el-form :model="form" label-position="top" class="w-100">
+                <div class="row g-4">
+                    <div class="col-md-4 col-xl-3">
+                        <el-form-item label="Piscigranja" class="mb-0">
+                            <el-select filterable v-model="form.piscigranja_id" @change="changePiscigranja">
+                                <el-option label="Todas" value="T" />
+                                <el-option v-for="item in piscigranjas" :key="item.id" :label="item.nombre" :value="item.id" />
+                            </el-select>
+                        </el-form-item>
+                    </div>
+                    <div class="col-md-4 col-xl-3">
+                        <el-form-item label="Piscina" class="mb-0">
+                            <el-select filterable v-model="form.piscina_id" @change="scheduleReload">
+                                <el-option label="Piscina principal" value="T" />
+                                <el-option v-for="item in piscinasList" :key="item.id" :label="item.nombre" :value="item.id" />
+                            </el-select>
+                        </el-form-item>
+                    </div>
+                    <div class="col-md-4 col-xl-3">
+                        <el-form-item label="Ventana visible" class="mb-0">
+                            <el-select v-model="form.ventana" @change="scheduleReload">
+                                <el-option v-for="item in ventanas" :key="item.id" :label="item.name" :value="item.id" />
+                            </el-select>
+                        </el-form-item>
+                    </div>
+                    <div class="col-md-4 col-xl-3">
+                        <el-form-item label="Proyeccion de biometria" class="mb-0">
+                            <el-select v-model="form.proyeccion_dias" @change="scheduleReload">
+                                <el-option v-for="item in proyeccionesCrecimiento" :key="item.id" :label="item.name" :value="item.id" />
+                            </el-select>
+                        </el-form-item>
                     </div>
                 </div>
-            </div>
-        </div>
+            </el-form>
+        </section>
 
-        <el-alert
-            v-if="errorMessage"
-            class="mb-5"
-            type="error"
-            :title="errorMessage"
-            show-icon
-            :closable="false"
-        />
-
-        <el-alert
-            v-if="response"
-            class="mb-5"
-            type="info"
-            show-icon
-            :closable="false"
-        >
-            <template #title>
-                Datos procesados dentro de la maquina virtual. La SVR de oxigeno trabaja a una hora; la ventana visible es
-                {{ response?.filters?.window_label ?? "la seleccionada" }} y el crecimiento usa el horizonte elegido.
+        <el-alert v-if="errorMessage" class="mb-6" type="warning" :title="errorMessage" show-icon :closable="false">
+            <template #default>
+                <el-button link type="primary" :loading="loading" @click="loadModelos">Reintentar ahora</el-button>
             </template>
         </el-alert>
 
-        <div v-if="warnings.length" class="card card-flush border border-warning mb-5">
-            <div class="card-body py-4">
-                <div class="fw-bold text-warning mb-2">Lecturas a considerar</div>
-                <div v-for="warning in warnings" :key="warning" class="text-gray-700 fs-7 mb-1">
-                    {{ warning }}
+        <template v-if="currentView === 'catalog'">
+            <section class="catalog-heading mb-5">
+                <div>
+                    <h3 class="fs-4 fw-bold text-dark mb-1">Selecciona una vista</h3>
+                    <p class="text-gray-600 fs-7 mb-0">Cada modelo abre sus variables, horizonte, explicacion y resultados.</p>
                 </div>
-            </div>
-        </div>
+                <span v-if="loading" class="text-gray-500 fs-8 d-flex align-items-center gap-2"><el-icon class="is-loading"><RefreshRight /></el-icon>Actualizando datos reales</span>
+            </section>
 
-        <div class="row g-5 g-xl-8 mb-5">
-            <div class="col-xl-3">
-                <div class="card card-flush h-xl-100">
-                    <div class="card-body">
-                        <span class="fs-7 text-gray-500 fw-semibold">Mediciones limpias</span>
-                        <div class="fs-2hx fw-bold text-dark">{{ summary.samples ?? "-" }}</div>
-                        <span class="text-gray-500">{{ summary.from ?? "-" }} -> {{ summary.to ?? "-" }}</span>
-                    </div>
-                </div>
-            </div>
-            <div class="col-xl-3">
-                <div class="card card-flush h-xl-100">
-                    <div class="card-body">
-                        <span class="fs-7 text-gray-500 fw-semibold">Ion nitrato actual</span>
-                        <div class="fs-2hx fw-bold text-info">
-                            {{ formatValue(latest.ion_nitrato, latest.ion_nitrato_unit) }}
-                        </div>
-                        <span class="text-gray-500">{{ latest.timestamp ?? "-" }}</span>
-                    </div>
-                </div>
-            </div>
-            <div class="col-xl-3">
-                <div class="card card-flush h-xl-100">
-                    <div class="card-body">
-                        <span class="fs-7 text-gray-500 fw-semibold">Oxigeno disuelto actual</span>
-                        <div class="fs-2hx fw-bold text-success">
-                            {{ formatValue(latest.oxigeno_disuelto, latest.oxigeno_disuelto_unit) }}
-                        </div>
-                        <span class="text-gray-500">{{ latest.piscina ?? "Todas las piscinas" }}</span>
-                    </div>
-                </div>
-            </div>
-            <div class="col-xl-3">
-                <div class="card card-flush h-xl-100">
-                    <div class="card-body">
-                        <span class="fs-7 text-gray-500 fw-semibold">Puntos graficados</span>
-                        <div class="fs-2hx fw-bold text-primary">{{ summary.historical_points ?? 0 }}</div>
-                        <span class="text-gray-500">{{ response?.filters?.window_label ?? "-" }}</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div v-if="response" class="card card-flush border border-primary mb-5">
-            <div class="card-body py-5">
-                <div class="d-flex flex-wrap align-items-center justify-content-between gap-4">
-                    <div>
-                        <div class="fw-bold text-dark fs-4">Aprendizaje automatico para el oxigeno disuelto</div>
-                        <div class="text-gray-600 fs-7 mt-1">{{ aiModel.detail }}</div>
-                    </div>
-                    <div class="text-end">
-                        <span :class="['badge mb-1', aiModel.productive ? 'badge-light-success' : 'badge-light-warning']">
-                            {{ aiModel.productive ? 'En uso productivo' : 'Modelo entrenado en evaluacion' }}
+            <section class="row g-5">
+                <div v-for="item in catalog" :key="item.code" class="col-md-6 col-xl-3">
+                    <button type="button" class="model-choice h-100 text-start" @click="selectModel(item.code)">
+                        <span class="model-choice__icon"><el-icon><component :is="item.icon" /></el-icon></span>
+                        <span class="model-choice__body">
+                            <span class="d-flex justify-content-between align-items-start gap-2">
+                                <span class="fw-bold text-dark fs-6">{{ item.name }}</span>
+                                <span v-if="models.find((model) => model.code === item.code)" :class="['badge', statusClass(models.find((model) => model.code === item.code)?.status)]">{{ statusLabel(models.find((model) => model.code === item.code)?.status) }}</span>
+                            </span>
+                            <span class="text-gray-600 fs-7 mt-3">{{ item.description }}</span>
+                            <span class="model-choice__footer">{{ item.horizon }}</span>
                         </span>
-                        <div class="text-gray-500 fs-8">Modelo {{ aiModel.version ?? 'sin entrenar' }} - {{ shortId(aiModel.asset_id) }}</div>
+                    </button>
+                </div>
+                <div class="col-md-6 col-xl-3">
+                    <button type="button" class="model-choice model-choice--twin h-100 text-start" @click="openTwin">
+                        <span class="model-choice__icon"><el-icon><SetUp /></el-icon></span>
+                        <span class="model-choice__body">
+                            <span class="fw-bold text-dark fs-6">Gemelo digital de la piscina</span>
+                            <span class="text-gray-600 fs-7 mt-3">Introduce un escenario y observa los modelos que pueden calcularse con esas variables.</span>
+                            <span class="model-choice__footer">Biometria y simulacion manual</span>
+                        </span>
+                    </button>
+                </div>
+            </section>
+
+            <section v-if="response" class="snapshot-strip mt-6">
+                <div><span>OD actual</span><strong>{{ formatValue(latest.oxigeno_disuelto, latest.oxigeno_disuelto_unit) }}</strong></div>
+                <div><span>Ion nitrato</span><strong>{{ formatValue(latest.ion_nitrato, latest.ion_nitrato_unit) }}</strong></div>
+                <div><span>Lecturas limpias</span><strong>{{ formatValue(summary.samples) }}</strong></div>
+                <div><span>Ventana</span><strong>{{ response.filters?.window_label ?? "-" }}</strong></div>
+            </section>
+        </template>
+
+        <template v-else-if="currentView === 'detail'">
+            <div class="detail-nav mb-5">
+                <el-button text :icon="RefreshRight" @click="showCatalog">Volver a modelos</el-button>
+                <span class="text-gray-400">/</span>
+                <span class="text-gray-600 fs-7">{{ activeMeta?.name }}</span>
+            </div>
+
+            <section v-if="activeMeta" class="model-overview mb-6">
+                <div class="model-overview__icon"><el-icon><component :is="activeMeta.icon" /></el-icon></div>
+                <div class="model-overview__copy">
+                    <div class="d-flex align-items-center flex-wrap gap-3">
+                        <h3 class="fs-2 fw-bold text-dark mb-0">{{ activeMeta.name }}</h3>
+                        <span v-if="activeModel" :class="['badge', statusClass(activeModel.status)]">{{ statusLabel(activeModel.status) }}</span>
                     </div>
+                    <p class="text-gray-700 fs-6 mt-2 mb-1">{{ activeMeta.description }}</p>
+                    <p class="text-gray-500 fs-7 mb-0">{{ activeMeta.importance }}</p>
                 </div>
-            </div>
-        </div>
+            </section>
 
-        <div v-if="lifecycle.summary?.length" class="row g-3 mb-5">
-            <div v-for="item in lifecycle.summary" :key="item.step" class="col-md-6 col-xl-3">
-                <div class="border border-dashed border-gray-300 rounded p-4 h-100 bg-light">
-                    <div class="fw-bold text-dark fs-7 mb-2">{{ item.step }}</div>
-                    <div class="text-gray-600 fs-8">{{ item.detail }}</div>
+            <section v-if="activeMeta" class="model-controls mb-6">
+                <div class="model-controls__group">
+                    <span class="text-gray-500 fs-8 fw-semibold text-uppercase">Tiempo</span>
+                    <el-select v-if="activeMeta.code === MODEL_CODES.growth" v-model="form.proyeccion_dias" class="model-controls__select" @change="scheduleReload">
+                        <el-option v-for="item in proyeccionesCrecimiento" :key="item.id" :label="item.name" :value="item.id" />
+                    </el-select>
+                    <el-select v-else v-model="form.ventana" class="model-controls__select" @change="scheduleReload">
+                        <el-option v-for="item in ventanas" :key="item.id" :label="item.name" :value="item.id" />
+                    </el-select>
                 </div>
-            </div>
-        </div>
-
-        <div v-loading="loading" class="row g-5 g-xl-8">
-            <div class="col-xl-12" v-if="!loading && !models.length && !errorMessage">
-                <div class="card card-flush">
-                    <div class="card-body text-center py-15">
-                        <div class="fs-3 fw-bold text-gray-700">Sin modelos disponibles para los filtros seleccionados</div>
-                        <div class="text-gray-500 mt-2">Revisa los datos disponibles o cambia los filtros.</div>
-                    </div>
+                <div class="model-controls__group model-controls__group--wide">
+                    <span class="text-gray-500 fs-8 fw-semibold text-uppercase">Variables utilizadas</span>
+                    <div class="input-tags"><span v-for="input in activeMeta.inputs" :key="input">{{ input }}</span></div>
                 </div>
-            </div>
+                <div class="model-controls__group">
+                    <span class="text-gray-500 fs-8 fw-semibold text-uppercase">Horizonte</span>
+                    <strong class="text-dark fs-7">{{ activeMeta.horizon }}</strong>
+                </div>
+            </section>
 
-            <div class="col-xl-12" v-for="model in models" :key="model.code">
-                <div class="card card-flush overflow-hidden h-xl-100">
-                    <div class="card-header py-5">
-                        <h3 class="card-title align-items-start flex-column">
-                            <span class="card-label fw-bold text-dark">{{ model.name }}</span>
-                            <span class="text-gray-500 mt-1 fw-semibold fs-6">{{ model.message }}</span>
-                        </h3>
-                        <div class="card-toolbar">
-                            <span :class="['badge', statusClass(model.status)]">{{ statusLabel(model.status) }}</span>
+            <section v-if="loading && !activeModel" class="card card-flush mb-6">
+                <div class="card-body py-12"><el-skeleton :rows="7" animated /></div>
+            </section>
+
+            <template v-else-if="activeModel">
+                <section class="row g-5 mb-6">
+                    <div class="col-lg-4">
+                        <div class="result-keyline h-100">
+                            <span>Valor actual</span>
+                            <strong>{{ formatValue(activeModel.current_value, activeModel.unit) }}</strong>
+                            <small>{{ activeModel.engine }}</small>
                         </div>
                     </div>
+                    <div class="col-lg-8">
+                        <div class="result-keyline h-100">
+                            <span>Uso en la piscina</span>
+                            <strong class="fs-5">{{ activeModel.usage?.label ?? statusLabel(activeModel.status) }}</strong>
+                            <small>{{ activeModel.usage?.detail ?? activeModel.message }}</small>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="row g-5 mb-6">
+                    <div class="col-xl-8">
+                        <div class="card card-flush h-100">
+                            <div class="card-header"><h4 class="card-title fw-bold text-dark fs-5">{{ activeModel.chart?.title?.text ?? activeModel.name }}</h4></div>
+                            <div class="card-body pt-0">
+                                <p class="text-gray-600 fs-7">{{ activeModel.chart_description }}</p>
+                                <ChartFisheye :options="activeModel.chart" height="420px" />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-xl-4">
+                        <div :class="['formula-panel h-100', modelFormulaTone(activeModel.code)]">
+                            <span class="text-gray-500 fs-8 fw-semibold text-uppercase">Formula y origen</span>
+                            <LatexFormula v-if="activeModel.formula?.latex" :latex="activeModel.formula.latex" />
+                            <code v-else class="d-block text-dark fs-7 text-break mt-3">{{ activeModel.formula?.expression }}</code>
+                            <p class="text-gray-700 fs-7 mt-4">{{ activeModel.formula?.detail }}</p>
+                            <ul v-if="activeModel.formula?.conditions?.length" class="text-gray-600 fs-8 ps-4 mb-4">
+                                <li v-for="condition in activeModel.formula.conditions" :key="condition">{{ condition }}</li>
+                            </ul>
+                            <div class="formula-panel__origin">{{ activeModel.origin?.document }}<br>{{ activeModel.origin?.data }}</div>
+                        </div>
+                    </div>
+                </section>
+
+                <section v-if="activeModel.relationship" class="card card-flush mb-6">
+                    <div class="card-header"><h4 class="card-title fw-bold text-dark fs-5">Relacion de variables</h4></div>
                     <div class="card-body pt-0">
-                        <div class="row g-5">
-                            <div class="col-xl-8">
-                                <p class="text-gray-600 fs-7 mb-3">{{ model.chart_description }}</p>
-                                <ChartFisheye :options="model.chart" height="420px" />
-                                <div v-if="model.relationship" class="border border-dashed border-gray-300 rounded mt-5 p-2">
-                                    <p class="text-gray-600 fs-7 px-3 pt-3 mb-0">{{ model.relationship.description }}</p>
-                                    <ChartFisheye :options="model.relationship.chart" height="350px" />
-                                </div>
-                            </div>
-                            <div class="col-xl-4">
-                                <div class="border border-dashed border-gray-300 rounded px-5 py-4 mb-4">
-                                    <div class="text-gray-500 fw-semibold">Valor actual</div>
-                                    <div class="fs-2 fw-bold text-dark">{{ formatValue(model.current_value, model.unit) }}</div>
-                                </div>
-                                <div v-if="model.usage" class="border border-dashed border-gray-300 rounded px-5 py-4 mb-4">
-                                    <div class="text-gray-500 fw-semibold mb-2">Como se usa</div>
-                                    <span :class="['badge mb-2', statusClass(model.usage.status)]">{{ model.usage.label }}</span>
-                                    <div class="text-gray-600 fs-8">{{ model.usage.detail }}</div>
-                                    <div v-if="model.usage.activation_criteria" class="mt-3">
-                                        <div v-for="(passed, criterion) in model.usage.activation_criteria" :key="criterion" class="d-flex justify-content-between fs-8 py-1 border-top border-gray-100">
-                                            <span>{{ criterion.replaceAll('_', ' ') }}</span>
-                                            <span :class="passed ? 'text-success fw-bold' : 'text-danger fw-bold'">{{ passed ? 'Cumple' : 'No cumple' }}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div v-if="model.formula" :class="['formula-panel', formulaTone(model.code), 'border', 'rounded', 'px-5', 'py-4', 'mb-4']">
-                                    <div class="formula-panel__title fw-semibold mb-2">Formula del modelo</div>
-                                    <LatexFormula v-if="model.formula.latex" :latex="model.formula.latex" />
-                                    <code v-else class="d-block text-dark fs-7 text-break">{{ model.formula.expression }}</code>
-                                    <code v-if="model.formula.kernel" class="d-block text-dark fs-8 mt-2 text-break">{{ model.formula.kernel }}</code>
-                                    <div class="text-gray-700 fs-8 mt-3">{{ model.formula.detail }}</div>
-                                    <ul v-if="model.formula.conditions?.length" class="text-gray-700 fs-8 ps-4 mt-3 mb-0">
-                                        <li v-for="condition in model.formula.conditions" :key="condition">{{ condition }}</li>
-                                    </ul>
-                                </div>
-                                <div v-if="model.origin" class="border border-dashed border-gray-300 rounded px-5 py-4 mb-4">
-                                    <div class="text-gray-500 fw-semibold mb-2">Origen</div>
-                                    <div class="text-dark fs-8 mb-2">{{ model.origin.document }}</div>
-                                    <div class="text-gray-600 fs-8">{{ model.origin.data }}</div>
-                                </div>
-                                <div v-if="model.asset_id" class="border border-dashed border-gray-300 rounded px-5 py-4 mb-4">
-                                    <div class="text-gray-500 fw-semibold">Modelo entrenado</div>
-                                    <div class="fw-bold text-dark">{{ model.version ?? "sin version" }}</div>
-                                    <div class="text-gray-500 fs-8">{{ shortId(model.asset_id) }}</div>
-                                </div>
-                                <div v-if="hasMetrics(model)" class="border border-dashed border-gray-300 rounded px-5 py-4 mb-4">
-                                    <div class="text-gray-500 fw-semibold">Metricas</div>
-                                    <div v-if="model.metrics?.mae !== undefined" class="fw-bold text-dark">MAE: {{ metricValue(model.metrics.mae) }}</div>
-                                    <div v-if="model.metrics?.r2 !== undefined" class="text-gray-500 fs-8">R2: {{ metricValue(model.metrics.r2) }}</div>
-                                    <div v-if="model.metrics?.f1_weighted !== undefined" class="fw-bold text-dark">F1 ponderado: {{ metricValue(model.metrics.f1_weighted) }}</div>
-                                    <div v-if="model.metrics?.accuracy !== undefined" class="text-gray-500 fs-8">Exactitud: {{ metricValue(model.metrics.accuracy) }}</div>
-                                </div>
-                                <div v-if="model.machine_learning" class="border border-dashed border-info rounded px-5 py-4 mb-4 bg-light-info">
-                                    <div class="text-info fw-semibold mb-2">SVM para clasificar el ICA</div>
-                                    <div class="text-gray-700 fs-8 mb-2">{{ model.machine_learning.detail }}</div>
-                                    <div v-if="model.machine_learning.classification" class="fw-bold text-dark">Clasificacion SVM: {{ model.machine_learning.classification }}</div>
-                                    <div v-if="model.machine_learning.version" class="text-gray-600 fs-8">{{ model.machine_learning.version }} - {{ shortId(model.machine_learning.asset_id) }}</div>
-                                    <div class="text-gray-500 fs-8 mt-2">Etiqueta de entrenamiento: {{ model.machine_learning.target_origin ?? "pendiente" }}</div>
-                                </div>
-                                <div v-if="model.components?.length" class="table-responsive border border-dashed border-gray-300 rounded px-4 py-3 mb-4">
-                                    <div class="text-gray-500 fw-semibold mb-2">Lecturas que componen el indice</div>
-                                    <table class="table table-sm align-middle mb-0">
-                                        <thead><tr class="text-muted fs-8"><th>Variable</th><th class="text-end">Lectura</th><th class="text-end">Q</th><th class="text-end">Peso</th></tr></thead>
-                                        <tbody>
-                                            <tr v-for="component in model.components" :key="component.variable">
-                                                <td class="fs-8">{{ component.variable }}</td>
-                                                <td class="text-end fs-8">{{ formatValue(component.raw_value, component.unit) }}</td>
-                                                <td class="text-end fs-8">{{ formatValue(component.normalized_score) }}</td>
-                                                <td class="text-end fs-8">{{ formatValue(component.weight) }}</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                                <div v-if="model.interpretation?.length" class="table-responsive border border-dashed border-gray-300 rounded px-4 py-3 mb-4">
-                                    <div class="text-gray-500 fw-semibold mb-2">Interpretacion</div>
-                                    <table class="table table-sm align-middle mb-0">
-                                        <thead><tr class="text-muted fs-8"><th>Rango</th><th class="text-end">Lectura</th></tr></thead>
-                                        <tbody>
-                                            <tr v-for="item in model.interpretation" :key="`${item.range}-${item.label}`">
-                                                <td class="fs-8">{{ interpretationRange(item) }}</td>
-                                                <td class="text-end fw-semibold fs-8">{{ item.label }}</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                                <div v-if="model.biometric_context?.available" class="border border-dashed border-warning rounded px-5 py-4 mb-4 bg-light-warning">
-                                    <div class="text-warning fw-semibold mb-2">Ultima biometria real</div>
-                                    <div class="text-gray-700 fs-8">{{ model.biometric_context.sampled_at }} - peso medio {{ formatValue(model.biometric_context.peso_promedio_g, "g") }} - longitud media {{ formatValue(model.biometric_context.longitud_promedio_cm, "cm") }}</div>
-                                    <div class="fw-bold text-dark mt-2">FCA: {{ metricValue(model.biometric_context.conversion_alimenticia) }} ({{ model.biometric_context.conversion_label }})</div>
-                                    <LatexFormula :latex="model.biometric_context.formula" />
-                                    <table class="table table-sm align-middle mb-0"><tbody><tr v-for="item in model.biometric_context.interpretation" :key="item.range"><td class="fs-8">{{ item.range }}</td><td class="text-end fw-semibold fs-8">{{ item.label }}</td></tr></tbody></table>
-                                </div>
-                                <div v-if="(model.forecast ?? []).length" class="table-responsive">
-                                    <table class="table table-row-dashed table-row-gray-300 align-middle gs-0 gy-3">
-                                        <thead>
-                                            <tr class="fw-bold text-muted">
-                                                <th>Tiempo</th>
-                                                <th class="text-end">Valor</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr v-for="item in (model.forecast ?? []).slice(0, 6)" :key="`${model.code}-${item.timestamp}-${item.hour}`">
-                                                <td>{{ item.label }}</td>
-                                                <td class="text-end fw-bold">{{ formatValue(item.value, item.unit ?? model.unit) }}</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
+                        <p class="text-gray-600 fs-7">{{ activeModel.relationship.description }}</p>
+                        <ChartFisheye :options="activeModel.relationship.chart" height="350px" />
+                    </div>
+                </section>
+
+                <section v-if="activeModel.code === MODEL_CODES.growth && selectedBiometrics?.available" class="pond-twin mb-6">
+                    <div class="pond-twin__header">
+                        <div><span class="text-gray-500 fs-8 fw-semibold text-uppercase">Gemelo digital de biometria</span><h4 class="fs-5 fw-bold text-dark mb-0">Evolucion del estanque</h4></div>
+                        <span class="badge badge-light-primary">Biometria real</span>
+                    </div>
+                    <div class="pond-twin__timeline">
+                        <div class="pond-twin__step"><span class="pond-twin__dot"></span><small>Ultima muestra</small><strong>{{ formatValue(selectedBiometrics.longitud_promedio_cm, "cm") }}</strong><span>{{ formatValue(selectedBiometrics.peso_promedio_g, "g") }}</span></div>
+                        <div class="pond-twin__line"></div>
+                        <div class="pond-twin__step"><span class="pond-twin__dot pond-twin__dot--current"></span><small>Temperatura actual</small><strong>{{ formatValue(activeModel.current_value, activeModel.unit) }}</strong><span>Ganancia diaria</span></div>
+                        <div class="pond-twin__line"></div>
+                        <div class="pond-twin__step"><span class="pond-twin__dot pond-twin__dot--future"></span><small>Proyeccion {{ growthProjection?.projection_days ?? form.proyeccion_dias }} dias</small><strong>{{ formatValue(growthProjection?.projected_length_mm, "mm") }}</strong><span>{{ formatValue(growthProjection?.projected_weight_g, "g") }}</span></div>
+                    </div>
+                    <p class="text-gray-600 fs-8 mt-5 mb-0">FCA {{ metricValue(selectedBiometrics.conversion_alimenticia) }}: {{ selectedBiometrics.conversion_label }}. La curva longitud-peso usada se muestra en la formula del modelo.</p>
+                </section>
+
+                <section class="row g-5 mb-6">
+                    <div class="col-xl-5">
+                        <div v-if="activeModel.asset_id || hasMetrics(activeModel)" class="info-block h-100">
+                            <span class="text-gray-500 fs-8 fw-semibold text-uppercase">Modelo y validacion</span>
+                            <div v-if="activeModel.asset_id" class="mt-3"><strong>{{ activeModel.version ?? "sin version" }}</strong><div class="text-gray-500 fs-8">{{ shortId(activeModel.asset_id) }}</div></div>
+                            <div v-if="activeModel.metrics?.mae !== undefined" class="mt-3 text-gray-700 fs-7">MAE: <strong>{{ metricValue(activeModel.metrics.mae) }}</strong></div>
+                            <div v-if="activeModel.metrics?.r2 !== undefined" class="text-gray-700 fs-7">R2: <strong>{{ metricValue(activeModel.metrics.r2) }}</strong></div>
+                            <div v-if="activeModel.metrics?.f1_weighted !== undefined" class="mt-3 text-gray-700 fs-7">F1 ponderado: <strong>{{ metricValue(activeModel.metrics.f1_weighted) }}</strong></div>
+                            <div v-if="activeModel.metrics?.accuracy !== undefined" class="text-gray-700 fs-7">Exactitud: <strong>{{ metricValue(activeModel.metrics.accuracy) }}</strong></div>
+                        </div>
+                    </div>
+                    <div class="col-xl-7">
+                        <div v-if="(activeModel.forecast ?? []).length" class="info-block h-100">
+                            <span class="text-gray-500 fs-8 fw-semibold text-uppercase">Resultado para el horizonte elegido</span>
+                            <div class="table-responsive mt-3">
+                                <table class="table table-sm table-row-dashed align-middle mb-0"><tbody><tr v-for="item in activeModel.forecast.slice(0, 6)" :key="`${activeModel.code}-${item.label}-${item.timestamp}`"><td class="text-gray-600 fs-7">{{ item.label }}</td><td class="text-end fw-bold text-dark fs-7">{{ formatValue(item.value, item.unit ?? activeModel.unit) }}</td></tr></tbody></table>
                             </div>
                         </div>
                     </div>
+                </section>
+
+                <section v-if="activeModel.machine_learning || activeModel.components?.length || activeModel.interpretation?.length" class="row g-5 mb-6">
+                    <div v-if="activeModel.machine_learning" class="col-xl-4"><div class="info-block h-100"><span class="text-gray-500 fs-8 fw-semibold text-uppercase">Aprendizaje automatico</span><p class="text-gray-700 fs-7 mt-3 mb-2">{{ activeModel.machine_learning.detail }}</p><strong v-if="activeModel.machine_learning.classification">{{ activeModel.machine_learning.classification }}</strong><div class="text-gray-500 fs-8 mt-2">{{ activeModel.machine_learning.target_origin }}</div></div></div>
+                    <div v-if="activeModel.components?.length" class="col-xl-4"><div class="info-block h-100"><span class="text-gray-500 fs-8 fw-semibold text-uppercase">Variables del indice</span><table class="table table-sm table-row-dashed align-middle mt-3 mb-0"><tbody><tr v-for="component in activeModel.components" :key="component.variable"><td class="fs-8">{{ component.variable }}</td><td class="text-end fs-8">{{ formatValue(component.raw_value, component.unit) }}</td><td class="text-end fw-bold fs-8">Q {{ formatValue(component.normalized_score) }}</td></tr></tbody></table></div></div>
+                    <div v-if="activeModel.interpretation?.length" class="col-xl-4"><div class="info-block h-100"><span class="text-gray-500 fs-8 fw-semibold text-uppercase">Interpretacion</span><table class="table table-sm table-row-dashed align-middle mt-3 mb-0"><tbody><tr v-for="item in activeModel.interpretation" :key="`${item.range}-${item.label}`"><td class="fs-8">{{ interpretationRange(item) }}</td><td class="text-end fw-bold fs-8">{{ item.label }}</td></tr></tbody></table></div></div>
+                </section>
+
+                <section v-if="lifecycle.summary?.length" class="lifecycle-strip mb-6">
+                    <div v-for="item in lifecycle.summary" :key="item.step"><strong>{{ item.step }}</strong><span>{{ item.detail }}</span></div>
+                </section>
+            </template>
+        </template>
+
+        <template v-else>
+            <div class="detail-nav mb-5"><el-button text :icon="RefreshRight" @click="showCatalog">Volver a modelos</el-button><span class="text-gray-400">/</span><span class="text-gray-600 fs-7">Gemelo digital de la piscina</span></div>
+            <section class="model-overview mb-6"><div class="model-overview__icon"><el-icon><SetUp /></el-icon></div><div class="model-overview__copy"><h3 class="fs-2 fw-bold text-dark mb-2">Gemelo digital de la piscina</h3><p class="text-gray-700 fs-6 mb-1">Usa las ultimas mediciones reales como base o escribe un escenario manual para observar la respuesta de los modelos compatibles.</p><p class="text-gray-500 fs-7 mb-0">La SVM temporal de OD conserva su propia vista: necesita historial, no una sola lectura manual.</p></div></section>
+
+            <section class="twin-layout mb-6">
+                <div class="twin-inputs">
+                    <span class="text-gray-500 fs-8 fw-semibold text-uppercase">Escenario manual</span>
+                    <div class="row g-4 mt-1">
+                        <div class="col-md-6"><label>Temperatura (C)</label><el-input-number v-model="scenarioForm.temperature_c" :min="0" :max="45" :step="0.1" controls-position="right" /></div>
+                        <div class="col-md-6"><label>pH</label><el-input-number v-model="scenarioForm.ph" :min="0" :max="14" :step="0.01" controls-position="right" /></div>
+                        <div class="col-md-6"><label>Oxigeno disuelto (mg/L)</label><el-input-number v-model="scenarioForm.dissolved_oxygen_mg_l" :min="0" :max="30" :step="0.1" controls-position="right" /></div>
+                        <div class="col-md-6"><label>Ion nitrato (mg/L)</label><el-input-number v-model="scenarioForm.nitrate_ion" :min="0" :max="500" :step="0.1" controls-position="right" /></div>
+                        <div class="col-md-6"><label>Proyeccion de biometria</label><el-select v-model="scenarioForm.projection_days"><el-option v-for="item in proyeccionesCrecimiento" :key="item.id" :label="item.name" :value="item.id" /></el-select></div>
+                    </div>
+                    <div class="mt-5"><span class="text-gray-500 fs-8 fw-semibold text-uppercase">Modelos a aplicar</span><el-checkbox-group v-model="scenarioForm.active_models" class="twin-checkboxes"><el-checkbox :label="MODEL_CODES.water">Calidad de agua</el-checkbox><el-checkbox :label="MODEL_CODES.oxygen">Estado de oxigeno</el-checkbox><el-checkbox :label="MODEL_CODES.growth">Crecimiento de tilapia</el-checkbox></el-checkbox-group></div>
+                    <el-button type="primary" class="mt-5" :icon="SetUp" :loading="scenarioLoading" @click="runScenario">Calcular escenario</el-button>
                 </div>
-            </div>
-        </div>
+                <div class="twin-reference">
+                    <span class="text-gray-500 fs-8 fw-semibold text-uppercase">Base de referencia</span>
+                    <div class="twin-reference__value">{{ latest.timestamp ?? "Cargando mediciones" }}</div>
+                    <p>Los campos se inicializan con las lecturas recientes de la piscina. Cada calculo informa que variables fueron reemplazadas manualmente.</p>
+                    <div v-if="response?.biometrics?.available" class="twin-reference__biometrics"><span>Ultima biometria</span><strong>{{ formatValue(response.biometrics.longitud_promedio_cm, "cm") }} / {{ formatValue(response.biometrics.peso_promedio_g, "g") }}</strong><small>FCA {{ metricValue(response.biometrics.conversion_alimenticia) }}</small></div>
+                </div>
+            </section>
+
+            <el-alert v-if="scenarioError" class="mb-6" type="warning" :title="scenarioError" show-icon :closable="false" />
+            <section v-if="scenarioLoading" class="card card-flush mb-6"><div class="card-body py-12"><el-skeleton :rows="6" animated /></div></section>
+            <template v-else-if="scenarioResult">
+                <section class="row g-5 mb-6"><div v-for="item in scenarioResult.models" :key="item.code" class="col-md-4"><div class="result-keyline h-100"><span>{{ item.name }}</span><strong>{{ formatValue(item.value, item.unit) }}</strong><small>{{ item.detail }}</small><small v-if="item.projection?.projected_weight_g">Peso proyectado: {{ formatValue(item.projection.projected_weight_g, "g") }}</small></div></div></section>
+                <section class="card card-flush mb-6"><div class="card-header"><h4 class="card-title fw-bold text-dark fs-5">Respuesta combinada de la piscina</h4></div><div class="card-body pt-0"><p class="text-gray-600 fs-7">Cada barra expresa la respuesta relativa de un modelo activo; los valores exactos se muestran arriba.</p><ChartFisheye :options="scenarioResult.chart" height="360px" /><div class="text-gray-500 fs-8 mt-3">{{ scenarioResult.notice }}</div></div></section>
+            </template>
+
+            <section v-if="warnings.length" class="warning-strip"><strong>Lecturas a considerar</strong><span v-for="warning in warnings" :key="warning">{{ warning }}</span></section>
+        </template>
     </App>
 </template>
 
 <style scoped>
-.formula-panel {
-    border-width: 1px;
+.module-intro,
+.catalog-heading,
+.detail-nav,
+.model-overview,
+.model-controls,
+.pond-twin__header,
+.snapshot-strip,
+.lifecycle-strip,
+.twin-layout {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
 }
 
-.formula-panel__title {
-    letter-spacing: 0;
+.module-intro {
+    align-items: flex-end;
 }
 
-.formula-svm {
-    background: #eef5ff;
-    border-color: #9ec5fe !important;
+.module-intro__actions {
+    flex: 0 0 auto;
+}
+
+.filter-strip,
+.model-controls,
+.twin-layout,
+.pond-twin,
+.snapshot-strip,
+.lifecycle-strip,
+.warning-strip {
+    border: 1px solid #e5e7eb;
+    background: #ffffff;
+}
+
+.filter-strip {
+    padding: 18px 20px;
+}
+
+.model-choice {
+    width: 100%;
+    display: flex;
+    gap: 14px;
+    border: 1px solid #dbe3ee;
+    background: #ffffff;
+    padding: 20px;
+    transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.model-choice:hover,
+.model-choice:focus-visible {
+    border-color: #4d8dff;
+    box-shadow: 0 8px 20px rgba(18, 74, 155, 0.12);
+    transform: translateY(-2px);
+    outline: none;
+}
+
+.model-choice__icon,
+.model-overview__icon {
+    width: 42px;
+    height: 42px;
+    flex: 0 0 42px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     color: #0d6efd;
+    background: #edf5ff;
+    font-size: 21px;
 }
 
-.formula-oxygen {
-    background: #ecfdf3;
-    border-color: #8ce3b2 !important;
-    color: #16803c;
+.model-choice--twin .model-choice__icon,
+.model-overview__icon {
+    color: #087f5b;
+    background: #eafaf3;
 }
 
-.formula-growth {
-    background: #f5f0ff;
-    border-color: #c7b3ff !important;
-    color: #7048c8;
+.model-choice__body {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
 }
 
-.formula-ica {
-    background: #ecfeff;
-    border-color: #8de4e8 !important;
-    color: #0f766e;
+.model-choice__footer {
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 600;
+    margin-top: auto;
+    padding-top: 16px;
 }
 
-.formula-default {
-    background: #f8f9fa;
-    border-color: #ced4da !important;
-    color: #495057;
+.snapshot-strip,
+.lifecycle-strip {
+    align-items: stretch;
+    overflow-x: auto;
+}
+
+.snapshot-strip > div,
+.lifecycle-strip > div {
+    min-width: 170px;
+    flex: 1;
+    padding: 16px 18px;
+    border-right: 1px solid #eef1f5;
+}
+
+.snapshot-strip > div:last-child,
+.lifecycle-strip > div:last-child {
+    border-right: 0;
+}
+
+.snapshot-strip span,
+.lifecycle-strip span {
+    display: block;
+    color: #64748b;
+    font-size: 12px;
+}
+
+.snapshot-strip strong {
+    display: block;
+    color: #172033;
+    font-size: 18px;
+    margin-top: 4px;
+}
+
+.detail-nav {
+    justify-content: flex-start;
+    gap: 10px;
+}
+
+.model-overview {
+    align-items: flex-start;
+    justify-content: flex-start;
+    padding: 24px 0;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.model-overview__copy {
+    max-width: 850px;
+}
+
+.model-controls {
+    align-items: stretch;
+    justify-content: flex-start;
+    padding: 16px;
+    flex-wrap: wrap;
+}
+
+.model-controls__group {
+    min-width: 180px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.model-controls__group--wide {
+    flex: 1 1 360px;
+}
+
+.model-controls__select {
+    width: 220px;
+    max-width: 100%;
+}
+
+.input-tags,
+.twin-checkboxes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.input-tags span {
+    border: 1px solid #dbe3ee;
+    padding: 5px 8px;
+    color: #475569;
+    font-size: 12px;
+    background: #f8fafc;
+}
+
+.result-keyline,
+.info-block {
+    border: 1px solid #e1e7ef;
+    padding: 20px;
+    background: #ffffff;
+}
+
+.result-keyline span,
+.info-block > span {
+    display: block;
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.result-keyline strong {
+    display: block;
+    color: #172033;
+    font-size: 28px;
+    line-height: 1.2;
+    margin: 9px 0 7px;
+}
+
+.result-keyline small {
+    display: block;
+    color: #64748b;
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+.formula-panel {
+    border: 1px solid #dbe3ee;
+    padding: 22px;
+    background: #ffffff;
 }
 
 .formula-panel :deep(.katex) {
-    color: currentColor;
+    color: #172033;
+    font-size: 1.12em;
+}
+
+.formula-panel__origin {
+    border-top: 1px solid #e5e7eb;
+    padding-top: 12px;
+    color: #64748b;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.formula-svm { border-left: 3px solid #0d6efd; }
+.formula-oxygen { border-left: 3px solid #16803c; }
+.formula-growth { border-left: 3px solid #7048c8; }
+.formula-water { border-left: 3px solid #0f766e; }
+.formula-default { border-left: 3px solid #64748b; }
+
+.pond-twin {
+    padding: 20px;
+    background: #f7fbff;
+}
+
+.pond-twin__timeline {
+    display: flex;
+    align-items: center;
+    margin-top: 24px;
+}
+
+.pond-twin__step {
+    width: 31%;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.pond-twin__step small,
+.pond-twin__step span {
+    color: #64748b;
+    font-size: 12px;
+}
+
+.pond-twin__step strong {
+    color: #172033;
+    font-size: 20px;
+    margin: 5px 0;
+}
+
+.pond-twin__dot {
+    width: 12px;
+    height: 12px;
+    background: #0d6efd;
+    display: block;
+    margin-bottom: 10px;
+}
+
+.pond-twin__dot--current { background: #16803c; }
+.pond-twin__dot--future { background: #7048c8; }
+
+.pond-twin__line {
+    height: 2px;
+    flex: 1;
+    background: #b8c7d8;
+    margin: 0 12px 30px;
+}
+
+.twin-layout {
+    align-items: stretch;
+}
+
+.twin-inputs,
+.twin-reference {
+    padding: 22px;
+}
+
+.twin-inputs {
+    flex: 1 1 66%;
+}
+
+.twin-reference {
+    flex: 1 1 34%;
+    border-left: 1px solid #e5e7eb;
+    background: #f8fafc;
+}
+
+.twin-inputs label {
+    display: block;
+    color: #475569;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+.twin-inputs :deep(.el-input-number),
+.twin-inputs :deep(.el-select) {
+    width: 100%;
+}
+
+.twin-checkboxes {
+    margin-top: 9px;
+}
+
+.twin-reference__value {
+    color: #172033;
+    font-weight: 700;
+    font-size: 16px;
+    margin-top: 10px;
+}
+
+.twin-reference p {
+    color: #64748b;
+    font-size: 13px;
+    line-height: 1.55;
+    margin-top: 14px;
+}
+
+.twin-reference__biometrics {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-top: 14px;
+    border-top: 1px solid #dbe3ee;
+}
+
+.twin-reference__biometrics span,
+.twin-reference__biometrics small { color: #64748b; font-size: 12px; }
+.twin-reference__biometrics strong { color: #172033; }
+
+.warning-strip {
+    padding: 16px 20px;
+}
+
+.warning-strip strong,
+.warning-strip span {
+    display: block;
+    color: #7c5d00;
+    font-size: 13px;
+}
+
+.warning-strip span { margin-top: 5px; }
+
+@media (max-width: 991px) {
+    .module-intro,
+    .twin-layout {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .twin-reference { border-left: 0; border-top: 1px solid #e5e7eb; }
+}
+
+@media (max-width: 650px) {
+    .model-controls,
+    .catalog-heading,
+    .pond-twin__header {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .snapshot-strip > div,
+    .lifecycle-strip > div { min-width: 155px; }
+    .pond-twin__timeline { align-items: flex-start; }
+    .pond-twin__line { margin-top: 5px; }
+    .pond-twin__step strong { font-size: 16px; }
 }
 </style>
