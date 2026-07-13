@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
 import ChartFisheye from "@/Components/ChartFisheye.vue";
+import LatexFormula from "@/Components/LatexFormula.vue";
 
 defineProps({
     title: String,
@@ -48,6 +49,7 @@ const summary = computed(() => response.value?.summary ?? {});
 const models = computed(() => response.value?.models ?? []);
 const warnings = computed(() => response.value?.warnings ?? []);
 const aiModel = computed(() => response.value?.ai_model ?? {});
+const lifecycle = computed(() => response.value?.lifecycle ?? {});
 
 const formatValue = (value, unit = "") => {
     if (value === null || value === undefined || value === "") return "-";
@@ -72,7 +74,7 @@ const statusLabel = (status) => {
         calculado: "Calculado",
         disponible: "Disponible",
         sin_datos: "Sin datos",
-        candidato_bloqueado: "Modelo IA en prueba",
+        candidato_bloqueado: "Modelo entrenado en evaluacion",
         calculo_parcial: "Calculo parcial",
         fuera_de_dominio: "Fuera del dominio",
     };
@@ -96,6 +98,23 @@ const shortId = (value) => {
     if (!value) return "N/D";
     const text = String(value);
     return text.length > 18 ? `${text.slice(0, 18)}...` : text;
+};
+
+const hasMetrics = (model) => Object.keys(model.metrics ?? {}).length > 0;
+
+const formulaTone = (code) => ({
+    SVM_OD_FORECAST_1H: "formula-svm",
+    OXYGEN_STATUS_MODEL: "formula-oxygen",
+    TILAPIA_GROWTH_TEMPERATURE: "formula-growth",
+    WATER_QUALITY_INDEX_ICA: "formula-ica",
+})[code] ?? "formula-default";
+
+const interpretationRange = (item) => {
+    if (item.range) return item.range;
+    const minimum = Number(item.minimum);
+    const maximum = Number(item.maximum);
+    if (!Number.isFinite(minimum) || !Number.isFinite(maximum)) return "-";
+    return `${minimum.toLocaleString("es-PE", { maximumFractionDigits: 1 })} a ${maximum.toLocaleString("es-PE", { maximumFractionDigits: 1 })}`;
 };
 
 const piscigranjasOptions = async () => {
@@ -247,8 +266,8 @@ onMounted(async () => {
             :closable="false"
         >
             <template #title>
-                Datos de la piscina procesados localmente. La SVM de oxigeno trabaja a una hora; la ventana visible es
-                {{ response?.filters?.window_label ?? "la seleccionada" }}.
+                Datos procesados dentro de la maquina virtual. La SVR de oxigeno trabaja a una hora; la ventana visible es
+                {{ response?.filters?.window_label ?? "la seleccionada" }} y el crecimiento usa el horizonte elegido.
             </template>
         </el-alert>
 
@@ -313,10 +332,19 @@ onMounted(async () => {
                     </div>
                     <div class="text-end">
                         <span :class="['badge mb-1', aiModel.productive ? 'badge-light-success' : 'badge-light-warning']">
-                            {{ aiModel.productive ? 'En uso productivo' : 'Estimacion de prueba visible' }}
+                            {{ aiModel.productive ? 'En uso productivo' : 'Modelo entrenado en evaluacion' }}
                         </span>
                         <div class="text-gray-500 fs-8">Modelo {{ aiModel.version ?? 'sin entrenar' }} - {{ shortId(aiModel.asset_id) }}</div>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <div v-if="lifecycle.summary?.length" class="row g-3 mb-5">
+            <div v-for="item in lifecycle.summary" :key="item.step" class="col-md-6 col-xl-3">
+                <div class="border border-dashed border-gray-300 rounded p-4 h-100 bg-light">
+                    <div class="fw-bold text-dark fs-7 mb-2">{{ item.step }}</div>
+                    <div class="text-gray-600 fs-8">{{ item.detail }}</div>
                 </div>
             </div>
         </div>
@@ -368,24 +396,72 @@ onMounted(async () => {
                                         </div>
                                     </div>
                                 </div>
-                                <div v-if="model.formula" class="border border-dashed border-primary rounded px-5 py-4 mb-4 bg-light-primary">
-                                    <div class="text-primary fw-semibold mb-2">Calcula</div>
-                                    <code class="d-block text-dark fs-7 text-break">{{ model.formula.expression }}</code>
+                                <div v-if="model.formula" :class="['formula-panel', formulaTone(model.code), 'border', 'rounded', 'px-5', 'py-4', 'mb-4']">
+                                    <div class="formula-panel__title fw-semibold mb-2">Formula del modelo</div>
+                                    <LatexFormula v-if="model.formula.latex" :latex="model.formula.latex" />
+                                    <code v-else class="d-block text-dark fs-7 text-break">{{ model.formula.expression }}</code>
                                     <code v-if="model.formula.kernel" class="d-block text-dark fs-8 mt-2 text-break">{{ model.formula.kernel }}</code>
                                     <div class="text-gray-700 fs-8 mt-3">{{ model.formula.detail }}</div>
                                     <ul v-if="model.formula.conditions?.length" class="text-gray-700 fs-8 ps-4 mt-3 mb-0">
                                         <li v-for="condition in model.formula.conditions" :key="condition">{{ condition }}</li>
                                     </ul>
                                 </div>
+                                <div v-if="model.origin" class="border border-dashed border-gray-300 rounded px-5 py-4 mb-4">
+                                    <div class="text-gray-500 fw-semibold mb-2">Origen</div>
+                                    <div class="text-dark fs-8 mb-2">{{ model.origin.document }}</div>
+                                    <div class="text-gray-600 fs-8">{{ model.origin.data }}</div>
+                                </div>
                                 <div v-if="model.asset_id" class="border border-dashed border-gray-300 rounded px-5 py-4 mb-4">
                                     <div class="text-gray-500 fw-semibold">Modelo entrenado</div>
                                     <div class="fw-bold text-dark">{{ model.version ?? "sin version" }}</div>
                                     <div class="text-gray-500 fs-8">{{ shortId(model.asset_id) }}</div>
                                 </div>
-                                <div class="border border-dashed border-gray-300 rounded px-5 py-4 mb-4">
+                                <div v-if="hasMetrics(model)" class="border border-dashed border-gray-300 rounded px-5 py-4 mb-4">
                                     <div class="text-gray-500 fw-semibold">Metricas</div>
-                                    <div class="fw-bold text-dark">MAE: {{ metricValue(model.metrics?.mae ?? model.mae) }}</div>
-                                    <div class="text-gray-500 fs-8">R2: {{ metricValue(model.metrics?.r2) }}</div>
+                                    <div v-if="model.metrics?.mae !== undefined" class="fw-bold text-dark">MAE: {{ metricValue(model.metrics.mae) }}</div>
+                                    <div v-if="model.metrics?.r2 !== undefined" class="text-gray-500 fs-8">R2: {{ metricValue(model.metrics.r2) }}</div>
+                                    <div v-if="model.metrics?.f1_weighted !== undefined" class="fw-bold text-dark">F1 ponderado: {{ metricValue(model.metrics.f1_weighted) }}</div>
+                                    <div v-if="model.metrics?.accuracy !== undefined" class="text-gray-500 fs-8">Exactitud: {{ metricValue(model.metrics.accuracy) }}</div>
+                                </div>
+                                <div v-if="model.machine_learning" class="border border-dashed border-info rounded px-5 py-4 mb-4 bg-light-info">
+                                    <div class="text-info fw-semibold mb-2">SVM para clasificar el ICA</div>
+                                    <div class="text-gray-700 fs-8 mb-2">{{ model.machine_learning.detail }}</div>
+                                    <div v-if="model.machine_learning.classification" class="fw-bold text-dark">Clasificacion SVM: {{ model.machine_learning.classification }}</div>
+                                    <div v-if="model.machine_learning.version" class="text-gray-600 fs-8">{{ model.machine_learning.version }} - {{ shortId(model.machine_learning.asset_id) }}</div>
+                                    <div class="text-gray-500 fs-8 mt-2">Etiqueta de entrenamiento: {{ model.machine_learning.target_origin ?? "pendiente" }}</div>
+                                </div>
+                                <div v-if="model.components?.length" class="table-responsive border border-dashed border-gray-300 rounded px-4 py-3 mb-4">
+                                    <div class="text-gray-500 fw-semibold mb-2">Lecturas que componen el indice</div>
+                                    <table class="table table-sm align-middle mb-0">
+                                        <thead><tr class="text-muted fs-8"><th>Variable</th><th class="text-end">Lectura</th><th class="text-end">Q</th><th class="text-end">Peso</th></tr></thead>
+                                        <tbody>
+                                            <tr v-for="component in model.components" :key="component.variable">
+                                                <td class="fs-8">{{ component.variable }}</td>
+                                                <td class="text-end fs-8">{{ formatValue(component.raw_value, component.unit) }}</td>
+                                                <td class="text-end fs-8">{{ formatValue(component.normalized_score) }}</td>
+                                                <td class="text-end fs-8">{{ formatValue(component.weight) }}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div v-if="model.interpretation?.length" class="table-responsive border border-dashed border-gray-300 rounded px-4 py-3 mb-4">
+                                    <div class="text-gray-500 fw-semibold mb-2">Interpretacion</div>
+                                    <table class="table table-sm align-middle mb-0">
+                                        <thead><tr class="text-muted fs-8"><th>Rango</th><th class="text-end">Lectura</th></tr></thead>
+                                        <tbody>
+                                            <tr v-for="item in model.interpretation" :key="`${item.range}-${item.label}`">
+                                                <td class="fs-8">{{ interpretationRange(item) }}</td>
+                                                <td class="text-end fw-semibold fs-8">{{ item.label }}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div v-if="model.biometric_context?.available" class="border border-dashed border-warning rounded px-5 py-4 mb-4 bg-light-warning">
+                                    <div class="text-warning fw-semibold mb-2">Ultima biometria real</div>
+                                    <div class="text-gray-700 fs-8">{{ model.biometric_context.sampled_at }} - peso medio {{ formatValue(model.biometric_context.peso_promedio_g, "g") }} - longitud media {{ formatValue(model.biometric_context.longitud_promedio_cm, "cm") }}</div>
+                                    <div class="fw-bold text-dark mt-2">FCA: {{ metricValue(model.biometric_context.conversion_alimenticia) }} ({{ model.biometric_context.conversion_label }})</div>
+                                    <LatexFormula :latex="model.biometric_context.formula" />
+                                    <table class="table table-sm align-middle mb-0"><tbody><tr v-for="item in model.biometric_context.interpretation" :key="item.range"><td class="fs-8">{{ item.range }}</td><td class="text-end fw-semibold fs-8">{{ item.label }}</td></tr></tbody></table>
                                 </div>
                                 <div v-if="(model.forecast ?? []).length" class="table-responsive">
                                     <table class="table table-row-dashed table-row-gray-300 align-middle gs-0 gy-3">
@@ -411,3 +487,47 @@ onMounted(async () => {
         </div>
     </App>
 </template>
+
+<style scoped>
+.formula-panel {
+    border-width: 1px;
+}
+
+.formula-panel__title {
+    letter-spacing: 0;
+}
+
+.formula-svm {
+    background: #eef5ff;
+    border-color: #9ec5fe !important;
+    color: #0d6efd;
+}
+
+.formula-oxygen {
+    background: #ecfdf3;
+    border-color: #8ce3b2 !important;
+    color: #16803c;
+}
+
+.formula-growth {
+    background: #f5f0ff;
+    border-color: #c7b3ff !important;
+    color: #7048c8;
+}
+
+.formula-ica {
+    background: #ecfeff;
+    border-color: #8de4e8 !important;
+    color: #0f766e;
+}
+
+.formula-default {
+    background: #f8f9fa;
+    border-color: #ced4da !important;
+    color: #495057;
+}
+
+.formula-panel :deep(.katex) {
+    color: currentColor;
+}
+</style>
