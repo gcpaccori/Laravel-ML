@@ -1,5 +1,0 @@
-<<<<<<<< HEAD:public/build/assets/ActionMessage-B3TI9vNB.js
-import{c as s,o as t,j as o,m as c,i,a as n,k as r,v as l,T as d}from"./app-BMnN77PI.js";const v={class:"text-sm text-gray-600"},p={__name:"ActionMessage",props:{on:Boolean},setup(e){return(a,_)=>(t(),s("div",null,[o(d,{"leave-active-class":"transition ease-in duration-1000","leave-from-class":"opacity-100","leave-to-class":"opacity-0"},{default:c(()=>[i(n("div",v,[r(a.$slots,"default")],512),[[l,e.on]])]),_:3})]))}};export{p as _};
-========
-import{c as s,o as t,j as o,m as c,i,a as n,k as r,v as l,T as d}from"./app-JrLeb_at.js";const v={class:"text-sm text-gray-600"},p={__name:"ActionMessage",props:{on:Boolean},setup(e){return(a,_)=>(t(),s("div",null,[o(d,{"leave-active-class":"transition ease-in duration-1000","leave-from-class":"opacity-100","leave-to-class":"opacity-0"},{default:c(()=>[i(n("div",v,[r(a.$slots,"default")],512),[[l,e.on]])]),_:3})]))}};export{p as _};
->>>>>>>> ee036da (Regenerar assets tras integrar biometrias):public/build/assets/ActionMessage-BBCPn6wy.js
