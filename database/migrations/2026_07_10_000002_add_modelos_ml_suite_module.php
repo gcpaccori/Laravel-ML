@@ -17,7 +17,7 @@ return new class extends Migration
                     'url' => 'modelosmlsuite',
                 ],
                 [
-                    'name' => 'Suite MLOps',
+                    'name' => 'Entrenamiento de modelos de aprendizaje automatico',
                     'cod_father' => null,
                     'icon' => 'DataAnalysis',
                     'order' => 4,

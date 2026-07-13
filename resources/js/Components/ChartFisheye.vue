@@ -1,5 +1,5 @@
 <template>
-    <div ref="chartRef" class="w-full h-500px"></div>
+    <div ref="chartRef" class="w-full" :style="{ height }"></div>
 </template>
 
 <script setup lang="ts">
@@ -8,23 +8,37 @@ import * as echarts from "echarts";
 
 type EChartsOption = echarts.EChartsOption;
 
-const props = defineProps<{
-    options: any
-}>();
+const props = withDefaults(defineProps<{
+    options: any,
+    height?: string,
+}>(), {
+    height: "500px",
+});
 
 const chartRef = ref<HTMLDivElement | null>(null);
 let myChart: echarts.ECharts | null = null;
 
 function getOption(): EChartsOption {
+    const tooltip = props.options?.tooltip ?? {};
+    const tooltipRows = Array.isArray(tooltip.data) ? tooltip.data : null;
+    if (!tooltipRows) {
+        return {
+            ...props.options,
+            tooltip,
+        };
+    }
+
     return {
         ...props.options,
         tooltip: {
-            ...props.options?.tooltip,
+            ...tooltip,
             formatter(params: any) {
-                const tooltip = props.options.tooltip.data[params[0].dataIndex];
-                let html = `<strong>${tooltip.title}</strong><br/>`;
-                tooltip.items.forEach((item: any, index: number) => {
-                    html += `${params[index]?.marker ?? ""} ${item.label}: ${item.value}<br/>`;
+                const active = Array.isArray(params) ? params : [params];
+                const row = tooltipRows[active[0]?.dataIndex];
+                if (!row) return "";
+                let html = `<strong>${row.title}</strong><br/>`;
+                row.items.forEach((item: any, index: number) => {
+                    html += `${active[index]?.marker ?? ""} ${item.label}: ${item.value}<br/>`;
                 });
                 return html;
             }
@@ -38,12 +52,17 @@ function initChart() {
     myChart.setOption(getOption());
 }
 
+function resizeChart() {
+    myChart?.resize();
+}
+
 onMounted(() => {
     initChart();
-    window.addEventListener("resize", () => myChart?.resize());
+    window.addEventListener("resize", resizeChart);
 });
 
 onBeforeUnmount(() => {
+    window.removeEventListener("resize", resizeChart);
     myChart?.dispose();
     myChart = null;
 });

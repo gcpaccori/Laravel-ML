@@ -11,10 +11,10 @@ class ModeloMlController extends Controller
     public function index()
     {
         return Inertia::render('Modules/Views/ModelosMl', [
-            'title' => 'Modelos ML',
+            'title' => 'Modelos de aprendizaje automatico',
             'toolbar' => [
                 ['label' => 'Inicio', 'route' => 'dashboard'],
-                ['label' => 'Modelos ML'],
+                ['label' => 'Modelos de aprendizaje automatico'],
             ],
         ]);
     }
@@ -24,11 +24,22 @@ class ModeloMlController extends Controller
         $baseUrl = rtrim(env('AQUACULTURE_BACKEND_URL', 'http://aquaculture_backend:8000/api/v1'), '/');
         $pondId = (string) $request->input('piscina_id', '1');
         $pondId = $pondId === 'T' ? '1' : $pondId;
+        $windowHours = [
+            '6h' => 6,
+            '24h' => 24,
+            '7d' => 168,
+            '30d' => 720,
+            '90d' => 2160,
+        ][$request->input('ventana', '7d')] ?? 168;
+        $growthProjectionDays = max(1, min(365, (int) $request->input('proyeccion_dias', 7)));
 
         $response = Http::acceptJson()
             ->connectTimeout(5)
             ->timeout(45)
-            ->get("{$baseUrl}/ponds/{$pondId}/ai/dashboard");
+            ->get("{$baseUrl}/ponds/{$pondId}/ai/dashboard", [
+                'window_hours' => $windowHours,
+                'growth_projection_days' => $growthProjectionDays,
+            ]);
 
         if ($response->failed()) {
             return response()->json([

@@ -20,7 +20,8 @@ const form = ref({
     piscigranja_id: "T",
     piscina_id: "T",
     horizonte: "1h",
-    ventana: "all",
+    ventana: "7d",
+    proyeccion_dias: 7,
 });
 
 const horizontes = [
@@ -28,10 +29,18 @@ const horizontes = [
 ];
 
 const ventanas = [
+    { id: "6h", name: "Ultimas 6 horas" },
+    { id: "24h", name: "Ultimas 24 horas" },
     { id: "7d", name: "Ultimos 7 dias" },
     { id: "30d", name: "Ultimos 30 dias" },
     { id: "90d", name: "Ultimos 90 dias" },
-    { id: "all", name: "Todo el historico" },
+];
+
+const proyeccionesCrecimiento = [
+    { id: 1, name: "1 dia" },
+    { id: 7, name: "7 dias" },
+    { id: 30, name: "30 dias" },
+    { id: 90, name: "90 dias" },
 ];
 
 const latest = computed(() => response.value?.latest ?? {});
@@ -65,6 +74,9 @@ const statusLabel = (status) => {
         calculado: "Calculado",
         disponible: "Disponible",
         sin_datos: "Sin datos",
+        candidato_bloqueado: "Candidato bloqueado",
+        calculo_parcial: "Calculo parcial",
+        fuera_de_dominio: "Fuera del dominio",
     };
     return labels[status] ?? status ?? "N/D";
 };
@@ -75,6 +87,9 @@ const statusClass = (status) => {
     if (status === "calculado") return "badge-light-primary";
     if (status === "gemelo_digital") return "badge-light-primary";
     if (status === "escenario_sin_asset") return "badge-light-warning";
+    if (status === "candidato_bloqueado") return "badge-light-warning";
+    if (status === "calculo_parcial") return "badge-light-warning";
+    if (status === "fuera_de_dominio") return "badge-light-danger";
     if (status === "sin_datos") return "badge-light-danger";
     return "badge-light-info";
 };
@@ -143,7 +158,7 @@ onMounted(async () => {
                     <div class="card-body">
                         <el-form :model="form" label-position="top" class="w-100">
                             <div class="row">
-                                <div class="col-lg-3">
+                                <div class="col-lg-2">
                                     <el-form-item label="Piscigranja">
                                         <el-select filterable v-model="form.piscigranja_id" @change="changePiscigranja">
                                             <el-option label="Todos" value="T" />
@@ -173,9 +188,23 @@ onMounted(async () => {
 
                                 <div class="col-lg-3">
                                     <el-form-item label="Horizonte">
-                                        <el-select v-model="form.horizonte" @change="changeFiltro">
+                                        <el-select v-model="form.horizonte" disabled>
                                             <el-option
                                                 v-for="item in horizontes"
+                                                :key="item.id"
+                                                :label="item.name"
+                                                :value="item.id"
+                                            />
+                                        </el-select>
+                                        <div class="text-gray-500 fs-8 mt-1">La SVM se valido exclusivamente a una hora.</div>
+                                    </el-form-item>
+                                </div>
+
+                                <div class="col-lg-2">
+                                    <el-form-item label="Ventana de datos">
+                                        <el-select v-model="form.ventana" @change="changeFiltro">
+                                            <el-option
+                                                v-for="item in ventanas"
                                                 :key="item.id"
                                                 :label="item.name"
                                                 :value="item.id"
@@ -184,11 +213,11 @@ onMounted(async () => {
                                     </el-form-item>
                                 </div>
 
-                                <div class="col-lg-3">
-                                    <el-form-item label="Ventana de datos">
-                                        <el-select v-model="form.ventana" @change="changeFiltro">
+                                <div class="col-lg-2">
+                                    <el-form-item label="Proyeccion de crecimiento">
+                                        <el-select v-model="form.proyeccion_dias" @change="changeFiltro">
                                             <el-option
-                                                v-for="item in ventanas"
+                                                v-for="item in proyeccionesCrecimiento"
                                                 :key="item.id"
                                                 :label="item.name"
                                                 :value="item.id"
@@ -271,7 +300,7 @@ onMounted(async () => {
                     <div class="card-body">
                         <span class="fs-7 text-gray-500 fw-semibold">Puntos graficados</span>
                         <div class="fs-2hx fw-bold text-primary">{{ summary.historical_points ?? 0 }}</div>
-                        <span class="text-gray-500">{{ response?.filters?.horizonte_label ?? "-" }}</span>
+                        <span class="text-gray-500">{{ response?.filters?.window_label ?? "-" }}</span>
                     </div>
                 </div>
             </div>
@@ -330,22 +359,6 @@ onMounted(async () => {
             </div>
         </div>
 
-        <div v-if="response?.combined_chart" class="row g-5 g-xl-8 mb-5">
-            <div class="col-xl-12">
-                <div class="card card-flush overflow-hidden">
-                    <div class="card-header py-5">
-                        <h3 class="card-title align-items-start flex-column">
-                            <span class="card-label fw-bold text-dark">Datos reales y proyecciones</span>
-                            <span class="text-gray-500 mt-1 fw-semibold fs-6">Historico completo de la base combinado con los modelos entrenados.</span>
-                        </h3>
-                    </div>
-                    <div class="card-body pt-0">
-                        <ChartFisheye :options="response.combined_chart" />
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <div v-loading="loading" class="row g-5 g-xl-8">
             <div class="col-xl-12" v-if="!loading && !models.length && !errorMessage">
                 <div class="card card-flush">
@@ -369,13 +382,36 @@ onMounted(async () => {
                     </div>
                     <div class="card-body pt-0">
                         <div class="row g-5">
-                            <div class="col-xl-9">
-                                <ChartFisheye :options="model.chart" />
+                            <div class="col-xl-8">
+                                <ChartFisheye :options="model.chart" height="420px" />
+                                <div v-if="model.correlation_chart" class="border border-dashed border-gray-300 rounded mt-5 p-2">
+                                    <ChartFisheye :options="model.correlation_chart" height="390px" />
+                                </div>
                             </div>
-                            <div class="col-xl-3">
+                            <div class="col-xl-4">
                                 <div class="border border-dashed border-gray-300 rounded px-5 py-4 mb-4">
                                     <div class="text-gray-500 fw-semibold">Valor actual</div>
                                     <div class="fs-2 fw-bold text-dark">{{ formatValue(model.current_value, model.unit) }}</div>
+                                </div>
+                                <div v-if="model.usage" class="border border-dashed border-gray-300 rounded px-5 py-4 mb-4">
+                                    <div class="text-gray-500 fw-semibold mb-2">Uso del modelo</div>
+                                    <span :class="['badge mb-2', statusClass(model.usage.status)]">{{ model.usage.label }}</span>
+                                    <div class="text-gray-600 fs-8">{{ model.usage.detail }}</div>
+                                    <div v-if="model.usage.activation_criteria" class="mt-3">
+                                        <div v-for="(passed, criterion) in model.usage.activation_criteria" :key="criterion" class="d-flex justify-content-between fs-8 py-1 border-top border-gray-100">
+                                            <span>{{ criterion.replaceAll('_', ' ') }}</span>
+                                            <span :class="passed ? 'text-success fw-bold' : 'text-danger fw-bold'">{{ passed ? 'Cumple' : 'No cumple' }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div v-if="model.formula" class="border border-dashed border-primary rounded px-5 py-4 mb-4 bg-light-primary">
+                                    <div class="text-primary fw-semibold mb-2">Formula explicita</div>
+                                    <code class="d-block text-dark fs-7 text-break">{{ model.formula.expression }}</code>
+                                    <code v-if="model.formula.kernel" class="d-block text-dark fs-8 mt-2 text-break">{{ model.formula.kernel }}</code>
+                                    <div class="text-gray-700 fs-8 mt-3">{{ model.formula.detail }}</div>
+                                    <ul v-if="model.formula.conditions?.length" class="text-gray-700 fs-8 ps-4 mt-3 mb-0">
+                                        <li v-for="condition in model.formula.conditions" :key="condition">{{ condition }}</li>
+                                    </ul>
                                 </div>
                                 <div class="border border-dashed border-gray-300 rounded px-5 py-4 mb-4">
                                     <div class="text-gray-500 fw-semibold">Motor / fuente</div>
@@ -395,7 +431,7 @@ onMounted(async () => {
                                 <div class="text-gray-600 fs-7 mb-4">
                                     {{ model.traceability?.quality_note ?? model.traceability?.explanation ?? "Trazabilidad disponible en backend." }}
                                 </div>
-                                <div class="table-responsive">
+                                <div v-if="(model.forecast ?? []).length" class="table-responsive">
                                     <table class="table table-row-dashed table-row-gray-300 align-middle gs-0 gy-3">
                                         <thead>
                                             <tr class="fw-bold text-muted">
@@ -406,7 +442,7 @@ onMounted(async () => {
                                         <tbody>
                                             <tr v-for="item in (model.forecast ?? []).slice(0, 6)" :key="`${model.code}-${item.timestamp}-${item.hour}`">
                                                 <td>{{ item.label }}</td>
-                                                <td class="text-end fw-bold">{{ formatValue(item.value, model.unit) }}</td>
+                                                <td class="text-end fw-bold">{{ formatValue(item.value, item.unit ?? model.unit) }}</td>
                                             </tr>
                                         </tbody>
                                     </table>

@@ -19,7 +19,7 @@ return new class extends Migration
             if (!$exists) {
                 DB::table('modulos')->insert([
                     'sistema_id' => $sistemaId,
-                    'name' => 'Modelos ML',
+                    'name' => 'Modelos de aprendizaje automatico',
                     'cod_father' => null,
                     'url' => 'modelosml',
                     'icon' => 'DataAnalysis',
