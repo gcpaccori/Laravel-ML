@@ -136,7 +136,7 @@
                     response.data.message,
                     'Éxito',
                     {
-                        confirmButtonText: 'Ver PDF',
+                        confirmButtonText: 'Vizualizar Resultados',
                         cancelButtonText: 'Mostrar Biométrias',
                         type: 'success',
                         center: true,
@@ -146,7 +146,7 @@
                     }
                 )
                 .then(() => {
-                    window.open(route('biometrias.pdf', biometriaId), '_blank');
+                    window.location.href = route('biometrias.show', biometriaId);
                 })
                 .catch(() => {
                     back();
