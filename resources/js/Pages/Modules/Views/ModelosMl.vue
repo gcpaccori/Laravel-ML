@@ -47,9 +47,7 @@ const latest = computed(() => response.value?.latest ?? {});
 const summary = computed(() => response.value?.summary ?? {});
 const models = computed(() => response.value?.models ?? []);
 const warnings = computed(() => response.value?.warnings ?? []);
-const traceability = computed(() => response.value?.traceability ?? {});
-const lifecycle = computed(() => response.value?.lifecycle ?? {});
-const lifecycleModels = computed(() => response.value?.lifecycle?.models ?? []);
+const aiModel = computed(() => response.value?.ai_model ?? {});
 
 const formatValue = (value, unit = "") => {
     if (value === null || value === undefined || value === "") return "-";
@@ -74,7 +72,7 @@ const statusLabel = (status) => {
         calculado: "Calculado",
         disponible: "Disponible",
         sin_datos: "Sin datos",
-        candidato_bloqueado: "Candidato bloqueado",
+        candidato_bloqueado: "Modelo IA en prueba",
         calculo_parcial: "Calculo parcial",
         fuera_de_dominio: "Fuera del dominio",
     };
@@ -249,14 +247,14 @@ onMounted(async () => {
             :closable="false"
         >
             <template #title>
-                Backend usado: {{ response.backend_engine }} | Fuente: {{ traceability.source ?? "FastAPI local" }} | Metodo:
-                {{ traceability.projection_method ?? "N/D" }}
+                Datos de la piscina procesados localmente. La SVM de oxigeno trabaja a una hora; la ventana visible es
+                {{ response?.filters?.window_label ?? "la seleccionada" }}.
             </template>
         </el-alert>
 
         <div v-if="warnings.length" class="card card-flush border border-warning mb-5">
             <div class="card-body py-4">
-                <div class="fw-bold text-warning mb-2">Notas de calidad y trazabilidad</div>
+                <div class="fw-bold text-warning mb-2">Lecturas a considerar</div>
                 <div v-for="warning in warnings" :key="warning" class="text-gray-700 fs-7 mb-1">
                     {{ warning }}
                 </div>
@@ -306,54 +304,18 @@ onMounted(async () => {
             </div>
         </div>
 
-        <div class="row g-5 g-xl-8 mb-5">
-            <div class="col-xl-8">
-                <div class="card card-flush h-xl-100">
-                    <div class="card-header py-4">
-                        <h3 class="card-title fw-bold text-dark">Trazabilidad MLOps</h3>
+        <div v-if="response" class="card card-flush border border-primary mb-5">
+            <div class="card-body py-5">
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-4">
+                    <div>
+                        <div class="fw-bold text-dark fs-4">Aprendizaje automatico para el oxigeno disuelto</div>
+                        <div class="text-gray-600 fs-7 mt-1">{{ aiModel.detail }}</div>
                     </div>
-                    <div class="card-body pt-0">
-                        <div class="row g-4">
-                            <div class="col-md-4">
-                                <div class="border border-dashed border-gray-300 rounded px-5 py-4 h-100">
-                                    <div class="text-gray-500 fw-semibold">Datos / entrenamiento / artefactos</div>
-                                    <div class="fw-bold text-dark mt-2">
-                                        {{ traceability.uses_all_points ? "todos los puntos" : "ventana" }} /
-                                        {{ lifecycle.status ?? "N/D" }} /
-                                        {{ lifecycleModels.length }} modelos
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="border border-dashed border-gray-300 rounded px-5 py-4 h-100">
-                                    <div class="text-gray-500 fw-semibold">Filas de entrenamiento</div>
-                                    <div class="fw-bold text-dark mt-2">{{ Object.values(summary.training_rows ?? {}).join(" / ") || "N/D" }}</div>
-                                </div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="border border-dashed border-gray-300 rounded px-5 py-4 h-100">
-                                    <div class="text-gray-500 fw-semibold">Proyecciones</div>
-                                    <div class="fw-bold text-dark mt-2">{{ summary.forecast_points ?? 0 }} puntos futuros</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-xl-4">
-                <div class="card card-flush h-xl-100">
-                    <div class="card-header py-4">
-                        <h3 class="card-title fw-bold text-dark">Artefactos en uso</h3>
-                    </div>
-                    <div class="card-body pt-0">
-                        <div v-if="!lifecycleModels.length" class="text-gray-500">Sin artefactos reportados.</div>
-                        <div v-for="asset in lifecycleModels.slice(0, 5)" :key="asset.model_code ?? asset.artifact_path" class="d-flex justify-content-between py-2 border-bottom border-gray-200">
-                            <div>
-                                <div class="fw-bold text-dark fs-7">{{ asset.model_code ?? asset.status }}</div>
-                                <div class="text-gray-500 fs-8">filas: {{ asset.training_rows ?? "N/D" }}</div>
-                            </div>
-                            <span class="badge badge-light-primary align-self-center">{{ asset.algorithm ?? asset.status }}</span>
-                        </div>
+                    <div class="text-end">
+                        <span :class="['badge mb-1', aiModel.productive ? 'badge-light-success' : 'badge-light-warning']">
+                            {{ aiModel.productive ? 'En uso productivo' : 'Estimacion de prueba visible' }}
+                        </span>
+                        <div class="text-gray-500 fs-8">Modelo {{ aiModel.version ?? 'sin entrenar' }} - {{ shortId(aiModel.asset_id) }}</div>
                     </div>
                 </div>
             </div>
@@ -364,7 +326,7 @@ onMounted(async () => {
                 <div class="card card-flush">
                     <div class="card-body text-center py-15">
                         <div class="fs-3 fw-bold text-gray-700">Sin modelos disponibles para los filtros seleccionados</div>
-                        <div class="text-gray-500 mt-2">Revisa el backend MLOps o cambia piscina/horizonte.</div>
+                        <div class="text-gray-500 mt-2">Revisa los datos disponibles o cambia los filtros.</div>
                     </div>
                 </div>
             </div>
@@ -383,9 +345,11 @@ onMounted(async () => {
                     <div class="card-body pt-0">
                         <div class="row g-5">
                             <div class="col-xl-8">
+                                <p class="text-gray-600 fs-7 mb-3">{{ model.chart_description }}</p>
                                 <ChartFisheye :options="model.chart" height="420px" />
-                                <div v-if="model.correlation_chart" class="border border-dashed border-gray-300 rounded mt-5 p-2">
-                                    <ChartFisheye :options="model.correlation_chart" height="390px" />
+                                <div v-if="model.relationship" class="border border-dashed border-gray-300 rounded mt-5 p-2">
+                                    <p class="text-gray-600 fs-7 px-3 pt-3 mb-0">{{ model.relationship.description }}</p>
+                                    <ChartFisheye :options="model.relationship.chart" height="350px" />
                                 </div>
                             </div>
                             <div class="col-xl-4">
@@ -394,7 +358,7 @@ onMounted(async () => {
                                     <div class="fs-2 fw-bold text-dark">{{ formatValue(model.current_value, model.unit) }}</div>
                                 </div>
                                 <div v-if="model.usage" class="border border-dashed border-gray-300 rounded px-5 py-4 mb-4">
-                                    <div class="text-gray-500 fw-semibold mb-2">Uso del modelo</div>
+                                    <div class="text-gray-500 fw-semibold mb-2">Como se usa</div>
                                     <span :class="['badge mb-2', statusClass(model.usage.status)]">{{ model.usage.label }}</span>
                                     <div class="text-gray-600 fs-8">{{ model.usage.detail }}</div>
                                     <div v-if="model.usage.activation_criteria" class="mt-3">
@@ -405,7 +369,7 @@ onMounted(async () => {
                                     </div>
                                 </div>
                                 <div v-if="model.formula" class="border border-dashed border-primary rounded px-5 py-4 mb-4 bg-light-primary">
-                                    <div class="text-primary fw-semibold mb-2">Formula explicita</div>
+                                    <div class="text-primary fw-semibold mb-2">Calcula</div>
                                     <code class="d-block text-dark fs-7 text-break">{{ model.formula.expression }}</code>
                                     <code v-if="model.formula.kernel" class="d-block text-dark fs-8 mt-2 text-break">{{ model.formula.kernel }}</code>
                                     <div class="text-gray-700 fs-8 mt-3">{{ model.formula.detail }}</div>
@@ -413,23 +377,15 @@ onMounted(async () => {
                                         <li v-for="condition in model.formula.conditions" :key="condition">{{ condition }}</li>
                                     </ul>
                                 </div>
-                                <div class="border border-dashed border-gray-300 rounded px-5 py-4 mb-4">
-                                    <div class="text-gray-500 fw-semibold">Motor / fuente</div>
-                                    <div class="fw-bold text-dark">{{ model.engine }}</div>
-                                    <div class="text-gray-500 fs-8">{{ model.source }}</div>
-                                </div>
-                                <div class="border border-dashed border-gray-300 rounded px-5 py-4 mb-4">
-                                    <div class="text-gray-500 fw-semibold">Asset / version</div>
-                                    <div class="fw-bold text-dark">{{ shortId(model.asset_id) }}</div>
-                                    <div class="text-gray-500 fs-8">{{ model.version ?? "sin version" }}</div>
+                                <div v-if="model.asset_id" class="border border-dashed border-gray-300 rounded px-5 py-4 mb-4">
+                                    <div class="text-gray-500 fw-semibold">Modelo entrenado</div>
+                                    <div class="fw-bold text-dark">{{ model.version ?? "sin version" }}</div>
+                                    <div class="text-gray-500 fs-8">{{ shortId(model.asset_id) }}</div>
                                 </div>
                                 <div class="border border-dashed border-gray-300 rounded px-5 py-4 mb-4">
                                     <div class="text-gray-500 fw-semibold">Metricas</div>
                                     <div class="fw-bold text-dark">MAE: {{ metricValue(model.metrics?.mae ?? model.mae) }}</div>
                                     <div class="text-gray-500 fs-8">R2: {{ metricValue(model.metrics?.r2) }}</div>
-                                </div>
-                                <div class="text-gray-600 fs-7 mb-4">
-                                    {{ model.traceability?.quality_note ?? model.traceability?.explanation ?? "Trazabilidad disponible en backend." }}
                                 </div>
                                 <div v-if="(model.forecast ?? []).length" class="table-responsive">
                                     <table class="table table-row-dashed table-row-gray-300 align-middle gs-0 gy-3">
