@@ -20,6 +20,18 @@ class ModeloMlController extends Controller
         ]);
     }
 
+    public function gemeloDigital()
+    {
+        return Inertia::render('Modules/Views/GemeloDigital', [
+            'title' => 'Gemelo digital de piscina',
+            'toolbar' => [
+                ['label' => 'Inicio', 'route' => 'dashboard'],
+                ['label' => 'Modelos de aprendizaje automatico', 'route' => 'monitoreo.modelosmls.index'],
+                ['label' => 'Gemelo digital de piscina'],
+            ],
+        ]);
+    }
+
     public function proyecciones(Request $request)
     {
         $baseUrl = $this->backendUrl();

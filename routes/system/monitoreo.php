@@ -17,6 +17,7 @@ Route::get('/parametros-agua/excel', [HistorialAguaController::class, 'export_ex
 
 // MODELOS ML
 Route::get('/modelos-ml', [ModeloMlController::class, 'index'])->name('monitoreo.modelosmls.index')->middleware('modulo:modelosml');
+Route::get('/gemelo-digital', [ModeloMlController::class, 'gemeloDigital'])->name('monitoreo.gemelodigitals.index')->middleware('modulo:modelosml');
 Route::get('/modelos-ml/proyecciones', [ModeloMlController::class, 'proyecciones'])->name('monitoreo.modelosmls.proyecciones')->middleware('modulo:modelosml');
 Route::post('/modelos-ml/simulacion', [ModeloMlController::class, 'simulacion'])->name('monitoreo.modelosmls.simulacion')->middleware('modulo:modelosml');
 Route::get('/modelos-ml-suite', [ModeloMlController::class, 'suite'])->name('monitoreo.modelosmlsuites.index')->middleware('modulo:modelosmlsuite');

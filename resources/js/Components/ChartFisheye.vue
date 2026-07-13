@@ -3,7 +3,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onBeforeUnmount, ref, watch } from "vue";
+import { nextTick, onMounted, onBeforeUnmount, ref, watch } from "vue";
 import * as echarts from "echarts";
 
 type EChartsOption = echarts.EChartsOption;
@@ -17,6 +17,7 @@ const props = withDefaults(defineProps<{
 
 const chartRef = ref<HTMLDivElement | null>(null);
 let myChart: echarts.ECharts | null = null;
+let resizeObserver: ResizeObserver | null = null;
 
 function getOption(): EChartsOption {
     const tooltip = props.options?.tooltip ?? {};
@@ -50,6 +51,9 @@ function initChart() {
     if (!chartRef.value) return;
     myChart = echarts.init(chartRef.value);
     myChart.setOption(getOption());
+    resizeObserver = new ResizeObserver(resizeChart);
+    resizeObserver.observe(chartRef.value);
+    requestAnimationFrame(resizeChart);
 }
 
 function resizeChart() {
@@ -63,15 +67,19 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
     window.removeEventListener("resize", resizeChart);
+    resizeObserver?.disconnect();
+    resizeObserver = null;
     myChart?.dispose();
     myChart = null;
 });
 
 watch(
     () => [props.options],
-    () => {
+    async () => {
         if (myChart) {
             myChart.setOption(getOption(), true);
+            await nextTick();
+            requestAnimationFrame(resizeChart);
         }
     },
     { deep: true }

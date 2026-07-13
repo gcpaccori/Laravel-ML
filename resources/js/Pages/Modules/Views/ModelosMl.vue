@@ -74,24 +74,12 @@ const currentView = ref("catalog");
 const selectedCode = ref(null);
 const requestController = ref(null);
 const reloadTimer = ref(null);
-const scenarioLoading = ref(false);
-const scenarioError = ref("");
-const scenarioResult = ref(null);
 
 const form = ref({
     piscigranja_id: "T",
     piscina_id: "T",
     ventana: "7d",
     proyeccion_dias: 7,
-});
-
-const scenarioForm = ref({
-    temperature_c: null,
-    ph: null,
-    dissolved_oxygen_mg_l: null,
-    nitrate_ion: null,
-    projection_days: 7,
-    active_models: [MODEL_CODES.water, MODEL_CODES.oxygen, MODEL_CODES.growth],
 });
 
 const ventanas = [
@@ -173,8 +161,6 @@ const modelFormulaTone = (code) => ({
     [MODEL_CODES.water]: "formula-water",
 })[code] ?? "formula-default";
 
-const metaFor = (code) => catalog.find((item) => item.code === code);
-
 const piscigranjasOptions = async () => {
     const { data } = await axios.get(route("piscigranjas.options"));
     piscigranjas.value = data.data ?? [];
@@ -231,34 +217,28 @@ const showCatalog = () => {
     selectedCode.value = null;
 };
 
-const openTwin = () => {
-    const measurements = response.value?.latest_measurement ?? {};
-    scenarioForm.value = {
-        temperature_c: measurements.water_temperature_c ?? null,
-        ph: measurements.ph ?? null,
-        dissolved_oxygen_mg_l: measurements.dissolved_oxygen_mg_l ?? null,
-        nitrate_ion: measurements.nitrate_ion ?? null,
-        projection_days: form.value.proyeccion_dias,
-        active_models: [MODEL_CODES.water, MODEL_CODES.oxygen, MODEL_CODES.growth],
-    };
-    scenarioError.value = "";
-    currentView.value = "twin";
+const openDigitalTwin = (modelCode = null) => {
+    const query = new URLSearchParams();
+    if (form.value.piscina_id !== "T") query.set("piscina_id", form.value.piscina_id);
+    if (modelCode) query.set("modelo", modelCode);
+    const suffix = query.toString();
+    window.location.assign(`${route("monitoreo.gemelodigitals.index")}${suffix ? `?${suffix}` : ""}`);
 };
 
-const runScenario = async () => {
-    scenarioLoading.value = true;
-    scenarioError.value = "";
-    try {
-        const { data } = await axios.post(route("monitoreo.modelosmls.simulacion"), {
-            piscina_id: form.value.piscina_id,
-            ...scenarioForm.value,
-        });
-        scenarioResult.value = data;
-    } catch (error) {
-        scenarioError.value = error?.response?.data?.message ?? "No se pudo calcular este escenario.";
-    } finally {
-        scenarioLoading.value = false;
-    }
+const relationshipRows = (model) => {
+    const chart = model?.relationship?.chart;
+    const series = chart?.series?.[0] ?? {};
+    const categories = chart?.xAxis?.data ?? chart?.yAxis?.data ?? [];
+    return (series.data ?? []).slice(0, 10).map((entry, index) => {
+        const value = entry && typeof entry === "object" && !Array.isArray(entry) ? (entry.value ?? entry) : entry;
+        const name = entry && typeof entry === "object" && entry.name
+            ? entry.name
+            : categories[index] ?? `Punto ${index + 1}`;
+        if (Array.isArray(value)) {
+            return { name, primary: value[0], secondary: value[1] ?? "-" };
+        }
+        return { name, primary: value, secondary: "-" };
+    });
 };
 
 onMounted(async () => {
@@ -282,9 +262,10 @@ onBeforeUnmount(() => {
             <div>
                 <div class="text-gray-500 fs-7 mb-1">Piscina, datos reales y proyecciones</div>
                 <h2 class="fs-2 fw-bold text-dark mb-2">Modelos de aprendizaje automatico</h2>
-                <p class="text-gray-600 fs-6 mb-0">Elige un modelo para revisar su proyeccion o abre el gemelo digital para explorar un escenario de la piscina.</p>
+                <p class="text-gray-600 fs-6 mb-0">Elige un modelo para revisar su proyeccion. El gemelo digital tiene su propio modulo de simulacion de piscina.</p>
             </div>
             <div class="module-intro__actions">
+                <el-button :icon="SetUp" @click="openDigitalTwin()">Gemelo digital</el-button>
                 <el-button :icon="RefreshRight" :loading="loading" @click="loadModelos">Actualizar datos</el-button>
             </div>
         </section>
@@ -355,16 +336,6 @@ onBeforeUnmount(() => {
                         </span>
                     </button>
                 </div>
-                <div class="col-md-6 col-xl-3">
-                    <button type="button" class="model-choice model-choice--twin h-100 text-start" @click="openTwin">
-                        <span class="model-choice__icon"><el-icon><SetUp /></el-icon></span>
-                        <span class="model-choice__body">
-                            <span class="fw-bold text-dark fs-6">Gemelo digital de la piscina</span>
-                            <span class="text-gray-600 fs-7 mt-3">Introduce un escenario y observa los modelos que pueden calcularse con esas variables.</span>
-                            <span class="model-choice__footer">Biometria y simulacion manual</span>
-                        </span>
-                    </button>
-                </div>
             </section>
 
             <section v-if="response" class="snapshot-strip mt-6">
@@ -392,6 +363,7 @@ onBeforeUnmount(() => {
                     <p class="text-gray-700 fs-6 mt-2 mb-1">{{ activeMeta.description }}</p>
                     <p class="text-gray-500 fs-7 mb-0">{{ activeMeta.importance }}</p>
                 </div>
+                <el-button class="model-overview__action" :icon="SetUp" @click="openDigitalTwin(activeMeta.code)">Ver en gemelo digital</el-button>
             </section>
 
             <section v-if="activeMeta" class="model-controls mb-6">
@@ -465,6 +437,10 @@ onBeforeUnmount(() => {
                     <div class="card-body pt-0">
                         <p class="text-gray-600 fs-7">{{ activeModel.relationship.description }}</p>
                         <ChartFisheye :options="activeModel.relationship.chart" height="350px" />
+                        <div v-if="relationshipRows(activeModel).length" class="relationship-table mt-5">
+                            <div class="text-gray-500 fs-8 fw-semibold text-uppercase mb-2">Puntos trazados</div>
+                            <div class="table-responsive"><table class="table table-sm table-row-dashed align-middle mb-0"><thead><tr class="text-gray-500 fs-8"><th>Variable o punto</th><th class="text-end">Valor X</th><th class="text-end">Valor Y</th></tr></thead><tbody><tr v-for="row in relationshipRows(activeModel)" :key="`${row.name}-${row.primary}`"><td class="fs-8">{{ row.name }}</td><td class="text-end fs-8">{{ formatValue(row.primary) }}</td><td class="text-end fs-8">{{ formatValue(row.secondary) }}</td></tr></tbody></table></div>
+                        </div>
                     </div>
                 </section>
 
@@ -516,40 +492,6 @@ onBeforeUnmount(() => {
             </template>
         </template>
 
-        <template v-else>
-            <div class="detail-nav mb-5"><el-button text :icon="RefreshRight" @click="showCatalog">Volver a modelos</el-button><span class="text-gray-400">/</span><span class="text-gray-600 fs-7">Gemelo digital de la piscina</span></div>
-            <section class="model-overview mb-6"><div class="model-overview__icon"><el-icon><SetUp /></el-icon></div><div class="model-overview__copy"><h3 class="fs-2 fw-bold text-dark mb-2">Gemelo digital de la piscina</h3><p class="text-gray-700 fs-6 mb-1">Usa las ultimas mediciones reales como base o escribe un escenario manual para observar la respuesta de los modelos compatibles.</p><p class="text-gray-500 fs-7 mb-0">La SVM temporal de OD conserva su propia vista: necesita historial, no una sola lectura manual.</p></div></section>
-
-            <section class="twin-layout mb-6">
-                <div class="twin-inputs">
-                    <span class="text-gray-500 fs-8 fw-semibold text-uppercase">Escenario manual</span>
-                    <div class="row g-4 mt-1">
-                        <div class="col-md-6"><label>Temperatura (C)</label><el-input-number v-model="scenarioForm.temperature_c" :min="0" :max="45" :step="0.1" controls-position="right" /></div>
-                        <div class="col-md-6"><label>pH</label><el-input-number v-model="scenarioForm.ph" :min="0" :max="14" :step="0.01" controls-position="right" /></div>
-                        <div class="col-md-6"><label>Oxigeno disuelto (mg/L)</label><el-input-number v-model="scenarioForm.dissolved_oxygen_mg_l" :min="0" :max="30" :step="0.1" controls-position="right" /></div>
-                        <div class="col-md-6"><label>Ion nitrato (mg/L)</label><el-input-number v-model="scenarioForm.nitrate_ion" :min="0" :max="500" :step="0.1" controls-position="right" /></div>
-                        <div class="col-md-6"><label>Proyeccion de biometria</label><el-select v-model="scenarioForm.projection_days"><el-option v-for="item in proyeccionesCrecimiento" :key="item.id" :label="item.name" :value="item.id" /></el-select></div>
-                    </div>
-                    <div class="mt-5"><span class="text-gray-500 fs-8 fw-semibold text-uppercase">Modelos a aplicar</span><el-checkbox-group v-model="scenarioForm.active_models" class="twin-checkboxes"><el-checkbox :label="MODEL_CODES.water">Calidad de agua</el-checkbox><el-checkbox :label="MODEL_CODES.oxygen">Estado de oxigeno</el-checkbox><el-checkbox :label="MODEL_CODES.growth">Crecimiento de tilapia</el-checkbox></el-checkbox-group></div>
-                    <el-button type="primary" class="mt-5" :icon="SetUp" :loading="scenarioLoading" @click="runScenario">Calcular escenario</el-button>
-                </div>
-                <div class="twin-reference">
-                    <span class="text-gray-500 fs-8 fw-semibold text-uppercase">Base de referencia</span>
-                    <div class="twin-reference__value">{{ latest.timestamp ?? "Cargando mediciones" }}</div>
-                    <p>Los campos se inicializan con las lecturas recientes de la piscina. Cada calculo informa que variables fueron reemplazadas manualmente.</p>
-                    <div v-if="response?.biometrics?.available" class="twin-reference__biometrics"><span>Ultima biometria</span><strong>{{ formatValue(response.biometrics.longitud_promedio_cm, "cm") }} / {{ formatValue(response.biometrics.peso_promedio_g, "g") }}</strong><small>FCA {{ metricValue(response.biometrics.conversion_alimenticia) }}</small></div>
-                </div>
-            </section>
-
-            <el-alert v-if="scenarioError" class="mb-6" type="warning" :title="scenarioError" show-icon :closable="false" />
-            <section v-if="scenarioLoading" class="card card-flush mb-6"><div class="card-body py-12"><el-skeleton :rows="6" animated /></div></section>
-            <template v-else-if="scenarioResult">
-                <section class="row g-5 mb-6"><div v-for="item in scenarioResult.models" :key="item.code" class="col-md-4"><div class="result-keyline h-100"><span>{{ item.name }}</span><strong>{{ formatValue(item.value, item.unit) }}</strong><small>{{ item.detail }}</small><small v-if="item.projection?.projected_weight_g">Peso proyectado: {{ formatValue(item.projection.projected_weight_g, "g") }}</small></div></div></section>
-                <section class="card card-flush mb-6"><div class="card-header"><h4 class="card-title fw-bold text-dark fs-5">Respuesta combinada de la piscina</h4></div><div class="card-body pt-0"><p class="text-gray-600 fs-7">Cada barra expresa la respuesta relativa de un modelo activo; los valores exactos se muestran arriba.</p><ChartFisheye :options="scenarioResult.chart" height="360px" /><div class="text-gray-500 fs-8 mt-3">{{ scenarioResult.notice }}</div></div></section>
-            </template>
-
-            <section v-if="warnings.length" class="warning-strip"><strong>Lecturas a considerar</strong><span v-for="warning in warnings" :key="warning">{{ warning }}</span></section>
-        </template>
     </App>
 </template>
 
@@ -575,6 +517,8 @@ onBeforeUnmount(() => {
 
 .module-intro__actions {
     flex: 0 0 auto;
+    display: flex;
+    gap: 8px;
 }
 
 .filter-strip,
@@ -623,7 +567,6 @@ onBeforeUnmount(() => {
     font-size: 21px;
 }
 
-.model-choice--twin .model-choice__icon,
 .model-overview__icon {
     color: #087f5b;
     background: #eafaf3;
@@ -690,6 +633,16 @@ onBeforeUnmount(() => {
 
 .model-overview__copy {
     max-width: 850px;
+}
+
+.model-overview__action {
+    margin-left: auto;
+    flex: 0 0 auto;
+}
+
+.relationship-table {
+    border-top: 1px solid #e5e7eb;
+    padding-top: 16px;
 }
 
 .model-controls {
@@ -918,6 +871,7 @@ onBeforeUnmount(() => {
     }
 
     .twin-reference { border-left: 0; border-top: 1px solid #e5e7eb; }
+    .model-overview__action { margin-left: 0; }
 }
 
 @media (max-width: 650px) {
