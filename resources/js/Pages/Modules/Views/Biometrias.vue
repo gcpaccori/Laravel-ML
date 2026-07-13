@@ -42,6 +42,10 @@
         router.visit(route('biometrias.edit', id));
     };
 
+    const handleShow = (id) => {
+        router.visit(route('biometrias.show', id));
+    };
+
     const handleDelete = async(id) => {
         ElMessageBox.confirm(
             '¿Estás seguro de que deseas eliminar este registro?',
@@ -73,7 +77,8 @@
     const methods = {
         handleEdit,
         handleDelete,
-        handlePdf
+        handlePdf,
+        handleShow
     };
 
     const { handleDynamicAction } = useDynamicAction(methods);

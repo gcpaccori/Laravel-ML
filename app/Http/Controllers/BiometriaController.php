@@ -2,24 +2,31 @@
 
 namespace App\Http\Controllers;
 
-use Inertia\Inertia;
-use App\Models\Campania;
-use App\Models\Biometria;
-use Illuminate\Http\Request;
-use App\Models\CampaniaEtapa;
-use App\Models\CampaniaEspecie;
-use Barryvdh\DomPDF\Facade\Pdf;
-use App\Helpers\DataTableHelper;
-use Illuminate\Support\Facades\DB;
-use App\Models\ParametrosProduccion;
 use App\DataTables\BiometriaDataTable;
+use App\Exports\BiometriaExport;
+use App\Helpers\DataTableHelper;
 use App\Http\Requests\BiometriaRequest;
+use App\Models\Biometria;
+use App\Models\Campania;
+use App\Models\CampaniaEspecie;
+use App\Models\CampaniaEtapa;
+use App\Models\ParametrosProduccion;
+use App\Services\BiometriaCalculoService;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\DB;
+use Inertia\Inertia;
+use Maatwebsite\Excel\Facades\Excel;
 
 class BiometriaController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
+    public $anchoLongitud;
+    public $anchoPeso;
+
+    public function __construct( private BiometriaCalculoService $calculoService) {
+        $this->anchoLongitud = 2;
+        $this->anchoPeso     = 5;
+    }
+
     public function index()
     {
         $datatable = new BiometriaDataTable();
@@ -40,32 +47,66 @@ class BiometriaController extends Controller
         return $dataTable->ajax();
     }
 
+    public function show( Biometria  $id )
+    {
+        $id->load([
+            'detalles',
+            'campaniaEtapa.etapa',
+            'campaniaEtapa.piscina',
+            'campaniaEtapa.campaniaEspecie.especie',
+            'campaniaEtapa.campaniaEspecie.campania.piscigranja',
+        ]);
+
+        return Inertia::render('Modules/Views/BiometriaShow', [
+            'title' => 'Visualizar Biométria',
+            'toolbar' => [
+                ['label' => 'Inicio', 'route' => 'dashboard'],
+                ['label' => 'Gestionar Biométrias', 'route' => 'produccion.biometrias.index'],
+                ['label' => 'Visualizar Biométria']
+            ],
+            'biometria' => $id,
+            'anchoLongitud' => $this->anchoLongitud,
+            'anchoPeso' => $this->anchoPeso,
+        ]);
+    }
+
     /**
      * Store a newly created resource in storage.
      */
     public function store(BiometriaRequest $request)
     {
-        $data = $this->calculateBiometriaData($request->all());
 
-        $reg = DB::transaction(function () use ($data, $request) {
+        $validated = $request->all();
+
+        $reg = DB::transaction(function () use ($validated) {
+            $campaniaEtapa = CampaniaEtapa::with('campaniaEspecie')->findOrFail($validated['campania_etapa_id']);
+
+            // Última biometría de la etapa = "anterior" para el nuevo registro
+            $ultimaBiometria = Biometria::where('campania_etapa_id', $validated['campania_etapa_id'])
+                ->orderByDesc('fecha_muestreo')->orderByDesc('id')->first();
+
+            // Regla de negocio: la nueva fecha_muestreo debe ser posterior a la última
+            if ($ultimaBiometria && $validated['fecha_muestreo'] <= $ultimaBiometria->fecha_muestreo->toDateString()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'La fecha de muestreo debe ser posterior al último registro de esta etapa.',
+                ]);
+            }
+
+            $calculados = $this->calculoService->calcular($validated, $ultimaBiometria, $campaniaEtapa);
+
             $biometria = Biometria::create([
-                "campania_etapa_id"                      => $data['campania_etapa_id'],
-                "fecha_muestreo"                         => $data['fecha_muestreo'],
-                "cantidad_muestreo"                      => $data['cantidad_muestreo'],
-                "cantidad_peces_inicial"                 => $data['cantidad_peces_inicial'],
-                "cantidad_peces_final"                   => $data['cantidad_peces_final'],
-                "peso_inicial_gr"                        => $data['peso_inicial_gr'],
-                "peso_final_gr"                          => $data['peso_final_gr'],
-                "tamanio_inicial_cm"                     => $data['tamanio_inicial_cm'],
-                "tamanio_final_cm"                       => $data['tamanio_final_cm'],
-                "biomasa_inicial_kg"                     => $data['biomasa_inicial_kg'],
-                "biomasa_final_kg"                       => $data['biomasa_final_kg'],
-                "tasa_supervivencia_porcentaje"          => $data['tasa_supervivencia_porcentaje'],
-                "tasa_crecimiento_especifico_porcentaje" => $data['tasa_crecimiento_especifico_porcentaje'],
-                "observaciones"                          => $data['observaciones']
+                'campania_etapa_id'           => $validated['campania_etapa_id'],
+                'fecha_muestreo'              => $validated['fecha_muestreo'],
+                'total_alimento_consumido_kg' => $validated['total_alimento_consumido_kg'],
+                'cantidad_peces_actuales'     => $validated['cantidad_peces_actuales'],
+                'observaciones'               => $validated['observaciones'] ?? null,
+                ...$calculados,
             ]);
 
-            return $biometria;
+            $biometria->detalles()->createMany($validated['detalles']);
+
+            return $biometria->fresh()->load('detalles');
         });
 
 
@@ -92,7 +133,7 @@ class BiometriaController extends Controller
      */
     public function edit( string $id )
     {
-        $biometria = Biometria::with(['campaniaEtapa'])->findOrFail($id);
+        $biometria = Biometria::with(['detalles','campaniaEtapa'])->findOrFail($id);
         return Inertia::render('Modules/Form/BiometriaForm', [
             'title' => 'Editar Biométrias',
             'toolbar' => [
@@ -109,28 +150,43 @@ class BiometriaController extends Controller
      */
     public function update(BiometriaRequest $request, Biometria $id)
     {
-        $data = $this->calculateBiometriaData($request->all());
+        // Regla clave: solo se edita si es el último registro de la cadena
+        if (!$id->esUltimoRegistro()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No se puede editar este registro porque existen biometrías posteriores en la etapa.',
+            ]);
+        }
 
-        $reg = DB::transaction(function () use ($data, $request, $id) {
+        $validated = $request->all();
+
+        $reg = DB::transaction(function () use ($validated, $id) {
+
+            $campaniaEtapa = $id->campaniaEtapa()->with('campaniaEspecie')->first();
+            $anterior      = $id->anterior(); // sigue siendo el mismo anterior, no cambia
+
+            // Si cambia fecha_muestreo, validar que siga siendo posterior al anterior
+            if ($anterior && $validated['fecha_muestreo'] <= $anterior->fecha_muestreo->toDateString()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'La fecha de muestreo debe ser posterior al registro anterior.',
+                ]);
+            }
+
+            $calculados = $this->calculoService->calcular($validated, $anterior, $campaniaEtapa);
 
             $id->update([
-                "campania_etapa_id"                      => $data['campania_etapa_id'],
-                "fecha_muestreo"                         => $data['fecha_muestreo'],
-                "cantidad_muestreo"                      => $data['cantidad_muestreo'],
-                "cantidad_peces_inicial"                 => $data['cantidad_peces_inicial'],
-                "cantidad_peces_final"                   => $data['cantidad_peces_final'],
-                "peso_inicial_gr"                        => $data['peso_inicial_gr'],
-                "peso_final_gr"                          => $data['peso_final_gr'],
-                "tamanio_inicial_cm"                     => $data['tamanio_inicial_cm'],
-                "tamanio_final_cm"                       => $data['tamanio_final_cm'],
-                "biomasa_inicial_kg"                     => $data['biomasa_inicial_kg'],
-                "biomasa_final_kg"                       => $data['biomasa_final_kg'],
-                "tasa_supervivencia_porcentaje"          => $data['tasa_supervivencia_porcentaje'],
-                "tasa_crecimiento_especifico_porcentaje" => $data['tasa_crecimiento_especifico_porcentaje'],
-                "observaciones"                          => $data['observaciones']
+                'fecha_muestreo'              => $validated['fecha_muestreo'],
+                'total_alimento_consumido_kg' => $validated['total_alimento_consumido_kg'],
+                'cantidad_peces_actuales'     => $validated['cantidad_peces_actuales'],
+                'observaciones'               => $validated['observaciones'] ?? null,
+                ...$calculados,
             ]);
 
-            return $id;
+            $id->detalles()->delete();
+            $id->detalles()->createMany($validated['detalles']);
+
+            return $id->fresh()->load('detalles');
         });
 
         return response()->json([
@@ -144,6 +200,14 @@ class BiometriaController extends Controller
      */
     public function destroy(Biometria $id)
     {
+
+        if (!$id->esUltimoRegistro()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No se puede eliminar este registro porque existen biometrías posteriores en la etapa.',
+            ]);
+        }
+
         $id->delete();
 
         return response()->json([
@@ -173,75 +237,87 @@ class BiometriaController extends Controller
 
     public function showParametrosEtapa ( string $campania_etapa_id )
     {
-        $etapa = ParametrosProduccion::where('campania_etapa_id', $campania_etapa_id)->first();
+        $etapa = ParametrosProduccion::with('campaniaEtapa.campaniaEspecie')->where('campania_etapa_id', $campania_etapa_id)->first();
         return $etapa;
     }
 
-    /**
-     * Calcula los campos derivados de la biometría
-     */
-    private function calculateBiometriaData(array $data): array
+    public function exportarExcel(Biometria $biometria)
     {
-        // Obtener datos base
-        $cantidadInicial = $data['cantidad_peces_inicial'] ?? 0;
-        $cantidadFinal   = $data['cantidad_peces_final'] ?? 0;
-        $pesoInicial     = $data['peso_inicial_gr'] ?? 0;
-        $pesoFinal       = $data['peso_final_gr'] ?? 0;
-        $tamanioInicial  = $data['tamanio_inicial_cm'] ?? 0;
-        $tamanioFinal    = $data['tamanio_final_cm'] ?? 0;
+        $biometria->load([
+            'detalles',
+            'campaniaEtapa.etapa',
+            'campaniaEtapa.piscina',
+            'campaniaEtapa.campaniaEspecie.especie',
+            'campaniaEtapa.campaniaEspecie.campania.piscigranja',
+        ]);
 
-        // Si hay detalles, recalcular promedios de peso y tamaño
-        if (!empty($data['detalles']) && is_array($data['detalles'])) {
-            $detallesValidos = collect($data['detalles'])
-                ->filter(fn ($d) => isset($d['peso_gr'], $d['tamanio_cm']) && $d['peso_gr'] > 0 && $d['tamanio_cm'] > 0);
+        $nombreArchivo = "biometria-{$biometria->id}-" . now()->format('Ymd_His') . '.xlsx';
 
-            if ($detallesValidos->isNotEmpty()) {
-                $pesoFinal = round($detallesValidos->avg('peso_gr'), 4);
-                $tamanioFinal = round($detallesValidos->avg('tamanio_cm'), 4);
-
-                // Actualizar también en el arreglo principal
-                $data['peso_final_gr'] = $pesoFinal;
-                $data['tamanio_final_cm'] = $tamanioFinal;
-            }
-        }
-
-        // Biomasa Inicial (Kg) = N° Peces Inicial * Peso Inicial / 1000
-        $data['biomasa_inicial_kg'] = ($cantidadInicial > 0 && $pesoInicial > 0)
-            ? round(($cantidadInicial * $pesoInicial) / 1000, 4)
-            : 0;
-
-        // Biomasa Final (Kg) = N° Peces Final * Peso Final / 1000
-        $data['biomasa_final_kg'] = ($cantidadFinal > 0 && $pesoFinal > 0)
-            ? round(($cantidadFinal * $pesoFinal) / 1000, 4)
-            : 0;
-
-        // Tasa Supervivencia (%) = (N° Peces Final / N° Peces Inicial) * 100
-        $data['tasa_supervivencia_porcentaje'] = ($cantidadInicial > 0 && $cantidadFinal > 0)
-            ? round(($cantidadFinal / $cantidadInicial) * 100, 4)
-            : 0;
-
-        // Tasa Crecimiento Específico (%) = (Peso Final - Peso Inicial) / Días
-        $diasMuestreo = $this->showParametrosEtapa($data['campania_especie_id'] ?? null);
-        $dias = $diasMuestreo?->dias_muestreo ?? 0;
-
-        $data['tasa_crecimiento_especifico_porcentaje'] = ($pesoInicial > 0 && $pesoFinal > 0 && $dias > 0)
-            ? round(($pesoFinal - $pesoInicial) / $dias, 4)
-            : 0;
-
-        return $data;
+        return Excel::download(new BiometriaExport($biometria), $nombreArchivo);
     }
 
-    public function exportPdf($id)
+
+    public function exportarPdf(Biometria $biometria)
     {
-        // $biometria = Biometria::with('detalles', 'campaniaEtapa.campaniaEspecie.especie')->findOrFail($id);
-        $biometria = Biometria::with(['campaniaEtapa.campaniaEspecie.campania.piscigranja', 'campaniaEtapa.etapa', 'campaniaEtapa.piscina'])->findOrFail($id);
+        $biometria->load([
+            'detalles',
+            'campaniaEtapa.etapa',
+            'campaniaEtapa.piscina',
+            'campaniaEtapa.campaniaEspecie.especie',
+            'campaniaEtapa.campaniaEspecie.campania.piscigranja',
+        ]);
 
-        // return response()->json($biometria, 200);
+        $distribucionLongitud = self::calcularDistribucion(
+            $biometria->detalles->pluck('longitud_cm')->toArray(),
+            $this->anchoLongitud
+        );
 
-        $pdf = Pdf::loadView('biometrias.pdf', compact('biometria'))
-                ->setPaper('a4', 'landscape');
-        // return $pdf->download("ficha_biometria_{$id}.pdf");
-        return $pdf->stream("Ficha de Biometría - ".$biometria->nombre_piscigranja."_".$biometria->nombre_campania.".pdf");
+        $distribucionPeso = self::calcularDistribucion(
+            $biometria->detalles->pluck('peso_g')->toArray(),
+            $this->anchoPeso
+        );
+
+        $pdf = Pdf::loadView('exports.biometria-pdf', [
+            'biometria'            => $biometria,
+            'campaniaEspecie'      => $biometria->campaniaEtapa->campaniaEspecie,
+            'distribucionLongitud' => $distribucionLongitud,
+            'distribucionPeso'     => $distribucionPeso,
+        ])->setPaper('a4', 'portrait');
+
+        $nombreArchivo = "biometria-{$biometria->id}-" . now()->format('Ymd_His') . '.pdf';
+
+        return $pdf->download($nombreArchivo);
+    }
+
+    public static function calcularDistribucion(array $valores, float $ancho): array
+    {
+        $datos = array_values(array_filter($valores, fn ($v) => $v !== null));
+
+        if (empty($datos)) {
+            return [];
+        }
+
+        $min = floor(min($datos) / $ancho) * $ancho;
+        $max = ceil(max($datos) / $ancho) * $ancho;
+
+        $bins = [];
+        for ($inicio = $min; $inicio < $max; $inicio += $ancho) {
+            $fin = round($inicio + $ancho, 4);
+            $cantidad = count(array_filter($datos, fn ($v) => $v >= $inicio && $v < $fin));
+
+            $bins[] = [
+                'rango'      => sprintf('≥%s a <%s', self::formatearNum($inicio), self::formatearNum($fin)),
+                'cantidad'   => $cantidad,
+                'porcentaje' => round(($cantidad / count($datos)) * 100, 2),
+            ];
+        }
+
+        return $bins;
+    }
+
+    private static function formatearNum(float $n): string
+    {
+        return floor($n) == $n ? (string) intval($n) : (string) round($n, 2);
     }
 
 }

@@ -192,6 +192,7 @@ defineExpose({ loadData, clearTable, triggerAction: handleAction })
                     :icon="icons[btn.icon]"
                     @click="handleAction(btn.action, btn.id, btn.name_funcion)"
                     aria-label="Acción de tabla"
+                    :disabled="btn.disabled"
                   />
                 </el-tooltip>
               </el-button-group>

@@ -21,104 +21,55 @@ class BiometriaRequest extends FormRequest
      */
     public function rules(): array
     {
+
         return [
-            'piscigranja_id'      => ['required'],
-            'campania_id'         => ['required'],
-            'campania_especie_id' => ['required'],
-
-            'campania_etapa_id' => ['required', 'exists:campania_etapas,id'],
-            'fecha_muestreo'    => ['required', 'date'],
-            'cantidad_muestreo' => ['nullable', 'integer', 'min:1'],
-
-            // Cantidad de peces
-            'cantidad_peces_inicial' => ['nullable', 'integer', 'min:1'],
-            'cantidad_peces_final'   => ['nullable', 'integer', 'min:1'],
-
-            // Peso
-            'peso_inicial_gr' => ['nullable', 'numeric', 'min:1'],
-            'peso_final_gr'   => ['nullable', 'numeric', 'min:1'],
-
-            // Tamaño
-            'tamanio_inicial_cm' => ['nullable', 'numeric', 'min:0.1'],
-            'tamanio_final_cm'   => ['nullable', 'numeric', 'min:0.1'],
-
-            // Biomasa
-            'biomasa_inicial_kg' => ['nullable', 'numeric', 'min:0.1'],
-            'biomasa_final_kg'   => ['nullable', 'numeric', 'min:0.1'],
-
-            // Indicadores
-            'tasa_supervivencia_porcentaje'          => ['nullable', 'numeric', 'between:0,100'],
-            'tasa_crecimiento_especifico_porcentaje' => ['nullable', 'numeric', 'between:0,100'],
-
-            'observaciones' => ['nullable', 'string'],
+            'piscigranja_id'              => ['required'],
+            'campania_id'                 => ['required'],
+            'campania_especie_id'         => ['required'],
+            'campania_etapa_id'           => ['required', 'exists:campania_etapas,id'],
+            'fecha_muestreo'              => ['required', 'date'],
+            'cantidad_muestreo'           => ['required', 'integer', 'min:1'],
+            'cantidad_peces_actuales'     => ['required', 'integer', 'min:1'],
+            'total_alimento_consumido_kg' => ['required', 'numeric', 'min:0.1'],
+            'observaciones'               => ['nullable', 'string'],
+            'detalles'                    => ['required', 'array', 'min:1'],
+            'detalles.*.longitud_cm'      => ['required', 'numeric'],
+            'detalles.*.peso_g'           => ['required', 'numeric'],
         ];
     }
 
-    public function attributes(): array
-    {
-        return [
-            'piscigranja_id'                         => 'piscigranja',
-            'campania_id'                            => 'campaña',
-            'campania_especie_id'                    => 'especie',
-            'campania_etapa_id'                      => 'etapa de campaña',
-            'fecha_muestreo'                         => 'fecha de muestreo',
-            'cantidad_muestreo'                      => 'número de muestreo',
-            'cantidad_peces_inicial'                 => 'cantidad de peces inicial',
-            'cantidad_peces_final'                   => 'cantidad de peces final',
-            'peso_inicial_gr'                        => 'peso inicial (g)',
-            'peso_final_gr'                          => 'peso final (g)',
-            'tamanio_inicial_cm'                     => 'tamaño inicial (cm)',
-            'tamanio_final_cm'                       => 'tamaño final (cm)',
-            'biomasa_inicial_kg'                     => 'biomasa inicial (kg)',
-            'biomasa_final_kg'                       => 'biomasa final (kg)',
-            'tasa_supervivencia_porcentaje'          => 'tasa de supervivencia (%)',
-            'tasa_crecimiento_especifico_porcentaje' => 'tasa de crecimiento específico (%)',
-            'observaciones'                          => 'observaciones',
-        ];
-    }
-
+    /**
+     * Get the validation error messages.
+     *
+     * @return array<string, string>
+     */
     public function messages(): array
     {
         return [
-            'piscigranja_id.required'      => 'La :attribute es obligatoria.',
-            'campania_id.required'         => 'La :attribute es obligatoria.',
-            'campania_especie_id.required' => 'La :attribute es obligatoria.',
-
-            'campania_etapa_id.required' => 'La :attribute es obligatoria.',
-            'campania_etapa_id.exists'   => 'La :attribute seleccionada no es válida.',
-
-            'fecha_muestreo.required' => 'La :attribute es obligatoria.',
-            'fecha_muestreo.date'     => 'La :attribute debe ser una fecha válida.',
-
-            'cantidad_muestreo.integer' => 'El :attribute debe ser un número entero.',
-            'cantidad_muestreo.min'     => 'El :attribute debe ser al menos 1.',
-
-            'cantidad_peces_inicial.integer' => 'La :attribute debe ser un número entero.',
-            'cantidad_peces_inicial.min'     => 'La :attribute no puede ser negativa.',
-            'cantidad_peces_final.integer'   => 'La :attribute debe ser un número entero.',
-            'cantidad_peces_final.min'       => 'La :attribute no puede ser negativa.',
-
-            'peso_inicial_gr.numeric' => 'El :attribute debe ser un número válido.',
-            'peso_inicial_gr.min'     => 'El :attribute no puede ser negativo.',
-            'peso_final_gr.numeric'   => 'El :attribute debe ser un número válido.',
-            'peso_final_gr.min'       => 'El :attribute no puede ser negativo.',
-
-            'tamanio_inicial_cm.numeric' => 'El :attribute debe ser un número válido.',
-            'tamanio_inicial_cm.min'     => 'El :attribute no puede ser negativo.',
-            'tamanio_final_cm.numeric'   => 'El :attribute debe ser un número válido.',
-            'tamanio_final_cm.min'       => 'El :attribute no puede ser negativo.',
-
-            'biomasa_inicial_kg.numeric' => 'La :attribute debe ser un número válido.',
-            'biomasa_inicial_kg.min'     => 'La :attribute no puede ser negativa.',
-            'biomasa_final_kg.numeric'   => 'La :attribute debe ser un número válido.',
-            'biomasa_final_kg.min'       => 'La :attribute no puede ser negativa.',
-
-            'tasa_supervivencia_porcentaje.numeric'          => 'La :attribute debe ser un número válido.',
-            'tasa_supervivencia_porcentaje.between'          => 'La :attribute debe estar entre 0 y 100.',
-            'tasa_crecimiento_especifico_porcentaje.numeric' => 'La :attribute debe ser un número válido.',
-            'tasa_crecimiento_especifico_porcentaje.between' => 'La :attribute debe estar entre 0 y 100.',
-
-            'observaciones.string' => 'Las :attribute deben ser texto válido.',
+            'piscigranja_id.required'              => 'Debe seleccionar una piscigranja.',
+            'campania_id.required'                 => 'Debe seleccionar una campaña.',
+            'campania_especie_id.required'         => 'Debe seleccionar una especie.',
+            'campania_etapa_id.required'           => 'Debe seleccionar una etapa.',
+            'campania_etapa_id.exists'             => 'La etapa seleccionada no es válida.',
+            'fecha_muestreo.required'              => 'La fecha de muestreo es obligatoria.',
+            'fecha_muestreo.date'                  => 'La fecha de muestreo no tiene un formato válido.',
+            'cantidad_muestreo.required'           => 'La cantidad de muestreo es obligatoria.',
+            'cantidad_muestreo.integer'            => 'La cantidad de muestreo debe ser un número entero.',
+            'cantidad_muestreo.min'                => 'La cantidad de muestreo debe ser mayor que cero.',
+            'cantidad_peces_actuales.required'     => 'La cantidad de peces actuales es obligatoria.',
+            'cantidad_peces_actuales.integer'      => 'La cantidad de peces actuales debe ser un número entero.',
+            'cantidad_peces_actuales.min'          => 'La cantidad de peces actuales debe ser mayor que cero.',
+            'total_alimento_consumido_kg.required' => 'La cantidad de alimento es obligatoria.',
+            'total_alimento_consumido_kg.numeric'  => 'La cantidad de alimento debe ser un número.',
+            'total_alimento_consumido_kg.min'      => 'La cantidad de alimento debe ser mayor que cero.',
+            'observaciones.string'                 => 'Las observaciones deben ser un texto válido.',
+            'detalles.required'                    => 'Debe registrar al menos un detalle de biometría.',
+            'detalles.array'                       => 'El detalle de biometría debe ser una lista válida.',
+            'detalles.min'                         => 'Debe registrar al menos un detalle de biometría.',
+            'detalles.*.peso_g.required'           => 'El peso es obligatorio.',
+            'detalles.*.peso_g.numeric'            => 'El peso debe ser un número.',
+            'detalles.*.longitud_cm.required'      => 'La talla es obligatoria.',
+            'detalles.*.longitud_cm.numeric'       => 'La talla debe ser un número.',
         ];
     }
 }

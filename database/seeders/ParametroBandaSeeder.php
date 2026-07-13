@@ -69,28 +69,28 @@ class ParametroBandaSeeder extends Seeder
 
             // Oxígeno disuelto (mg/L)
             [
-                "parametro"  => "oxigeno",
+                "parametro"  => "oxigeno_disuelto",
                 "title"      => "Crítico",
                 "color"      => "#ee1f25",
                 "low_score"  => 0,
                 "high_score" => 4,
             ],
             [
-                "parametro"  => "oxigeno",
+                "parametro"  => "oxigeno_disuelto",
                 "title"      => "Bajo",
                 "color"      => "#fdae19",
                 "low_score"  => 4,
                 "high_score" => 6.5,
             ],
             [
-                "parametro"  => "oxigeno",
+                "parametro"  => "oxigeno_disuelto",
                 "title"      => "Óptimo",
                 "color"      => "#54b947",
                 "low_score"  => 6.5,
                 "high_score" => 8,
             ],
             [
-                "parametro"  => "oxigeno",
+                "parametro"  => "oxigeno_disuelto",
                 "title"      => "Alto",
                 "color"      => "#00BFFF",
                 "low_score"  => 8,
@@ -99,21 +99,21 @@ class ParametroBandaSeeder extends Seeder
 
             // Nitrato (mg/L)
             [
-                "parametro"  => "nitrato",
+                "parametro"  => "ion_nitrato",
                 "title"      => "Seguro",
                 "color"      => "#54b947",
                 "low_score"  => 0,
                 "high_score" => 50,
             ],
             [
-                "parametro"  => "nitrato",
+                "parametro"  => "ion_nitrato",
                 "title"      => "Moderado",
                 "color"      => "#fdae19",
                 "low_score"  => 50,
                 "high_score" => 200,
             ],
             [
-                "parametro"  => "nitrato",
+                "parametro"  => "ion_nitrato",
                 "title"      => "Crítico",
                 "color"      => "#ee1f25",
                 "low_score"  => 200,

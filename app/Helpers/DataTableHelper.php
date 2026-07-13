@@ -28,7 +28,11 @@ class DataTableHelper
         return $columns;
     }
 
-    public static function getAccionesPermitidasDelModulo($resourceId = null, string $controllerName = null)
+    public static function getAccionesPermitidasDelModulo(
+        $resourceId = null,
+        string $controllerName = null,
+        array $disabledActions = []
+    )
     {
         // Inferir el nombre del controlador si no se proporciona
         if (!$controllerName) {
@@ -36,12 +40,13 @@ class DataTableHelper
             $controllerName = explode('@', $controllerAction)[0] ?? null;
         }
 
-        // $moduloUrl = strtolower(preg_replace('/([a-z])([A-Z])/', '$1$2', str_replace('Controller', '', $controllerName)));
         $moduloUrl = strtolower(str_replace('Controller', '', $controllerName));
 
         $modulo = Modulo::where('url', $moduloUrl)->first();
 
-        if (!$modulo) return [];
+        if (!$modulo) {
+            return [];
+        }
 
         $acciones = $modulo->acciones()
             ->where('location', 'T')
@@ -52,16 +57,23 @@ class DataTableHelper
                 return Auth::user()?->can($permiso);
             });
 
-        // Mapeamos directamente al formato requerido en la columna `action`
-        return $acciones->map(function ($accion) use ($resourceId) {
+        return $acciones->map(function ($accion) use ($resourceId, $disabledActions) {
+
+            $disabled = in_array(
+                strtolower($accion->name),
+                array_map('strtolower', $disabledActions)
+            );
+
             return [
-                'type' => $accion->type,
-                'icon' => $accion->icon,
-                'action' => $accion->accion,
-                'name_funcion' => $accion->name_funcion,
-                'id' => $resourceId,
+                'type'          => $accion->type,
+                'icon'          => $accion->icon,
+                'action'        => $accion->accion,
+                'name_funcion'  => $accion->name_funcion,
+                'id'            => $resourceId,
+                'disabled'      => $disabled,
             ];
-        })->toArray();
+
+        })->values()->toArray();
     }
 
     public static function getAccionesPermitidasEnMarco(string $controllerName = null)

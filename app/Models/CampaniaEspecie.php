@@ -33,11 +33,11 @@ class CampaniaEspecie extends Model
     protected function casts(): array
     {
         return [
-            'peso_inicial_gr' => 'float',
-            'peso_final_gr' => 'float',
-            'cantidad_siembra' => 'integer',
+            'peso_inicial_gr'    => 'float',
+            'peso_final_gr'      => 'float',
+            'cantidad_siembra'   => 'integer',
             'cantidad_cosechada' => 'integer',
-            'fecha_siembra' => 'date',
+            'fecha_siembra'      => 'date',
         ];
     }
 

@@ -6,42 +6,37 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('biometrias', function (Blueprint $table) {
             $table->id();
             $table->foreignId('campania_etapa_id')->constrained('campania_etapas');
+            $table->date('fecha_inicial');
+
+            // Muestreo
             $table->date('fecha_muestreo');
             $table->integer('cantidad_muestreo')->nullable(); // cantidad de muestras
+            $table->float('muestreo_porcentaje');
+            $table->unsignedSmallInteger('tiempo_dias');
+            $table->float('cantidad_peces_iniciales');
+            $table->float('cantidad_peces_actuales');
 
-            // Datos de cantidad
-            $table->integer('cantidad_peces_inicial')->nullable();
-            $table->integer('cantidad_peces_final')->nullable();
-
-            // Datos de peso
-            $table->decimal('peso_inicial_gr', 8, 4)->nullable();
-            $table->decimal('peso_final_gr', 8, 4)->nullable();
-
-            // Datos de tamaño
-            $table->decimal('tamanio_inicial_cm', 8, 4)->nullable();
-            $table->decimal('tamanio_final_cm', 8, 4)->nullable();
-
-            // Biomasa
-            $table->decimal('biomasa_inicial_kg', 8, 4)->nullable();
-            $table->decimal('biomasa_final_kg', 8, 4)->nullable();
-
-            // Indicadores
-            $table->decimal('tasa_supervivencia_porcentaje', 8, 4)->nullable();
-            $table->decimal('tasa_crecimiento_especifico_porcentaje', 8, 4)->nullable();
+            // Biometría
+            $table->float('bi_kg')->comment('Biomasa inicial');
+            $table->float('bf_kg')->comment('Biomasa final');
+            $table->float('prom_longitud_cm');
+            $table->float('prom_peso_g');
+            $table->float('tasa_crecimiento_g_dia');
+            $table->float('total_alimento_consumido_kg');
+            $table->float('conversion_alimenticia');
+            $table->float('tasa_supervivencia_porcentaje')->nullable();
 
             $table->text('observaciones')->nullable();
             $table->timestamps();
             $table->softDeletes();
 
-            $table->index(['campania_etapa_id', 'fecha_muestreo']);
+            $table->index('fecha_muestreo');
+            $table->index('fecha_inicial');
         });
     }
 
