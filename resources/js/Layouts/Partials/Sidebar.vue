@@ -9,6 +9,9 @@
             isActive(getRouteName(sistema, sub))
         );
     };
+    const isModuloBranchActive = (sistema, modulo) => {
+        return isActive(getRouteName(sistema, modulo)) || isAnyChildActive(sistema, modulo);
+    };
 </script>
 <template>
     <div id="kt_app_sidebar" class="app-sidebar flex-column" data-kt-drawer="true" data-kt-drawer-name="app-sidebar" data-kt-drawer-activate="{default: true, lg: false}" data-kt-drawer-overlay="true" data-kt-drawer-width="225px" data-kt-drawer-direction="start" data-kt-drawer-toggle="#kt_app_sidebar_mobile_toggle">
@@ -71,12 +74,18 @@
                                 <template v-for="modulo in sistema.children" :key="modulo.id">
                                     <div
                                         v-if="hasSubmodulos(modulo)"
-                                        :class="['menu-item menu-accordion', isAnyChildActive(sistema, modulo) ? 'hover show': '']"
+                                        :class="['menu-item menu-accordion', isModuloBranchActive(sistema, modulo) ? 'hover show': '']"
                                         data-kt-menu-trigger="click"
                                     >
-                                        <span class="menu-link" :class="{ active: isAnyChildActive(sistema, modulo) }">
+                                        <span class="menu-link" :class="{ active: isModuloBranchActive(sistema, modulo) }">
                                             <span class="menu-bullet"><span class="bullet bullet-dot"></span></span>
-                                            <span class="menu-title">{{ modulo.label }}</span>
+                                            <Link
+                                                class="menu-title text-decoration-none"
+                                                :href="route(getRouteName(sistema, modulo))"
+                                                @click.stop
+                                            >
+                                                {{ modulo.label }}
+                                            </Link>
                                             <span class="menu-arrow"></span>
                                         </span>
                                         <div class="menu-sub menu-sub-accordion">
