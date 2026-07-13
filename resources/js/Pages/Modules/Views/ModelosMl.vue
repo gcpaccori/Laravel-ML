@@ -29,11 +29,12 @@ const MODEL_CODES = {
 const catalog = [
     {
         code: MODEL_CODES.svm,
-        name: "Oxigeno disuelto a una hora",
-        description: "Anticipa el OD de la proxima hora a partir de la serie real de sensores.",
+        name: "SVM/SVR: proyeccion de OD",
+        description: "Modelo de regresion SVM que anticipa el oxigeno disuelto de la proxima hora con la serie real de sensores.",
         importance: "Ayuda a observar cambios de oxigeno antes de que afecten a los peces.",
         inputs: ["Temperatura", "pH", "OD", "Ion nitrato", "Historial temporal"],
         horizon: "1 hora",
+        modelType: "IA entrenada - SVM de regresion",
         icon: DataAnalysis,
     },
     {
@@ -332,6 +333,7 @@ onBeforeUnmount(() => {
                                 <span v-if="models.find((model) => model.code === item.code)" :class="['badge', statusClass(models.find((model) => model.code === item.code)?.status)]">{{ statusLabel(models.find((model) => model.code === item.code)?.status) }}</span>
                             </span>
                             <span class="text-gray-600 fs-7 mt-3">{{ item.description }}</span>
+                            <span v-if="item.modelType" class="model-choice__type">{{ item.modelType }}</span>
                             <span class="model-choice__footer">{{ item.horizon }}</span>
                         </span>
                     </button>
@@ -584,6 +586,13 @@ onBeforeUnmount(() => {
     font-weight: 600;
     margin-top: auto;
     padding-top: 16px;
+}
+
+.model-choice__type {
+    color: #0d6efd;
+    font-size: 12px;
+    font-weight: 600;
+    margin-top: 12px;
 }
 
 .snapshot-strip,
