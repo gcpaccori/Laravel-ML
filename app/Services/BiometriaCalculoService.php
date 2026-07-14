@@ -57,7 +57,7 @@ class BiometriaCalculoService
         // 5. Tasa de crecimiento (g/día)
         $biomasaGanada = $bfKg - $biKg;
         $tasaCrecimientoGDia = $tiempoDias > 0
-            ? round($biomasaGanada / $tiempoDias, 2)
+            ? round( (($biomasaGanada / $tiempoDias) / $cantidadPecesIniciales) * 1000 , 2)
             : 0.0;
 
         // 6. Conversión alimenticia (FCA)
