@@ -103,22 +103,23 @@ class CampaniaController extends Controller
                 "estado"                => $request->estado
             ]);
 
-            // Actualizar o crear especies en campañas
             if ($request->has('especies') && is_array($request->especies)) {
                 foreach ($request->especies as $especieData) {
-                    $id->especies()->updateOrCreate(
-                        [
-                            'campania_id' => $id->id,
-                            'especie_id' => $especieData['especie_id']
-                        ],
-                        [
-                            'cantidad_siembra'      => $especieData['cantidad_siembra'],
-                            'fecha_siembra'         => $especieData['fecha_siembra'],
-                            'cantidad_cosechada'    => $especieData['cantidad_cosechada'] ?? null,
-                            'peso_inicial_gr'       => $especieData['peso_inicial_gr'] ?? null,
-                            'peso_final_gr'         => $especieData['peso_final_gr'] ?? null,
-                        ]
-                    );
+
+                    // Si ya existe, no se modifica
+                    if (!empty($especieData['id'])) {
+                        continue;
+                    }
+
+                    // Solo crear nuevas especies
+                    $id->especies()->create([
+                        'especie_id'           => $especieData['especie_id'],
+                        'cantidad_siembra'     => $especieData['cantidad_siembra'],
+                        'fecha_siembra'        => $especieData['fecha_siembra'],
+                        'cantidad_cosechada'   => $especieData['cantidad_cosechada'] ?? null,
+                        'peso_inicial_gr'      => $especieData['peso_inicial_gr'] ?? null,
+                        'peso_final_gr'        => $especieData['peso_final_gr'] ?? null,
+                    ]);
                 }
             }
 

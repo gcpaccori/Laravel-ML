@@ -117,6 +117,10 @@
         }
     }
 
+    const isRegistered = (row) => {
+        return !!row.id;
+    };
+
     // Sincronizar cambios del padre
     watch(() => props.modelValue, async (val) => {
         dialogVisible.value = val;
@@ -236,7 +240,7 @@
                     <el-table-column label="Especie">
                         <template #default="{ row, $index }">
                             <el-form-item :error="errors[`especies.${$index}.especie_id`]?.[0] ?? errors[`especies`]?.[0]">
-                                <el-select v-model="row.especie_id" placeholder="Seleccionar..." filterable>
+                                <el-select v-model="row.especie_id" placeholder="Seleccionar..." filterable :disabled="isRegistered(row)">
                                     <el-option
                                         v-for="item in optionsEspecies"
                                         :key="item.id"
@@ -258,6 +262,7 @@
                                     format="DD/MM/YYYY"
                                     value-format="YYYY-MM-DD"
                                     :clearable="false"
+                                    :disabled="isRegistered(row)"
                                 />
                             </el-form-item>
                         </template>
@@ -266,7 +271,7 @@
                     <el-table-column label="N° alevines inicial">
                         <template #default="{ row, $index }">
                             <el-form-item :error="errors[`especies.${$index}.cantidad_siembra`]?.[0]">
-                                <el-input type="any" class="w-100" v-model="row.cantidad_siembra" :min="0" step="any" />
+                                <el-input type="any" class="w-100" v-model="row.cantidad_siembra" :min="0" step="any" :disabled="isRegistered(row)"/>
                             </el-form-item>
                         </template>
                     </el-table-column>
@@ -274,7 +279,7 @@
                     <el-table-column label="N° peces final">
                         <template #default="{ row, $index }">
                             <el-form-item :error="errors[`especies.${$index}.cantidad_cosechada`]?.[0]">
-                                <el-input type="any" class="w-100" v-model="row.cantidad_cosechada" :min="0" step="any" />
+                                <el-input type="any" class="w-100" v-model="row.cantidad_cosechada" :min="0" step="any" :disabled="isRegistered(row)"/>
                             </el-form-item>
                         </template>
                     </el-table-column>
@@ -282,7 +287,7 @@
                     <el-table-column label="Peso inicial Alevin(g)">
                         <template #default="{ row, $index }">
                             <el-form-item :error="errors[`especies.${$index}.peso_inicial_gr`]?.[0]">
-                                <el-input type="any" class="w-100" v-model="row.peso_inicial_gr" :precision="2" step="any" />
+                                <el-input type="any" class="w-100" v-model="row.peso_inicial_gr" :precision="2" step="any" :disabled="isRegistered(row)"/>
                             </el-form-item>
                         </template>
                     </el-table-column>
@@ -290,7 +295,7 @@
                     <el-table-column label="Peso Final Pez(g)">
                         <template #default="{ row, $index }">
                             <el-form-item :error="errors[`especies.${$index}.peso_final_gr`]?.[0]">
-                                <el-input type="any" class="w-100" v-model="row.peso_final_gr" :precision="2" step="any" />
+                                <el-input type="any" class="w-100" v-model="row.peso_final_gr" :precision="2" step="any" :disabled="isRegistered(row)"/>
                             </el-form-item>
                         </template>
                     </el-table-column>
@@ -299,10 +304,10 @@
                         <template #default="{ row, $index }">
                             <el-button
                                 type="danger"
-                                :icon="row.id && row.id > 0 ? Delete : Close"
                                 @click="delEspecieCampania($index, row.id)"
-                                circle
+                                size="small"
                             >
+                                {{row.id && row.id > 0 ? "Eliminar" : "Borrar"}}
                             </el-button>
                         </template>
                     </el-table-column>
