@@ -18,17 +18,17 @@ class BiometriaCalculoService
     public function calcular(array $datos, ?Biometria $anterior, CampaniaEtapa $campaniaEtapa): array
     {
         // 1. Promedios desde detalles
-        $pesos      = array_column($datos['detalles'], 'peso_g');
-        $longitudes = array_column($datos['detalles'], 'longitud_cm');
-
-        $promPesoG      = count($pesos) ? round(array_sum($pesos) / count($pesos), 2) : 0.0;
-        $promLongitudCm = count($longitudes) ? round(array_sum($longitudes) / count($longitudes), 2) : 0.0;
+        $pesos           = array_column($datos['detalles'], 'peso_g');
+        $longitudes      = array_column($datos['detalles'], 'longitud_cm');
+        $promPesoG       = count($pesos) ? round(array_sum($pesos) / count($pesos), 4) : 0.0;
+        $promLongitudCm  = count($longitudes) ? round(array_sum($longitudes) / count($longitudes), 4) : 0.0;
+        $poblacionActual = $datos['cantidad_peces_actuales'];
 
         // 2. Iniciales: heredados del anterior, o de campaniaEspecie si es el primero
         if ($anterior) {
             $fechaInicial           = $anterior->fecha_muestreo;
-            // $cantidadPecesIniciales = $anterior->cantidad_peces_actuales;
-            $cantidadPecesIniciales = $anterior->cantidad_peces_iniciales;
+            $cantidadPecesIniciales = $anterior->cantidad_peces_actuales;
+            // $cantidadPecesIniciales = $anterior->cantidad_peces_iniciales;
             $biKg                   = $anterior->bf_kg;
         } else {
             $campaniaEspecie = $campaniaEtapa->campaniaEspecie;
@@ -40,13 +40,13 @@ class BiometriaCalculoService
             $fechaInicial           = $campaniaEspecie->fecha_siembra;
             $cantidadPecesIniciales = $campaniaEspecie->cantidad_siembra;
             $biKg = ($campaniaEspecie->cantidad_siembra && $campaniaEspecie->peso_inicial_gr)
-                ? round(($campaniaEspecie->cantidad_siembra * $campaniaEspecie->peso_inicial_gr) / 1000, 2)
+                ? round(($campaniaEspecie->cantidad_siembra * $campaniaEspecie->peso_inicial_gr) / 1000, 4)
                 : 0.0;
         }
 
         // 3. Biomasa final = peces actuales ó peces iniciales * peso promedio actual
         $bfKg = $promPesoG > 0
-            ? round(($cantidadPecesIniciales * $promPesoG) / 1000, 2)
+            ? round(($poblacionActual * $promPesoG) / 1000, 4)
             : 0.0;
 
         // 4. Tiempo transcurrido
@@ -57,23 +57,23 @@ class BiometriaCalculoService
         // 5. Tasa de crecimiento (g/día)
         $biomasaGanada = $bfKg - $biKg;
         $tasaCrecimientoGDia = $tiempoDias > 0
-            ? round( (($biomasaGanada / $tiempoDias) / $cantidadPecesIniciales) * 1000 , 2)
+            ? round( (($biomasaGanada / $tiempoDias) / $poblacionActual) * 1000 , 4)
             : 0.0;
 
         // 6. Conversión alimenticia (FCA)
         $conversionAlimenticia = $biomasaGanada > 0
-            ? round($datos['total_alimento_consumido_kg'] / $biomasaGanada, 2)
+            ? round($datos['total_alimento_consumido_kg'] / $biomasaGanada, 4)
             : 0.0;
 
         // 7. Supervivencia
         $tasaSupervivencia = $cantidadPecesIniciales > 0
-            ? round(($datos['cantidad_peces_actuales'] / $cantidadPecesIniciales) * 100, 2)
+            ? round(($poblacionActual / $cantidadPecesIniciales) * 100, 4)
             : null;
 
         // 8. % de muestreo
         $cantidadMuestreo = $datos['cantidad_muestreo'] ?? count($datos['detalles']);
-        $muestreoPorcentaje = $cantidadPecesIniciales > 0
-            ? round(($cantidadMuestreo * 100) / $cantidadPecesIniciales , 2)
+        $muestreoPorcentaje = $poblacionActual > 0
+            ? round(($cantidadMuestreo * 100) / $poblacionActual , 4)
             : 0.0;
 
         return [
