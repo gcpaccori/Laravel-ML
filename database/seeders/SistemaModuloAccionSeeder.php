@@ -137,6 +137,13 @@ class SistemaModuloAccionSeeder extends Seeder
                         'order'    => 1,
                         'acciones' => ['new','edit','delete'],
                     ],
+                    [
+                        'name'     => 'Fotoperíodo',
+                        'url'      => 'fotoperiodo',
+                        'icon'     => 'Stopwatch',
+                        'order'    => 1,
+                        'acciones' => [],
+                    ],
                 ]
                 ],
             [

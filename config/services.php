@@ -35,4 +35,8 @@ return [
         ],
     ],
 
+    'monitoreo_api' => [
+        'api_key' => env('MONITOREO_API_KEY'),
+    ],
+
 ];

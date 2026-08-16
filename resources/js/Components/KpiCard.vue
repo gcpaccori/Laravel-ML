@@ -30,11 +30,20 @@ const props = defineProps({
 })
 
 const valorFormateado = computed(() => {
-  if (props.valor === null || props.valor === undefined) return '—'
-  return Number(props.valor).toLocaleString('es-PE', {
-    minimumFractionDigits: props.decimales,
-    maximumFractionDigits: props.decimales,
-  })
+  if (props.valor === null || props.valor === undefined || props.valor === '') {
+    return '—'
+  }
+
+  // Si es numérico, aplicar formato
+  if (!isNaN(Number(props.valor)) && props.valor !== '') {
+    return Number(props.valor).toLocaleString('es-PE', {
+      minimumFractionDigits: props.decimales,
+      maximumFractionDigits: props.decimales,
+    })
+  }
+
+  // Si es texto, mostrar directamente
+  return props.valor
 })
 
 const colorSuave = computed(() => `${props.color}1A`) // color + alpha hex (~10%)
@@ -75,7 +84,7 @@ const colorSuave = computed(() => `${props.color}1A`) // color + alpha hex (~10%
 
 .kpi-valor {
   margin: 4px 0 0 0;
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 700;
   line-height: 1.1;
   color: var(--el-text-color-primary);
@@ -90,7 +99,7 @@ const colorSuave = computed(() => `${props.color}1A`) // color + alpha hex (~10%
 
 .kpi-ayuda {
   margin: 4px 0 0 0;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--el-text-color-placeholder);
 }
 </style>

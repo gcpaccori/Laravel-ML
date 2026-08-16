@@ -2,82 +2,107 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Events\ParametroAguaActualizado;
+use App\Http\Controllers\Controller;
+use App\Models\ParametroAgua;
+use App\Models\ParametroAmbiente;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use App\Models\ParametroAgua;
-use App\Http\Controllers\Controller;
-use App\Events\ParametroAguaActualizado;
+use Illuminate\Validation\ValidationException;
+use Log;
 
 class ParametroAguaController extends Controller
 {
 
-    private $apiKey = "MonitoreoAgua2025"; // API key
+    private $apiKey;
 
-    /**
-     * Display a listing of the resource.
-     */
-    public function index()
+    public function __construct()
     {
-
+        $this->apiKey = config('services.monitoreo_api.api_key');
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request)
     {
-        \Log::info('Datos Recibidos', ['parametros' => $request->all()]);
+        Log::info('Datos Recibidos', ['parametros' => $request->all()]);
 
-        // return 'OK';
+        if (!hash_equals((string) $this->apiKey, (string) $request->api_key)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'API Key incorrecta.'
+            ], 401);
+        }
 
-        // Validar API Key
-        if ($request->api_key == $this->apiKey) {
-            // $fechaFormateada = Carbon::createFromFormat('d/m/Y H:i:s', $request->fecha_medicion)->format('Y-m-d H:i:s');
+        try {
+            $validated = $request->validate([
+                'piscina_id'     => ['required', 'integer'],
+                'fecha_medicion' => ['required', 'date'],
 
-            $parametro = ParametroAgua::create([
-                'piscina_id'        => $request->piscina_id,
-                'temperatura'       => $request->temperatura,
-                'ph'                => $request->ph,
-                'oxigeno_disuelto'  => $request->oxigeno_disuelto,
-                'ion_nitrato'       => $request->ion_nitrato,
-                'fecha_medicion'    => $request->fecha_medicion,
+                // Parámetros del agua
+                'temperatura'      => ['nullable', 'numeric'],
+                'ph'               => ['nullable', 'numeric'],
+                'oxigeno_disuelto' => ['nullable', 'numeric'],
+                'ion_nitrato'      => ['nullable', 'numeric'],
+
+                // Parámetros ambientales
+                'iluminancia'          => ['nullable', 'numeric'],
+                'temperatura_ambiente' => ['nullable', 'numeric'],
+                'humedad_ambiente'     => ['nullable', 'numeric'],
             ]);
 
-            event(new ParametroAguaActualizado($parametro));
+            $tieneParametrosAgua = collect(['temperatura', 'ph', 'oxigeno_disuelto', 'ion_nitrato'])->contains(fn ($campo) => $request->filled($campo));
 
-            echo "New record created successfully";
+            if ($tieneParametrosAgua) {
+                ParametroAgua::create([
+                    'piscina_id'       => $validated['piscina_id'],
+                    'temperatura'      => $validated['temperatura'] ?? 0,
+                    'ph'               => $validated['ph'] ?? 0,
+                    'oxigeno_disuelto' => $validated['oxigeno_disuelto'] ?? 0,
+                    'ion_nitrato'      => $validated['ion_nitrato'] ?? 0,
+                    'fecha_medicion'   => $validated['fecha_medicion'],
+                ]);
+            }
 
-            // \Log::info('Exito', [
-            //     'message' => 'Parámetros registrados correctamente.',
-            //     'data' => $parametro
-            // ]);
+            $tieneParametrosAmbientales = collect(['iluminancia', 'temperatura_ambiente', 'humedad_ambiente'])->contains(fn ($campo) => $request->filled($campo));
+
+            if ($tieneParametrosAmbientales) {
+                $datosAmbiente = [
+                    'piscina_id'           => $validated['piscina_id'],
+                    'iluminancia'          => $validated['iluminancia'] ?? 0,
+                    'temperatura_ambiente' => $validated['temperatura_ambiente'] ?? 0,
+                    'humedad_ambiente'     => $validated['humedad_ambiente'] ?? 0,
+                    'fecha_medicion'       => $validated['fecha_medicion'],
+                ];
+                ParametroAmbiente::registrarLectura($datosAmbiente);
+            }
+
+            event(new ParametroAguaActualizado);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Datos registrados correctamente.',
+            ], 201);
+
+        } catch (ValidationException $e) {
+
+            Log::info('Los datos enviados no son válidos:', ['parametros' => $e->errors()]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Los datos enviados no son válidos.',
+                'errors'  => $e->errors(),
+            ], 422);
+
+        } catch (\Throwable $e) {
+
+            Log::error('Error registrando parámetros', [
+                'error'      => $e->getMessage(),
+                'piscina_id' => $request->piscina_id,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error interno al registrar los datos.'
+            ], 500);
         }
-        else{
-            echo "Wrong API Key provided.";
-        }
-    }
-
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
-    {
-        //
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
-    {
-        //
-    }
-
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
-    {
-        //
     }
 }

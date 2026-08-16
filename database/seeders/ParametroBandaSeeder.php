@@ -14,7 +14,7 @@ class ParametroBandaSeeder extends Seeder
     {
         $data = [
 
-            // Temperatura (°C)
+            // Temperatura Agua (°C)
             [
                 "parametro"  => "temperatura",
                 "title"      => "Frío",
@@ -118,6 +118,89 @@ class ParametroBandaSeeder extends Seeder
                 "color"      => "#ee1f25",
                 "low_score"  => 200,
                 "high_score" => 20000,
+            ],
+
+            // Iluminancia (LUX) - Fotoperíodo, alimentado por el sensor LILYGO
+            [
+                "parametro"  => "iluminancia",
+                "title"      => "Oscuridad",
+                "color"      => "#1F3864",
+                "low_score"  => 0,
+                "high_score" => 1,
+            ],
+            [
+                "parametro"  => "iluminancia",
+                "title"      => "Transición",
+                "color"      => "#fdae19",
+                "low_score"  => 1,
+                "high_score" => 10,
+            ],
+            [
+                "parametro"  => "iluminancia",
+                "title"      => "Luz",
+                "color"      => "#f2c744",
+                "low_score"  => 10,
+                "high_score" => 65535,
+            ],
+
+            // Temperatura ambiente (°C)
+            [
+                "parametro"  => "temperatura_ambiente",
+                "title"      => "Bajo",
+                "color"      => "#00BFFF",
+                "low_score"  => 0,
+                "high_score" => 20,
+            ],
+            [
+                "parametro"  => "temperatura_ambiente",
+                "title"      => "Óptimo",
+                "color"      => "#54b947",
+                "low_score"  => 20,
+                "high_score" => 30,
+            ],
+            [
+                "parametro"  => "temperatura_ambiente",
+                "title"      => "Alto",
+                "color"      => "#fdae19",
+                "low_score"  => 30,
+                "high_score" => 35,
+            ],
+            [
+                "parametro"  => "temperatura_ambiente",
+                "title"      => "Crítico",
+                "color"      => "#ee1f25",
+                "low_score"  => 35,
+                "high_score" => 100,
+            ],
+            
+            // Humedad ambiente (%)
+            [
+                "parametro"  => "humedad_ambiente",
+                "title"      => "Baja",
+                "color"      => "#fdae19",
+                "low_score"  => 0,
+                "high_score" => 40,
+            ],
+            [
+                "parametro"  => "humedad_ambiente",
+                "title"      => "Óptimo",
+                "color"      => "#54b947",
+                "low_score"  => 40,
+                "high_score" => 70,
+            ],
+            [
+                "parametro"  => "humedad_ambiente",
+                "title"      => "Alta",
+                "color"      => "#fdae19",
+                "low_score"  => 70,
+                "high_score" => 85,
+            ],
+            [
+                "parametro"  => "humedad_ambiente",
+                "title"      => "Crítico",
+                "color"      => "#ee1f25",
+                "low_score"  => 85,
+                "high_score" => 100,
             ],
         ];
 
