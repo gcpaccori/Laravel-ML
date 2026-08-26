@@ -29,7 +29,7 @@ class ApproveModelAlertPolicy extends Command
         {--unit= : Unidad del valor de corte}
         {--severity=advertencia : advertencia, critico o emergencia}
         {--reason= : Justificacion tecnica aprobada}
-        {--version=1 : Version entera de la politica}
+        {--policy-version=1 : Version entera de la politica}
         {--approved-by= : ID del usuario que aprobo la politica}';
 
     protected $description = 'Aprueba explicitamente una politica que permite a un modelo local crear alarmas';
@@ -96,7 +96,7 @@ class ApproveModelAlertPolicy extends Command
                 'threshold' => (float) $threshold,
                 'unit' => $this->option('unit') ?: null,
                 'severity' => $severity,
-                'version' => max(1, (int) $this->option('version')),
+                'version' => max(1, (int) $this->option('policy-version')),
                 'rationale' => $reason,
                 'approved_by' => $approverId ?: null,
                 'approved_at' => now(),

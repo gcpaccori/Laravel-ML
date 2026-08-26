@@ -23,6 +23,6 @@ php artisan model-alerts:approve-policy OD-SVM-LOW-1H \
   --approved-by=1
 ```
 
-El comando valida el modelo, la piscina, la severidad, el valor y la justificacion. Una politica global se crea omitiendo `--piscina`. Cambiar el umbral o la formula debe incrementar `--version` y dejar una justificacion nueva.
+El comando valida el modelo, la piscina, la severidad, el valor y la justificacion. Una politica global se crea omitiendo `--piscina`. Cambiar el umbral o la formula debe incrementar `--policy-version` y dejar una justificacion nueva.
 
 El modelo de luz no puede emitir todavia: requiere lecturas reales de luz vinculadas con racion y respuesta alimentaria, un artefacto validado y una politica aprobada. Los escenarios manuales del gemelo digital nunca generan alarmas.
