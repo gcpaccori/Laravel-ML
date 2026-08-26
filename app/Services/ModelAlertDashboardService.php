@@ -50,8 +50,15 @@ class ModelAlertDashboardService
 
         try {
             $payload = $this->fetchDashboard($resolvedPondId, $windowHours);
-            Cache::put($cacheKey, $payload, now()->addSeconds($this->cacheSeconds()));
-            Cache::put($staleKey, $payload, now()->addSeconds($this->staleSeconds()));
+            $warming = (bool) data_get($payload, 'meta.warming', false);
+            Cache::put(
+                $cacheKey,
+                $payload,
+                now()->addSeconds($warming ? 2 : $this->cacheSeconds()),
+            );
+            if (! $warming) {
+                Cache::put($staleKey, $payload, now()->addSeconds($this->staleSeconds()));
+            }
 
             return $payload;
         } catch (Throwable $exception) {
@@ -236,7 +243,7 @@ class ModelAlertDashboardService
     {
         $native = Http::acceptJson()
             ->connectTimeout($this->connectTimeout())
-            ->timeout(min($this->timeout(), 8))
+            ->timeout(min($this->timeout(), 5))
             ->get("{$this->backendUrl()}/ponds/{$pondId}/model-alerts/dashboard", [
                 'window_hours' => $windowHours,
             ]);
@@ -252,7 +259,7 @@ class ModelAlertDashboardService
             return $payload;
         }
 
-        return $this->legacyCompatibilityDashboard($pondId, $windowHours);
+        throw new RuntimeException('FastAPI no expuso el contrato local de alarmas de modelos.');
     }
 
     private function legacyCompatibilityDashboard(string $pondId, int $windowHours): array

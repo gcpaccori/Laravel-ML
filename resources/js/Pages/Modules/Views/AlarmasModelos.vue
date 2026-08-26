@@ -46,6 +46,7 @@ const piscigranjas = ref([]);
 const piscinas = ref([]);
 const requestController = ref(null);
 const reloadTimer = ref(null);
+const warmupTimer = ref(null);
 
 const filters = ref({
     piscigranja_id: "T",
@@ -174,6 +175,10 @@ const loadDashboard = async (refresh = false) => {
             lightScenario.value.current_lux = Number(light.value.latest_value);
             lightScenario.value.maximum_lux = Math.max(1, Number(light.value.latest_value));
         }
+        clearTimeout(warmupTimer.value);
+        if (data?.meta?.warming) {
+            warmupTimer.value = setTimeout(() => loadDashboard(false), 3000);
+        }
     } catch (error) {
         if (error?.code !== "ERR_CANCELED") {
             errorMessage.value = error?.response?.data?.message ?? "No se pudo cargar el estado de las alarmas de modelos.";
@@ -230,6 +235,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
     requestController.value?.abort();
     clearTimeout(reloadTimer.value);
+    clearTimeout(warmupTimer.value);
     window.Echo?.leave("alarmas.modelos");
 });
 </script>
@@ -280,6 +286,14 @@ onBeforeUnmount(() => {
         </section>
 
         <el-alert v-if="errorMessage" class="mb-5" type="warning" :title="errorMessage" show-icon :closable="false" />
+        <el-alert
+            v-else-if="response?.meta?.warming"
+            class="mb-5"
+            type="info"
+            :title="response.meta.message"
+            show-icon
+            :closable="false"
+        />
         <el-alert
             v-else-if="response?.meta?.degraded || response?.meta?.stale"
             class="mb-5"
