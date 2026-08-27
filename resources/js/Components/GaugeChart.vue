@@ -65,7 +65,7 @@ onMounted(() => {
   window.addEventListener("resize", () => myChart?.resize());
 });
 
-// ✅ 1. actualizar solo el valor (más rápido)
+// 1. actualizar solo el valor (más rápido)
 watch(() => props.value, (newVal) => {
   if (myChart) {
     myChart.setOption({
@@ -74,7 +74,7 @@ watch(() => props.value, (newVal) => {
   }
 });
 
-// ✅ 2. re-renderizar si cambian los demás props
+// 2. re-renderizar si cambian los demás props
 watch([() => props.min, () => props.max, () => props.bandsData, () => props.unit], () => {
   renderChart();
 }, { deep: true });

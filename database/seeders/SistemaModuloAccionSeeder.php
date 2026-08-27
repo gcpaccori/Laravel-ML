@@ -44,6 +44,13 @@ class SistemaModuloAccionSeeder extends Seeder
                 'type'         => 'danger',
                 'name_funcion' => 'handleDelete',
             ],
+            [
+                'accion'       => 'Visualizar',
+                'name'         => 'show',
+                'icon'         => 'View',
+                'type'         => 'primary',
+                'name_funcion' => 'handleShow',
+            ],
         ];
 
         $acciones = collect($accionesBase)->map(fn($a) =>
@@ -181,7 +188,7 @@ class SistemaModuloAccionSeeder extends Seeder
                         'acciones' => ['new','edit','delete'],
                     ],
                 ]
-                ],
+            ],
             [
                 'name'    => 'Gestionar Producción',
                 'icon'    => 'DataLine',
@@ -189,11 +196,18 @@ class SistemaModuloAccionSeeder extends Seeder
                 'order'   => 3,
                 'modulos' => [
                     [
+                        'name'     => 'Tabla Alimentación',
+                        'url'      => 'alimentacionbft',
+                        'icon'     => 'DataLine',
+                        'order'    => 1,
+                        'acciones' => ['new','edit','delete', 'show'],
+                    ],
+                    [
                         'name'     => 'Biometrias',
                         'url'      => 'biometria',
                         'icon'     => 'DataLine',
-                        'order'    => 1,
-                        'acciones' => ['new','edit','delete'],
+                        'order'    => 2,
+                        'acciones' => ['new','edit','delete', 'show'],
                     ],
                 ]
             ]

@@ -4,6 +4,7 @@ use App\Http\Controllers\CalidadAguaController;
 use App\Http\Controllers\HistorialAguaController;
 use App\Http\Controllers\ModeloMlController;
 use App\Http\Controllers\ParametroAmbienteController;
+use App\Http\Controllers\AlarmaController;
 
 // CALIDAD AGUA
 Route::get('/calidadaguas', [CalidadAguaController::class, 'index'])->name('monitoreo.calidadaguas.index')->middleware('modulo:calidadagua');
@@ -26,3 +27,11 @@ Route::get('/modelos-ml-suite', [ModeloMlController::class, 'suite'])->name('mon
 Route::get('/fotoperiodo', [ParametroAmbienteController::class, 'index'])->name('monitoreo.fotoperiodos.index')->middleware('modulo:fotoperiodo');
 Route::get('/fotoperiodo/parametros', [ParametroAmbienteController::class, 'getDataParametros'])->name('fotoperiodos.parametros');
 
+// NOTIFICACIONES
+Route::get('/alarmas', [AlarmaController::class, 'index'])->name('alarmas.index');
+Route::get('/alarmas/dropdown', [AlarmaController::class, 'alarmasDropdown'])->name('alarmas.dropdown');
+Route::get('/alarmas/statistics', [AlarmaController::class, 'alarmaStatistics'])->name('alarmas.statistics');
+Route::get('/alarmas/datatable', [AlarmaController::class, 'datatable'])->name('alarmas.datatable');
+Route::get('/alarmas/{alarma}', [AlarmaController::class, 'show'])->name('alarmas.show');
+Route::patch('/alarmas/{alarma}/reconocer', [AlarmaController::class, 'reconocer'])->name('alarmas.reconocer');
+Route::patch('/alarmas/{alarma}/resolver', [AlarmaController::class, 'resolver'])->name('alarmas.resolver');

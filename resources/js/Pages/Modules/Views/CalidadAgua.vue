@@ -3,6 +3,7 @@
     import GaugeChart from "@/Components/GaugeChart.vue";
     import PiscigranjasMap from "@/Components/PiscigranjasMap.vue";
     import ServerTime from "@/Components/ServerTime.vue";
+    import KpiCard from "@/Components/KpiCard.vue";
 
     const props = defineProps({
         title: String,
@@ -137,71 +138,63 @@
         </div>
 
         <div class="row g-5">
-            <div class="col-xl-3">
-                <a href="#" class="card bg-danger hoverable card-xl-stretch mb-xl-3">
-                    <div class="card-body">
-                        <div class="text-gray-100 fw-bold fs-3">{{ parametros_agua.piscigranja?.nombre ?? '-' }}</div>
-                        <div class="fw-semibold text-gray-100">Piscigranja</div>
-                    </div>
-                </a>
+            <div class="col-lg-4">
+                <KpiCard
+                    label="Piscigranja"
+                    :valor="parametros_agua.piscigranja?.nombre"
+                    icon="OfficeBuilding"
+                    color="#F1416C"
+                />
             </div>
-            <div class="col-xl-3">
-                <a href="#" class="card bg-dark hoverable card-xl-stretch mb-xl-3">
-                    <div class="card-body">
-                        <div class="text-gray-100 fw-bold fs-3">{{ parametros_agua.piscina?.nombre ?? '-' }}</div>
-                        <div class="fw-semibold text-gray-100">Piscina</div>
-                    </div>
-                </a>
+
+            <div class="col-lg-4">
+                <KpiCard
+                    label="Piscina"
+                    :valor="parametros_agua.piscina?.nombre"
+                    icon="Grid"
+                    color="#67C23A"
+                />
             </div>
-            <div class="col-xl-3">
-                <a href="#" class="card bg-success hoverable card-xl-stretch mb-xl-3">
-                    <div class="card-body">
-                        <div class="text-white fw-bold fs-3">{{ parametros_agua?.fecha_medicion ?? '-' }}</div>
-                        <div class="fw-semibold text-white">Última fecha de medición sensor</div>
-                    </div>
-                </a>
-            </div>
-            <div class="col-xl-3">
-                <a href="#" class="card bg-info hoverable card-xl-stretch mb-5 mb-xl-3">
-                    <div class="card-body">
-                        <div class="text-white fw-bold fs-3">{{ parametros_agua?.fecha_registro ?? '-' }}</div>
-                        <div class="fw-semibold text-white">Última fecha de registro sistema</div>
-                    </div>
-                </a>
+
+            <div class="col-lg-4">
+                <KpiCard
+                    label="Último registro"
+                    :valor="parametros_agua?.fecha_registro"
+                    icon="Calendar"
+                    color="#009EF7"
+                />
             </div>
         </div>
 
-        <div class="row g-md-5 g-sm-5">
-            <div class="col-lg-6 col-md-12">
-                <div class="card card-flush overflow-hidden h-xl-100">
-                    <div class="card-header py-5">
-                        <h3 class="card-title align-items-start flex-column">
-                            <span class="card-label fw-bold text-dark fs-5">Geolocalización de Piscigranjas</span>
-                            <span class="text-gray-400 mt-1 fw-semibold fs-7">Ubicación de las piscigranjas por departamentos</span>
-                        </h3>
-                    </div>
-                    <div class="card-body pt-0">
-                        <PiscigranjasMap :piscigranjas="piscigranjasMapList" />
-                    </div>
-                </div>
+        <div class="row mt-5 d-flex align-items-stretch">
+            <div class="col-lg-6 d-flex">
+                <el-card shadow="hover" class="w-100">
+                    <template #header>
+                        <span class="fw-bold text-uppercase">Geolocalización de Piscigranjas</span>
+                    </template>
+                    <PiscigranjasMap :piscigranjas="piscigranjasMapList" />
+                </el-card>
             </div>
 
-            <div class="col-lg-6 col-md-12">
-                <div class="card card-flush overflow-hidden h-xl-100">
-                    <div class="card-header py-5">
-                        <h3 class="card-title align-items-start flex-column">
-                            <span class="card-label fw-bold text-dark fs-5">Monitoreo en tiempo real</span>
-                            <span class="text-gray-400 mt-1 fw-semibold fs-7">Monitoreo en tiempo real de la calidad del agua de las piscinas</span>
-                        </h3>
-                    </div>
-                    <div class="card-body pt-0">
-                        <div class="row">
-                            <div
-                                v-for="gauge in gauges"
-                                :key="gauge.key"
-                                class="col-lg-6 mb-5"
+            <div class="col-lg-6 d-flex">
+                <el-card shadow="hover" class="w-100">
+                    <template #header>
+                        <span class="fw-bold text-uppercase">
+                            Monitoreo en tiempo real
+                        </span>
+                    </template>
+
+                    <div class="row">
+                        <div
+                            v-for="gauge in gauges"
+                            :key="gauge.key"
+                            class="col-lg-6 mb-2"
+                        >
+                            <el-card
+                                shadow="hover"
+                                class="h-100"
                             >
-                                <h5 class="text-center fw-bold mb-2">
+                                <h5 class="text-center fw-bold">
                                     {{ gauge.label }}
                                 </h5>
 
@@ -212,56 +205,10 @@
                                     :bandsData="gauge.bands"
                                     :unit="gauge.unit"
                                 />
-                            </div>
+                            </el-card>
                         </div>
                     </div>
-                    <!-- <div class="card-body pt-0">
-                        <div class="row mb-5">
-                            <div class="col-lg-6">
-                                <h5 class="text-center font-bold mb-2">Temperatura</h5>
-                                <GaugeChart
-                                    :value="parametros_agua.temperatura"
-                                    :min="props.bands.bandsTemperatura.min"
-                                    :max="props.bands.bandsTemperatura.max"
-                                    :bandsData="props.bands.bandsTemperatura.bands"
-                                    unit="°C"
-                                />
-                            </div>
-                            <div class="col-lg-6">
-                                <h5 class="text-center font-bold mb-2">Grado de Acidez</h5>
-                                <GaugeChart
-                                    :value="parametros_agua.ph"
-                                    :min="props.bands.bandsPh.min"
-                                    :max="props.bands.bandsPh.max"
-                                    :bandsData="props.bands.bandsPh.bands"
-                                    unit="pH"
-                                />
-                            </div>
-                        </div>
-                        <div class="row">
-                            <div class="col-lg-6">
-                                <h5 class="text-center font-bold mb-2">Oxígeno Disuelto</h5>
-                                <GaugeChart
-                                    :value="parametros_agua.oxigeno"
-                                    :min="props.bands.bandsOxigeno.min"
-                                    :max="props.bands.bandsOxigeno.max"
-                                    :bandsData="props.bands.bandsOxigeno.bands"
-                                    unit="mg/L"
-                                />
-                            </div>
-                            <div class="col-lg-6">
-                                <h5 class="text-center font-bold mb-2">Ion de Nitrato</h5>
-                                <GaugeChart
-                                    :value="parametros_agua.nitrato"
-                                    :min="props.bands.bandsNitrato.min"
-                                    :max="props.bands.bandsNitrato.max"
-                                    :bandsData="props.bands.bandsNitrato.bands"
-                                    unit="mg/L"
-                                />
-                            </div>
-                        </div>
-                    </div> -->
-                </div>
+                </el-card>
             </div>
         </div>
     </App>

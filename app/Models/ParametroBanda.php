@@ -12,6 +12,7 @@ class ParametroBanda extends Model
         return [
             'low_score'  => 'float',
             'high_score' => 'float',
+            'alerta'     => 'boolean'
         ];
     }
 }

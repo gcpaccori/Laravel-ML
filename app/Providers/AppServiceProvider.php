@@ -2,6 +2,10 @@
 
 namespace App\Providers;
 
+use App\Models\ParametroAgua;
+use App\Models\ParametroAmbiente;
+use App\Observers\ParametroAguaObserver;
+use App\Observers\ParametroAmbienteObserver;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -19,6 +23,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        ParametroAgua::observe(ParametroAguaObserver::class);
+        ParametroAmbiente::observe(ParametroAmbienteObserver::class);
     }
 }

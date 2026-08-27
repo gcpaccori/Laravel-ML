@@ -10,17 +10,21 @@ class ParametroBandaSeeder extends Seeder
     /**
      * Run the database seeds.
      */
-    public function run()
+    public function run(): void
     {
         $data = [
 
-            // Temperatura Agua (°C)
+            // =========================================================
+            // TEMPERATURA AGUA (°C)
+            // =========================================================
             [
                 "parametro"  => "temperatura",
                 "title"      => "Frío",
                 "color"      => "#00BFFF",
                 "low_score"  => 0,
                 "high_score" => 25,
+                "nivel"      => "advertencia",
+                "alerta"     => true,
             ],
             [
                 "parametro"  => "temperatura",
@@ -28,6 +32,8 @@ class ParametroBandaSeeder extends Seeder
                 "color"      => "#54b947",
                 "low_score"  => 25,
                 "high_score" => 31,
+                "nivel"      => "normal",
+                "alerta"     => false,
             ],
             [
                 "parametro"  => "temperatura",
@@ -35,6 +41,8 @@ class ParametroBandaSeeder extends Seeder
                 "color"      => "#fdae19",
                 "low_score"  => 31,
                 "high_score" => 35,
+                "nivel"      => "advertencia",
+                "alerta"     => true,
             ],
             [
                 "parametro"  => "temperatura",
@@ -42,15 +50,21 @@ class ParametroBandaSeeder extends Seeder
                 "color"      => "#ee1f25",
                 "low_score"  => 35,
                 "high_score" => 100,
+                "nivel"      => "critico",
+                "alerta"     => true,
             ],
 
+            // =========================================================
             // pH
+            // =========================================================
             [
                 "parametro"  => "ph",
                 "title"      => "Ácido",
                 "color"      => "#ee1f25",
                 "low_score"  => 0,
                 "high_score" => 6.5,
+                "nivel"      => "critico",
+                "alerta"     => true,
             ],
             [
                 "parametro"  => "ph",
@@ -58,6 +72,8 @@ class ParametroBandaSeeder extends Seeder
                 "color"      => "#54b947",
                 "low_score"  => 6.5,
                 "high_score" => 8.5,
+                "nivel"      => "normal",
+                "alerta"     => false,
             ],
             [
                 "parametro"  => "ph",
@@ -65,15 +81,21 @@ class ParametroBandaSeeder extends Seeder
                 "color"      => "#fdae19",
                 "low_score"  => 8.5,
                 "high_score" => 20,
+                "nivel"      => "advertencia",
+                "alerta"     => true,
             ],
 
-            // Oxígeno disuelto (mg/L)
+            // =========================================================
+            // OXÍGENO DISUELTO (mg/L)
+            // =========================================================
             [
                 "parametro"  => "oxigeno_disuelto",
                 "title"      => "Crítico",
                 "color"      => "#ee1f25",
                 "low_score"  => 0,
                 "high_score" => 4,
+                "nivel"      => "critico",
+                "alerta"     => true,
             ],
             [
                 "parametro"  => "oxigeno_disuelto",
@@ -81,6 +103,8 @@ class ParametroBandaSeeder extends Seeder
                 "color"      => "#fdae19",
                 "low_score"  => 4,
                 "high_score" => 6.5,
+                "nivel"      => "advertencia",
+                "alerta"     => true,
             ],
             [
                 "parametro"  => "oxigeno_disuelto",
@@ -88,6 +112,8 @@ class ParametroBandaSeeder extends Seeder
                 "color"      => "#54b947",
                 "low_score"  => 6.5,
                 "high_score" => 8,
+                "nivel"      => "normal",
+                "alerta"     => false,
             ],
             [
                 "parametro"  => "oxigeno_disuelto",
@@ -95,15 +121,21 @@ class ParametroBandaSeeder extends Seeder
                 "color"      => "#00BFFF",
                 "low_score"  => 8,
                 "high_score" => 50,
+                "nivel"      => "advertencia",
+                "alerta"     => true,
             ],
 
-            // Nitrato (mg/L)
+            // =========================================================
+            // NITRATO (mg/L)
+            // =========================================================
             [
                 "parametro"  => "ion_nitrato",
                 "title"      => "Seguro",
                 "color"      => "#54b947",
                 "low_score"  => 0,
                 "high_score" => 50,
+                "nivel"      => "normal",
+                "alerta"     => false,
             ],
             [
                 "parametro"  => "ion_nitrato",
@@ -111,6 +143,8 @@ class ParametroBandaSeeder extends Seeder
                 "color"      => "#fdae19",
                 "low_score"  => 50,
                 "high_score" => 200,
+                "nivel"      => "advertencia",
+                "alerta"     => true,
             ],
             [
                 "parametro"  => "ion_nitrato",
@@ -118,15 +152,21 @@ class ParametroBandaSeeder extends Seeder
                 "color"      => "#ee1f25",
                 "low_score"  => 200,
                 "high_score" => 20000,
+                "nivel"      => "critico",
+                "alerta"     => true,
             ],
 
-            // Iluminancia (LUX) - Fotoperíodo, alimentado por el sensor LILYGO
+            // =========================================================
+            // ILUMINANCIA (LUX)
+            // =========================================================
             [
                 "parametro"  => "iluminancia",
                 "title"      => "Oscuridad",
                 "color"      => "#1F3864",
                 "low_score"  => 0,
                 "high_score" => 1,
+                "nivel"      => "normal",
+                "alerta"     => false,
             ],
             [
                 "parametro"  => "iluminancia",
@@ -134,6 +174,8 @@ class ParametroBandaSeeder extends Seeder
                 "color"      => "#fdae19",
                 "low_score"  => 1,
                 "high_score" => 10,
+                "nivel"      => "normal",
+                "alerta"     => false,
             ],
             [
                 "parametro"  => "iluminancia",
@@ -141,15 +183,21 @@ class ParametroBandaSeeder extends Seeder
                 "color"      => "#f2c744",
                 "low_score"  => 10,
                 "high_score" => 65535,
+                "nivel"      => "normal",
+                "alerta"     => false,
             ],
 
-            // Temperatura ambiente (°C)
+            // =========================================================
+            // TEMPERATURA AMBIENTE (°C)
+            // =========================================================
             [
                 "parametro"  => "temperatura_ambiente",
                 "title"      => "Bajo",
                 "color"      => "#00BFFF",
                 "low_score"  => 0,
                 "high_score" => 20,
+                "nivel"      => "advertencia",
+                "alerta"     => true,
             ],
             [
                 "parametro"  => "temperatura_ambiente",
@@ -157,6 +205,8 @@ class ParametroBandaSeeder extends Seeder
                 "color"      => "#54b947",
                 "low_score"  => 20,
                 "high_score" => 30,
+                "nivel"      => "normal",
+                "alerta"     => false,
             ],
             [
                 "parametro"  => "temperatura_ambiente",
@@ -164,6 +214,8 @@ class ParametroBandaSeeder extends Seeder
                 "color"      => "#fdae19",
                 "low_score"  => 30,
                 "high_score" => 35,
+                "nivel"      => "advertencia",
+                "alerta"     => true,
             ],
             [
                 "parametro"  => "temperatura_ambiente",
@@ -171,15 +223,21 @@ class ParametroBandaSeeder extends Seeder
                 "color"      => "#ee1f25",
                 "low_score"  => 35,
                 "high_score" => 100,
+                "nivel"      => "critico",
+                "alerta"     => true,
             ],
-            
-            // Humedad ambiente (%)
+
+            // =========================================================
+            // HUMEDAD AMBIENTE (%)
+            // =========================================================
             [
                 "parametro"  => "humedad_ambiente",
                 "title"      => "Baja",
                 "color"      => "#fdae19",
                 "low_score"  => 0,
                 "high_score" => 40,
+                "nivel"      => "advertencia",
+                "alerta"     => true,
             ],
             [
                 "parametro"  => "humedad_ambiente",
@@ -187,6 +245,8 @@ class ParametroBandaSeeder extends Seeder
                 "color"      => "#54b947",
                 "low_score"  => 40,
                 "high_score" => 70,
+                "nivel"      => "normal",
+                "alerta"     => false,
             ],
             [
                 "parametro"  => "humedad_ambiente",
@@ -194,6 +254,8 @@ class ParametroBandaSeeder extends Seeder
                 "color"      => "#fdae19",
                 "low_score"  => 70,
                 "high_score" => 85,
+                "nivel"      => "advertencia",
+                "alerta"     => true,
             ],
             [
                 "parametro"  => "humedad_ambiente",
@@ -201,6 +263,8 @@ class ParametroBandaSeeder extends Seeder
                 "color"      => "#ee1f25",
                 "low_score"  => 85,
                 "high_score" => 100,
+                "nivel"      => "critico",
+                "alerta"     => true,
             ],
         ];
 
@@ -212,8 +276,10 @@ class ParametroBandaSeeder extends Seeder
                 ],
                 [
                     "low_score" => $item["low_score"],
-                    "high_score"=> $item["high_score"],
+                    "high_score" => $item["high_score"],
                     "color"     => $item["color"],
+                    "nivel"     => $item["nivel"],
+                    "alerta"    => $item["alerta"],
                 ]
             );
         }

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AlimentacionBftController;
 use App\Http\Controllers\BiometriaController;
 
 // BIOMETRIAS
@@ -19,3 +20,14 @@ Route::get('/piscigranjas/campania/{piscigranja_id}', [BiometriaController::clas
 Route::get('/campania/especie/{campania_id}', [BiometriaController::class, 'showEspecie'])->name('especie.active.show');
 Route::get('/especie/etapa/{campania_especie_id}', [BiometriaController::class, 'showEtapa'])->name('etapa.active.show');
 Route::get('/etapa/parametro/{campania_etapa_id}', [BiometriaController::class, 'showParametrosEtapa'])->name('parametro.active.show');
+
+Route::get('alimentacion-bft', [AlimentacionBftController::class, 'index'])->name('produccion.alimentacionbfts.index')->middleware('modulo:alimentacionbft');
+
+// Route::prefix('campana-especie/{campaniaEspecie}/alimentacion-bft')
+//     ->name('campana-especie.alimentacion-bft.')
+//     ->controller(AlimentacionBftController::class)
+//     ->group(function () {
+//         Route::get('/', 'show')->name('show');
+//         Route::post('/', 'store')->name('store');
+//         Route::get('/pdf', 'pdf')->name('pdf');
+//     });

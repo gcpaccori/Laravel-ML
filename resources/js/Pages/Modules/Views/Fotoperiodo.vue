@@ -414,7 +414,7 @@ onMounted(async () => {
             <div class="col-lg-4 d-flex">
                 <el-card shadow="hover" class="w-100">
                     <template #header>
-                        <span class="text-uppercase">Fotoperíodo del día</span>
+                        <span class="fw-bold text-uppercase">Fotoperíodo del día</span>
                     </template>
 
                     <KpiCard
@@ -435,7 +435,7 @@ onMounted(async () => {
             <div class="col-lg-8 d-flex">
                 <el-card shadow="hover" class="w-100">
                     <template #header>
-                        <span class="text-uppercase">Iluminancia durante el día</span>
+                        <span class="fw-bold text-uppercase">Iluminancia durante el día</span>
                     </template>
 
                     <div

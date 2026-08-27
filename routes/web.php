@@ -1,9 +1,9 @@
 <?php
 
-use Carbon\Carbon;
-use Inertia\Inertia;
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\DashboardController;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
 
 Route::redirect('/', 'login');
 

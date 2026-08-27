@@ -88,6 +88,7 @@ const colorSuave = computed(() => `${props.color}1A`) // color + alpha hex (~10%
   font-weight: 700;
   line-height: 1.1;
   color: var(--el-text-color-primary);
+  word-break: break-word;
 }
 
 .kpi-sufijo {

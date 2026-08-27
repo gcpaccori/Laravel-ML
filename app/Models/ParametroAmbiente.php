@@ -65,7 +65,7 @@ class ParametroAmbiente extends Model
     {
         $fechaNow = now();
         $fecha = $fechaNow->toDateString();
-        $ultima = self::where('piscina_id', $datos['piscina_id'])->whereDate('fecha', $fecha)->orderByDesc('created_at')->first();
+        $ultima = self::where('piscina_id', $datos['piscina_id'])->whereDate('fecha', $fecha)->orderByDesc('fecha_medicion')->first();
         $segundosLuz = $ultima->segundos_luz ?? 0;
         $segundosOscuridad = $ultima->segundos_oscuridad ?? 0;
 
@@ -81,7 +81,6 @@ class ParametroAmbiente extends Model
 
         return self::create([
             'piscina_id'           => $datos['piscina_id'],
-            // 'fecha_medicion'       => $datos['fecha_medicion'],
             'fecha_medicion'       => $fechaNow,
             'fecha'                => $fecha,
             'iluminancia'          => $datos['iluminancia'],
@@ -122,7 +121,6 @@ class ParametroAmbiente extends Model
         return Attribute::make(
             get: function () {
                 return $this->fecha_medicion?->format('d/m/Y H:i:s') ?? '-';
-                // return $this->created_at?->format('d/m/Y H:i:s') ?? '-';
             }
         );
     }
