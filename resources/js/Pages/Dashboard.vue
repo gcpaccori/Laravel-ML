@@ -30,9 +30,8 @@ const filtrosForm = ref({
     campania_especie_id: null,
     campania_etapa_id: null,
 });
+const mostrarFiltros = ref(false);
 
-
-// SELECTS FILTROS
 const piscigranjasOptions = async () => {
     const { data } = await axios.get(route("piscigranjas.options"));
     optionsPiscigranjas.value = data.data;
@@ -74,7 +73,6 @@ const etapasOptions = async () => {
     optionsEtapas.value = data;
 };
 
-// ==================== APLICAR / LIMPIAR FILTROS ====================
 const aplicarFiltros = async() => {
     cargando.value = true;
 
@@ -110,7 +108,6 @@ const limpiarFiltros = async() => {
     await aplicarFiltros();
 }
 
-// ==================== UTILIDADES DE FORMATO ====================
 function formatearNumero(valor) {
     if (valor === null || valor === undefined) return "-";
     return Number(valor).toLocaleString("es-PE", { maximumFractionDigits: 2 });
@@ -141,7 +138,6 @@ const colorFca = computed(() => {
     return "#F56C6C";
 });
 
-// ==================== RESUMEN (fila de totales de la tabla) ====================
 function resumenTabla(param) {
     const { columns, data } = param;
     const sumar = (prop) =>
@@ -159,13 +155,11 @@ function resumenTabla(param) {
     });
 }
 
-// ==================== GRÁFICOS (ECharts vía composable useEchart) ====================
 const hayEvolucion = computed(() =>
     evolucion.value.some((s) => s.puntos.length),
 );
 const hayComparativa = computed(() => comparativaEtapas.value.length > 0);
 
-// Paleta consistente para identificar cada etapa entre los distintos gráficos
 const PALETA = [
     "#409EFF",
     "#67C23A",
@@ -357,8 +351,13 @@ onMounted( async() => {
 
 <template>
     <App :title="title" :toolbar="toolbar">
-        <!-- ==================== FILTROS ==================== -->
-        <FormSection class="mb-4" @submitted="aplicarFiltros">
+        <div class="mb-3">
+            <a href="#" @click.prevent="mostrarFiltros = !mostrarFiltros" class="text-decoration-none">
+                <i :class="mostrarFiltros ? 'el-icon-arrow-up' : 'el-icon-arrow-down'"></i>
+                {{ mostrarFiltros ? '[ - Ocultar Filtros ]' : '[ + Mostrar Filtros ]' }}
+            </a>
+        </div>
+        <FormSection v-show="mostrarFiltros" class="mb-4" @submitted="aplicarFiltros" size="small">
             <template #form>
                 <div class="row">
                     <div class="col-lg-4">
@@ -447,7 +446,6 @@ onMounted( async() => {
             <template #actions>
                 <div class="d-flex justify-content-center">
                     <el-button
-                        size="small"
                         type="primary"
                         native-type="submit"
                         icon="Search"
@@ -457,7 +455,6 @@ onMounted( async() => {
                         Filtrar
                     </el-button>
                     <el-button
-                        size="small"
                         icon="Refresh"
                         @click="limpiarFiltros"
                         >Limpiar
@@ -466,7 +463,6 @@ onMounted( async() => {
             </template>
         </FormSection>
 
-        <!-- ==================== KPIs ==================== -->
         <div class="row g-3 mb-4">
             <div class="col-6 col-sm-4 col-md-3 col-lg-3">
                 <KpiCard
@@ -541,7 +537,6 @@ onMounted( async() => {
             </div>
         </div>
 
-        <!-- ==================== EVOLUCIÓN EN EL TIEMPO ==================== -->
         <el-row :gutter="16" class="seccion mb-4">
             <el-col :span="12">
                 <el-card shadow="never">
@@ -582,7 +577,6 @@ onMounted( async() => {
             </el-col>
         </el-row>
 
-        <!-- ==================== COMPARATIVAS ENTRE ETAPAS ==================== -->
         <el-row :gutter="16" class="seccion mb-4">
             <el-col :span="12">
                 <el-card shadow="never">
@@ -625,7 +619,6 @@ onMounted( async() => {
             </el-col>
         </el-row>
 
-        <!-- ==================== TABLA COMPARATIVA ==================== -->
         <el-card shadow="never" class="seccion">
             <template #header>
                 <span class="seccion-titulo"

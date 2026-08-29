@@ -54,7 +54,7 @@ const configNivel = (nivel) => {
 };
 
 const verAlarma = (alarma) => {
-    router.visit(route("alarmas.show", alarma.id));
+    router.visit(route("monitoreo.alarmas.show", alarma.id));
 };
 </script>
 
@@ -170,7 +170,7 @@ const verAlarma = (alarma) => {
                         <button
                             type="button"
                             class="btn btn-color-gray-600 btn-active-color-primary"
-                            @click="router.visit(route('alarmas.index'))"
+                            @click="router.visit(route('monitoreo.alarmas.index'))"
                         >
                             Ver todas las alertas
                             <i class="ki-duotone ki-arrow-right fs-5">

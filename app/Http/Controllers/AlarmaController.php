@@ -48,7 +48,7 @@ class AlarmaController extends Controller
         return Inertia::render('Modules/Views/Alarmas/Show', [
             'title' => 'Detalle de Alerta',
             'toolbar' => [
-                ['label' => 'Alertas', 'route' => 'alarmas.index'],
+                ['label' => 'Alertas', 'route' => 'monitoreo.alarmas.index'],
                 ['label' => 'Información completa de la alarma'],
             ],
             'alarma' => [

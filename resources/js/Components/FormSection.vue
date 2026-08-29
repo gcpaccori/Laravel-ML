@@ -1,6 +1,13 @@
 <script setup>
 import { computed, useSlots } from 'vue';
 
+defineProps({
+    size: {
+        type: String,
+        default: 'default'
+    }
+});
+
 defineEmits(['submitted']);
 
 const hasActions = computed(() => !! useSlots().actions);
@@ -11,7 +18,7 @@ const hasToolbar = computed(() => !! useSlots().toolbar);
 
 <template>
     <div class="card shadow-sm">
-        <el-form @submit.prevent="$emit('submitted')" label-position="top">
+        <el-form @submit.prevent="$emit('submitted')" label-position="top" :size="size">
             <div class="card-header" v-if="hasTitle || hasDescription || hasToolbar" >
                 <h3 class="card-title align-items-start flex-column">
                     <span class="card-label fw-bold text-dark">

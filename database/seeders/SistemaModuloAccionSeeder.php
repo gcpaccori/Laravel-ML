@@ -134,7 +134,7 @@ class SistemaModuloAccionSeeder extends Seeder
                         'name'     => 'Historial Calidad Agua',
                         'url'      => 'historialagua',
                         'icon'     => 'Stopwatch',
-                        'order'    => 1,
+                        'order'    => 3,
                         'acciones' => ['new','edit','delete'],
                     ],
                     [
@@ -148,7 +148,14 @@ class SistemaModuloAccionSeeder extends Seeder
                         'name'     => 'Fotoperíodo',
                         'url'      => 'fotoperiodo',
                         'icon'     => 'Stopwatch',
-                        'order'    => 1,
+                        'order'    => 2,
+                        'acciones' => [],
+                    ],
+                    [
+                        'name'     => 'Alertas',
+                        'url'      => 'alarma',
+                        'icon'     => 'Stopwatch',
+                        'order'    => 4,
                         'acciones' => [],
                     ],
                 ]

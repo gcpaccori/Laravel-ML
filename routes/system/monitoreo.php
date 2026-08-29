@@ -28,10 +28,10 @@ Route::get('/fotoperiodo', [ParametroAmbienteController::class, 'index'])->name(
 Route::get('/fotoperiodo/parametros', [ParametroAmbienteController::class, 'getDataParametros'])->name('fotoperiodos.parametros');
 
 // NOTIFICACIONES
-Route::get('/alarmas', [AlarmaController::class, 'index'])->name('alarmas.index');
+Route::get('/alarmas', [AlarmaController::class, 'index'])->name('monitoreo.alarmas.index')->middleware('modulo:alarma');
 Route::get('/alarmas/dropdown', [AlarmaController::class, 'alarmasDropdown'])->name('alarmas.dropdown');
 Route::get('/alarmas/statistics', [AlarmaController::class, 'alarmaStatistics'])->name('alarmas.statistics');
 Route::get('/alarmas/datatable', [AlarmaController::class, 'datatable'])->name('alarmas.datatable');
-Route::get('/alarmas/{alarma}', [AlarmaController::class, 'show'])->name('alarmas.show');
+Route::get('/alarmas/{alarma}', [AlarmaController::class, 'show'])->name('monitoreo.alarmas.show');
 Route::patch('/alarmas/{alarma}/reconocer', [AlarmaController::class, 'reconocer'])->name('alarmas.reconocer');
 Route::patch('/alarmas/{alarma}/resolver', [AlarmaController::class, 'resolver'])->name('alarmas.resolver');

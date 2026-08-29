@@ -69,6 +69,7 @@ const handleResolver = async (id) => {
             message: response.data.message,
             type: response.data.success ? 'success' : 'error',
         });
+        getStatistics();
         reloadTable();
     }).catch( (e) => {
         console.log(e);
@@ -76,7 +77,7 @@ const handleResolver = async (id) => {
 };
 
 const handleShow = (id) => {
-    router.visit(route('alarmas.show', id));
+    router.visit(route('monitoreo.alarmas.show', id));
 };
 
 const methods = {
