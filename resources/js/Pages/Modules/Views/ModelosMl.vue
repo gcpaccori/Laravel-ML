@@ -1,11 +1,13 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import {
+    Bell,
     Connection,
     DataAnalysis,
     Odometer,
     RefreshRight,
     SetUp,
+    Sunny,
     TrendCharts,
 } from "@element-plus/icons-vue";
 import ChartFisheye from "@/Components/ChartFisheye.vue";
@@ -24,6 +26,7 @@ const MODEL_CODES = {
     oxygen: "OXYGEN_STATUS_MODEL",
     growth: "TILAPIA_GROWTH_TEMPERATURE",
     water: "WATER_QUALITY_INDEX_ICA",
+    light: "LIGHT_FEED_RESPONSE_CLASSIFIER_V1",
 };
 
 const catalog = [
@@ -63,6 +66,16 @@ const catalog = [
         inputs: ["Temperatura", "pH", "OD", "Ion nitrato"],
         horizon: "Lectura actual",
         icon: Connection,
+    },
+    {
+        code: MODEL_CODES.light,
+        name: "Luz y respuesta alimentaria",
+        description: "Prepara la estimacion de respuesta al alimento a partir de luz subacuatica, fotoperiodo y contexto del agua.",
+        importance: "Permitira relacionar el ambiente luminoso con la actividad alimentaria sin confundir un escenario manual con una prediccion entrenada.",
+        inputs: ["Luz subacuatica", "Fotoperiodo", "Hora", "OD", "Temperatura", "Racion", "Respuesta observada"],
+        horizon: "Siguiente evento de alimentacion",
+        modelType: "Modelo planificado - requiere datos del sensor",
+        icon: Sunny,
     },
 ];
 
@@ -208,7 +221,19 @@ const changePiscigranja = async () => {
     scheduleReload();
 };
 
+const openModelAlerts = (modelCode = null) => {
+    const query = new URLSearchParams();
+    if (form.value.piscina_id !== "T") query.set("piscina_id", form.value.piscina_id);
+    if (modelCode) query.set("modelo", modelCode);
+    const suffix = query.toString();
+    window.location.assign(`${route("monitoreo.alarmasmodelos.index")}${suffix ? `?${suffix}` : ""}`);
+};
+
 const selectModel = (code) => {
+    if (code === MODEL_CODES.light) {
+        openModelAlerts(code);
+        return;
+    }
     selectedCode.value = code;
     currentView.value = "detail";
 };
@@ -266,6 +291,7 @@ onBeforeUnmount(() => {
                 <p class="text-gray-600 fs-6 mb-0">Elige un modelo para revisar su proyeccion. El gemelo digital tiene su propio modulo de simulacion de piscina.</p>
             </div>
             <div class="module-intro__actions">
+                <el-button :icon="Bell" @click="openModelAlerts()">Alarmas de modelos</el-button>
                 <el-button :icon="SetUp" @click="openDigitalTwin()">Gemelo digital</el-button>
                 <el-button :icon="RefreshRight" :loading="loading" @click="loadModelos">Actualizar datos</el-button>
             </div>
@@ -323,14 +349,15 @@ onBeforeUnmount(() => {
                 <span v-if="loading" class="text-gray-500 fs-8 d-flex align-items-center gap-2"><el-icon class="is-loading"><RefreshRight /></el-icon>Actualizando datos reales</span>
             </section>
 
-            <section class="row g-5">
-                <div v-for="item in catalog" :key="item.code" class="col-md-6 col-xl-3">
+            <section class="model-catalog-grid">
+                <div v-for="item in catalog" :key="item.code">
                     <button type="button" class="model-choice h-100 text-start" @click="selectModel(item.code)">
                         <span class="model-choice__icon"><el-icon><component :is="item.icon" /></el-icon></span>
                         <span class="model-choice__body">
                             <span class="d-flex justify-content-between align-items-start gap-2">
                                 <span class="fw-bold text-dark fs-6">{{ item.name }}</span>
-                                <span v-if="models.find((model) => model.code === item.code)" :class="['badge', statusClass(models.find((model) => model.code === item.code)?.status)]">{{ statusLabel(models.find((model) => model.code === item.code)?.status) }}</span>
+                                <span v-if="item.code === MODEL_CODES.light" class="badge badge-light-warning">Esperando sensor</span>
+                                <span v-else-if="models.find((model) => model.code === item.code)" :class="['badge', statusClass(models.find((model) => model.code === item.code)?.status)]">{{ statusLabel(models.find((model) => model.code === item.code)?.status) }}</span>
                             </span>
                             <span class="text-gray-600 fs-7 mt-3">{{ item.description }}</span>
                             <span v-if="item.modelType" class="model-choice__type">{{ item.modelType }}</span>
@@ -536,6 +563,12 @@ onBeforeUnmount(() => {
 
 .filter-strip {
     padding: 18px 20px;
+}
+
+.model-catalog-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 20px;
 }
 
 .model-choice {
@@ -896,5 +929,6 @@ onBeforeUnmount(() => {
     .pond-twin__timeline { align-items: flex-start; }
     .pond-twin__line { margin-top: 5px; }
     .pond-twin__step strong { font-size: 16px; }
+    .model-catalog-grid { grid-template-columns: 1fr; }
 }
 </style>

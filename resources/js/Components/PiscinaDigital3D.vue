@@ -1,5 +1,5 @@
 <script setup>
-import { onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import * as THREE from "three";
 
 const props = defineProps({
@@ -9,6 +9,9 @@ const props = defineProps({
     projectedWeightG: { type: Number, default: 0 },
     estimatedFishCount: { type: Number, default: 0 },
     focusedModel: { type: String, default: "Piscina" },
+    lightLevelLux: { type: Number, default: 0 },
+    lightMode: { type: String, default: "unavailable" },
+    lightPhase: { type: String, default: "sin fase medida" },
 });
 
 const sceneHost = ref(null);
@@ -23,6 +26,8 @@ let waterBasePositions = [];
 let fishGroup;
 let particleCloud;
 let particleMaterial;
+let hemisphereLight;
+let directionalLight;
 let animationFrame;
 let resizeObserver;
 let startedAt = 0;
@@ -43,6 +48,12 @@ const fishColor = (quality) => {
 };
 
 const displayFishCount = () => clamp(Math.round((Number(props.estimatedFishCount) || 500) / 42), 12, 56);
+const lightCaption = computed(() => {
+    if (props.lightMode === "unavailable") return "Luz sin datos";
+    const level = Number(props.lightLevelLux) || 0;
+    const source = props.lightMode === "observed" ? "observada" : "escenario manual";
+    return `${level.toLocaleString("es-PE", { maximumFractionDigits: 1 })} lux · ${source}`;
+});
 
 const makeFish = (index) => {
     const fish = new THREE.Group();
@@ -103,6 +114,18 @@ const applyState = () => {
         fish.scale.setScalar(fishScale);
         fish.userData.material.color.set(fishColor(quality));
     });
+    const measuredLight = clamp(Number(props.lightLevelLux) || 0, 0, 200000);
+    const normalizedLight = props.lightMode === "unavailable"
+        ? 0.48
+        : clamp(Math.log10(measuredLight + 1) / Math.log10(5001), 0.08, 1);
+    const background = new THREE.Color("#14283d").lerp(new THREE.Color("#dceff5"), normalizedLight);
+    scene?.background?.copy(background);
+    if (hemisphereLight) hemisphereLight.intensity = 0.6 + normalizedLight * 1.5;
+    if (directionalLight) directionalLight.intensity = 0.45 + normalizedLight * 2.05;
+    if (water.material.emissive) {
+        water.material.emissive.set("#0b3852");
+        water.material.emissiveIntensity = 0.04 + normalizedLight * 0.08;
+    }
     rebuildParticles();
 };
 
@@ -161,10 +184,11 @@ const initScene = () => {
         renderer.outputColorSpace = THREE.SRGBColorSpace;
         sceneHost.value.appendChild(renderer.domElement);
 
-        scene.add(new THREE.HemisphereLight("#ffffff", "#8195a4", 2.1));
-        const light = new THREE.DirectionalLight("#ffffff", 2.4);
-        light.position.set(4, 8, 3);
-        scene.add(light);
+        hemisphereLight = new THREE.HemisphereLight("#ffffff", "#8195a4", 2.1);
+        scene.add(hemisphereLight);
+        directionalLight = new THREE.DirectionalLight("#ffffff", 2.4);
+        directionalLight.position.set(4, 8, 3);
+        scene.add(directionalLight);
 
         const floor = new THREE.Mesh(
             new THREE.BoxGeometry(8.4, 0.34, 5.6),
@@ -236,6 +260,11 @@ watch(
     },
 );
 
+watch(
+    () => [props.lightLevelLux, props.lightMode],
+    applyState,
+);
+
 onBeforeUnmount(() => {
     cancelAnimationFrame(animationFrame);
     resizeObserver?.disconnect();
@@ -259,6 +288,8 @@ onBeforeUnmount(() => {
         <div class="pool-scene__caption">
             <span>Simulacion 3D</span>
             <strong>{{ focusedModel }}</strong>
+            <small>{{ lightCaption }}</small>
+            <small v-if="lightMode !== 'unavailable'">{{ lightPhase }}</small>
         </div>
         <div v-if="webglError" class="pool-scene__error">{{ webglError }}</div>
     </section>
@@ -301,6 +332,7 @@ onBeforeUnmount(() => {
 }
 
 .pool-scene__caption strong { font-size: 16px; }
+.pool-scene__caption small { font-size: 11px; margin-top: 3px; }
 
 .pool-scene__error {
     position: absolute;

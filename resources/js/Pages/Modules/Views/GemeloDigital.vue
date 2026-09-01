@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
-import { ArrowLeft, RefreshRight, SetUp } from "@element-plus/icons-vue";
+import { ArrowLeft, Bell, RefreshRight, SetUp, Sunny } from "@element-plus/icons-vue";
 import ChartFisheye from "@/Components/ChartFisheye.vue";
 import PiscinaDigital3D from "@/Components/PiscinaDigital3D.vue";
 
@@ -17,6 +17,7 @@ const MODEL_CODES = {
     oxygen: "OXYGEN_STATUS_MODEL",
     growth: "TILAPIA_GROWTH_TEMPERATURE",
     water: "WATER_QUALITY_INDEX_ICA",
+    light: "LIGHT_FEED_RESPONSE_CLASSIFIER_V1",
 };
 
 const modelOptions = [
@@ -24,6 +25,7 @@ const modelOptions = [
     { value: MODEL_CODES.oxygen, label: "Estado de oxigeno" },
     { value: MODEL_CODES.growth, label: "Crecimiento de tilapia" },
     { value: MODEL_CODES.svm, label: "Proyeccion SVM de OD" },
+    { value: MODEL_CODES.light, label: "Luz y respuesta alimentaria" },
 ];
 
 const loading = ref(false);
@@ -31,6 +33,9 @@ const calculating = ref(false);
 const errorMessage = ref("");
 const response = ref(null);
 const scenarioResult = ref(null);
+const lightStatus = ref(null);
+const lightScenarioResult = ref(null);
+const lightLoading = ref(false);
 const focusModel = ref(new URLSearchParams(window.location.search).get("modelo") || MODEL_CODES.growth);
 const pondId = ref(new URLSearchParams(window.location.search).get("piscina_id") || "T");
 
@@ -40,7 +45,15 @@ const scenario = ref({
     dissolved_oxygen_mg_l: null,
     nitrate_ion: null,
     projection_days: 30,
-    active_models: [MODEL_CODES.water, MODEL_CODES.oxygen, MODEL_CODES.growth],
+    active_models: [MODEL_CODES.water, MODEL_CODES.oxygen, MODEL_CODES.growth, MODEL_CODES.light],
+});
+
+const lightScenario = ref({
+    maximum_lux: 500,
+    current_lux: null,
+    photoperiod_hours: 12,
+    dawn_hour: 6,
+    horizon_hours: 24,
 });
 
 const dashboardModel = (code) => response.value?.models?.find((model) => model.code === code);
@@ -58,6 +71,18 @@ const estimatedFishCount = computed(() => {
     return biomassKg > 0 && averageWeight.value > 0 ? Math.round((biomassKg * 1000) / averageWeight.value) : 0;
 });
 const visibleFishCount = computed(() => Math.min(56, Math.max(12, Math.round((estimatedFishCount.value || 500) / 42))));
+const lightLevel = computed(() => Number(
+    lightScenarioResult.value?.twin?.light_level
+    ?? lightStatus.value?.latest_value
+    ?? lightScenario.value.current_lux
+    ?? 0,
+));
+const lightMode = computed(() => {
+    if (lightScenarioResult.value) return "manual";
+    if (lightStatus.value?.latest_value !== null && lightStatus.value?.latest_value !== undefined) return "observed";
+    return "unavailable";
+});
+const lightPhase = computed(() => lightScenarioResult.value?.twin?.phase ?? "sin fase medida");
 const waterState = computed(() => {
     if (qualityIndex.value >= 70) return "Agua clara";
     if (qualityIndex.value >= 50) return "Agua con alerta";
@@ -86,11 +111,25 @@ const loadDashboard = async () => {
             dissolved_oxygen_mg_l: data.latest_measurement?.dissolved_oxygen_mg_l ?? null,
             nitrate_ion: data.latest_measurement?.nitrate_ion ?? null,
         };
-        await runScenario();
     } catch (error) {
         errorMessage.value = error?.response?.data?.message ?? "No se pudieron cargar los datos reales de la piscina.";
     } finally {
         loading.value = false;
+    }
+};
+
+const loadLightStatus = async () => {
+    try {
+        const { data } = await axios.get(route("monitoreo.alarmasmodelos.luz.estado"), {
+            params: { piscina_id: pondId.value },
+        });
+        lightStatus.value = data;
+        if (data.latest_value !== null && data.latest_value !== undefined) {
+            lightScenario.value.current_lux = Number(data.latest_value);
+            lightScenario.value.maximum_lux = Math.max(Number(data.latest_value), lightScenario.value.maximum_lux);
+        }
+    } catch {
+        lightStatus.value = null;
     }
 };
 
@@ -101,6 +140,7 @@ const runScenario = async () => {
         const { data } = await axios.post(route("monitoreo.modelosmls.simulacion"), {
             piscina_id: pondId.value,
             ...scenario.value,
+            active_models: scenario.value.active_models.filter((code) => code !== MODEL_CODES.light),
         });
         scenarioResult.value = data;
     } catch (error) {
@@ -110,9 +150,38 @@ const runScenario = async () => {
     }
 };
 
-const goToModels = () => window.location.assign(route("monitoreo.modelosmls.index"));
+const runLightScenario = async () => {
+    lightLoading.value = true;
+    try {
+        const { data } = await axios.post(route("monitoreo.alarmasmodelos.luz.escenario"), lightScenario.value);
+        lightScenarioResult.value = data;
+    } catch (error) {
+        errorMessage.value = error?.response?.data?.message ?? "No se pudo calcular el escenario de luz.";
+    } finally {
+        lightLoading.value = false;
+    }
+};
 
-onMounted(loadDashboard);
+const updateTwin = async () => {
+    const tasks = [runScenario()];
+    if (scenario.value.active_models.includes(MODEL_CODES.light)) tasks.push(runLightScenario());
+    await Promise.allSettled(tasks);
+};
+
+const goToModels = () => window.location.assign(route("monitoreo.modelosmls.index"));
+const goToAlerts = () => {
+    const query = new URLSearchParams({ modelo: focusModel.value });
+    if (pondId.value !== "T") query.set("piscina_id", pondId.value);
+    window.location.assign(`${route("monitoreo.alarmasmodelos.index")}?${query.toString()}`);
+};
+
+const resetRealData = async () => {
+    lightScenarioResult.value = null;
+    await Promise.allSettled([loadDashboard(), loadLightStatus()]);
+    await runScenario();
+};
+
+onMounted(resetRealData);
 </script>
 
 <template>
@@ -124,7 +193,10 @@ onMounted(loadDashboard);
                 <h2 class="fs-2 fw-bold text-dark mb-2">Gemelo digital de piscina</h2>
                 <p class="text-gray-600 fs-6 mb-0">Representacion 3D animada de biometria, agua y comportamiento visual de los peces. La escena cambia con la lectura real o el escenario manual.</p>
             </div>
-            <el-button :icon="RefreshRight" :loading="loading" @click="loadDashboard">Restablecer datos reales</el-button>
+            <div class="twin-heading__actions">
+                <el-button :icon="Bell" @click="goToAlerts">Alarmas del modelo</el-button>
+                <el-button :icon="RefreshRight" :loading="loading || calculating" @click="resetRealData">Restablecer datos reales</el-button>
+            </div>
         </section>
 
         <el-alert v-if="errorMessage" class="mb-5" type="warning" :title="errorMessage" show-icon :closable="false" />
@@ -134,6 +206,7 @@ onMounted(loadDashboard);
             <div><span>Oxigeno</span><strong>{{ formatValue(saturation, "%") }}</strong><small>Saturacion</small></div>
             <div><span>Biometria</span><strong>{{ formatValue(averageWeight, "g") }}</strong><small>{{ formatValue(biometrics.longitud_promedio_cm, "cm") }} de longitud media</small></div>
             <div><span>Estanque</span><strong>{{ formatValue(estimatedFishCount) }}</strong><small>peces estimados por biomasa</small></div>
+            <div><span>Luz subacuatica</span><strong>{{ formatValue(lightLevel, "lux") }}</strong><small>{{ lightMode === "observed" ? "Lectura observada" : lightMode === "manual" ? "Escenario manual" : "Sensor no disponible" }}</small></div>
         </section>
 
         <PiscinaDigital3D
@@ -143,6 +216,9 @@ onMounted(loadDashboard);
             :projected-weight-g="projectedWeight"
             :estimated-fish-count="estimatedFishCount"
             :focused-model="focusLabel"
+            :light-level-lux="lightLevel"
+            :light-mode="lightMode"
+            :light-phase="lightPhase"
         />
 
         <section class="scene-note mt-3 mb-6">
@@ -158,7 +234,18 @@ onMounted(loadDashboard);
                 <div class="col-sm-6 col-xl-3"><label>Oxigeno disuelto (mg/L)</label><el-input-number v-model="scenario.dissolved_oxygen_mg_l" :min="0" :max="30" :step="0.1" controls-position="right" /></div>
                 <div class="col-sm-6 col-xl-3"><label>Ion nitrato (mg/L)</label><el-input-number v-model="scenario.nitrate_ion" :min="0" :max="500" :step="0.1" controls-position="right" /></div>
             </div>
-            <div class="simulation-tools__bottom"><div><label>Proyeccion de biometria</label><el-select v-model="scenario.projection_days" class="days-select"><el-option :value="1" label="1 dia" /><el-option :value="7" label="7 dias" /><el-option :value="30" label="30 dias" /><el-option :value="90" label="90 dias" /><el-option :value="180" label="180 dias" /></el-select></div><div><label>Modelos aplicados</label><el-checkbox-group v-model="scenario.active_models" class="model-toggles"><el-checkbox :label="MODEL_CODES.water">Calidad de agua</el-checkbox><el-checkbox :label="MODEL_CODES.oxygen">Estado de oxigeno</el-checkbox><el-checkbox :label="MODEL_CODES.growth">Crecimiento</el-checkbox></el-checkbox-group></div><el-button type="primary" :icon="SetUp" :loading="calculating" @click="runScenario">Actualizar simulacion</el-button></div>
+            <div class="light-tools mt-5">
+                <div class="light-tools__heading"><el-icon><Sunny /></el-icon><div><strong>Protocolo luminoso</strong><span>Se aplica al gemelo como escenario manual y no genera una alarma productiva.</span></div></div>
+                <div><label>Intensidad maxima (lux)</label><el-input-number v-model="lightScenario.maximum_lux" :min="0" :max="200000" :step="50" controls-position="right" /></div>
+                <div><label>Fotoperiodo (horas)</label><el-input-number v-model="lightScenario.photoperiod_hours" :min="0" :max="24" :step="0.5" controls-position="right" /></div>
+                <div><label>Inicio de luz (hora)</label><el-input-number v-model="lightScenario.dawn_hour" :min="0" :max="23.5" :step="0.5" controls-position="right" /></div>
+            </div>
+            <div class="simulation-tools__bottom"><div><label>Proyeccion de biometria</label><el-select v-model="scenario.projection_days" class="days-select"><el-option :value="1" label="1 dia" /><el-option :value="7" label="7 dias" /><el-option :value="30" label="30 dias" /><el-option :value="90" label="90 dias" /><el-option :value="180" label="180 dias" /></el-select></div><div><label>Modelos aplicados</label><el-checkbox-group v-model="scenario.active_models" class="model-toggles"><el-checkbox :label="MODEL_CODES.water">Calidad de agua</el-checkbox><el-checkbox :label="MODEL_CODES.oxygen">Estado de oxigeno</el-checkbox><el-checkbox :label="MODEL_CODES.growth">Crecimiento</el-checkbox><el-checkbox :label="MODEL_CODES.light">Luz</el-checkbox></el-checkbox-group></div><el-button type="primary" :icon="SetUp" :loading="calculating || lightLoading" @click="updateTwin">Actualizar simulacion</el-button></div>
+        </section>
+
+        <section v-if="lightScenarioResult && scenario.active_models.includes(MODEL_CODES.light)" class="response-chart mb-6">
+            <div><span class="text-gray-500 fs-8 fw-semibold text-uppercase">Escenario manual</span><h3 class="fs-5 fw-bold text-dark mb-1">Luz aplicada al gemelo</h3><p class="text-gray-600 fs-7">La curva representa el fotoperiodo configurado. El modelo de respuesta alimentaria seguira bloqueado hasta registrar luz y resultado de alimentacion reales.</p></div>
+            <ChartFisheye :options="lightScenarioResult.chart" height="320px" />
         </section>
 
         <section v-if="scenarioResult" class="row g-5 mb-6">
@@ -186,6 +273,7 @@ onMounted(loadDashboard);
 }
 
 .twin-heading { align-items: flex-end; }
+.twin-heading__actions { display: flex; flex-wrap: wrap; gap: 8px; }
 
 .twin-status {
     align-items: stretch;
@@ -241,6 +329,22 @@ onMounted(loadDashboard);
     margin-top: 20px;
 }
 
+.light-tools {
+    display: grid;
+    grid-template-columns: minmax(250px, 1.4fr) repeat(3, minmax(150px, 1fr));
+    gap: 14px;
+    align-items: end;
+    padding: 16px 0;
+    border-top: 1px solid #e7ecf2;
+    border-bottom: 1px solid #e7ecf2;
+}
+
+.light-tools__heading { display: flex; align-items: flex-start; gap: 10px; color: #b77900; }
+.light-tools__heading strong,
+.light-tools__heading span { display: block; }
+.light-tools__heading strong { color: #172033; font-size: 13px; }
+.light-tools__heading span { color: #64748b; font-size: 11px; line-height: 1.45; margin-top: 3px; }
+
 .days-select { width: 180px !important; }
 .model-toggles { display: flex; flex-wrap: wrap; gap: 10px; }
 
@@ -255,11 +359,16 @@ onMounted(loadDashboard);
 .model-response small { display: block; color: #64748b; font-size: 12px; line-height: 1.5; }
 .model-response strong { display: block; color: #172033; font-size: 27px; margin: 8px 0; }
 
+@media (max-width: 1200px) {
+    .light-tools { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 @media (max-width: 768px) {
     .twin-heading,
     .simulation-tools__header,
     .simulation-tools__bottom,
     .scene-note { align-items: flex-start; flex-direction: column; }
     .focus-select { width: 100%; }
+    .light-tools { grid-template-columns: 1fr; }
 }
 </style>

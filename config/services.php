@@ -39,4 +39,12 @@ return [
         'api_key' => env('MONITOREO_API_KEY'),
     ],
 
+    'aquaculture_backend' => [
+        'url' => env('AQUACULTURE_BACKEND_URL', 'http://aquaculture_backend:8000/api/v1'),
+        'connect_timeout' => (int) env('AQUACULTURE_BACKEND_CONNECT_TIMEOUT', 2),
+        'timeout' => (int) env('AQUACULTURE_BACKEND_TIMEOUT', 18),
+        'cache_seconds' => (int) env('MODEL_ALERTS_CACHE_SECONDS', 60),
+        'stale_seconds' => (int) env('MODEL_ALERTS_STALE_SECONDS', 1800),
+    ],
+
 ];

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Alarma extends Model
 {
@@ -79,4 +80,8 @@ class Alarma extends Model
         ];
     }
 
+    public function evidenciaModelo(): HasOne
+    {
+        return $this->hasOne(AlarmaModeloEvidencia::class);
+    }
 }

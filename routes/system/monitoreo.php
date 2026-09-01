@@ -3,6 +3,7 @@
 use App\Http\Controllers\CalidadAguaController;
 use App\Http\Controllers\HistorialAguaController;
 use App\Http\Controllers\ModeloMlController;
+use App\Http\Controllers\AlarmaModeloController;
 use App\Http\Controllers\ParametroAmbienteController;
 use App\Http\Controllers\AlarmaController;
 
@@ -35,3 +36,9 @@ Route::get('/alarmas/datatable', [AlarmaController::class, 'datatable'])->name('
 Route::get('/alarmas/{alarma}', [AlarmaController::class, 'show'])->name('monitoreo.alarmas.show');
 Route::patch('/alarmas/{alarma}/reconocer', [AlarmaController::class, 'reconocer'])->name('alarmas.reconocer');
 Route::patch('/alarmas/{alarma}/resolver', [AlarmaController::class, 'resolver'])->name('alarmas.resolver');
+
+// ALARMAS DERIVADAS DE MODELOS
+Route::get('/alarmas-modelos', [AlarmaModeloController::class, 'index'])->name('monitoreo.alarmasmodelos.index')->middleware('modulo:alarmasmodelo');
+Route::get('/alarmas-modelos/datos', [AlarmaModeloController::class, 'dashboard'])->name('monitoreo.alarmasmodelos.datos')->middleware('modulo:alarmasmodelo');
+Route::get('/alarmas-modelos/luz/estado', [AlarmaModeloController::class, 'lightStatus'])->name('monitoreo.alarmasmodelos.luz.estado')->middleware('modulo:alarmasmodelo');
+Route::post('/alarmas-modelos/luz/escenario', [AlarmaModeloController::class, 'lightScenario'])->name('monitoreo.alarmasmodelos.luz.escenario')->middleware('modulo:alarmasmodelo');
