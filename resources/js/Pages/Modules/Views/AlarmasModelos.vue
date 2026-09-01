@@ -1,39 +1,66 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import {
-    ArrowLeft,
-    Bell,
-    Connection,
-    DataAnalysis,
-    RefreshRight,
-    SetUp,
-    Sunny,
-    TrendCharts,
-    Warning,
-} from "@element-plus/icons-vue";
+import { QuestionFilled, RefreshRight, Setting, SetUp } from "@element-plus/icons-vue";
 import ChartFisheye from "@/Components/ChartFisheye.vue";
-import PiscinaDigital3D from "@/Components/PiscinaDigital3D.vue";
 
 defineProps({
     title: String,
-    toolbar: {
-        type: Array,
-        required: false,
-    },
+    toolbar: { type: Array, required: false },
 });
 
-const MODEL_CODES = {
-    ica: "WATER_QUALITY_INDEX_ICA",
-    growth: "TILAPIA_GROWTH_TEMPERATURE",
-    svm: "SVM_OD_FORECAST_1H",
-    light: "LIGHT_FEED_RESPONSE_CLASSIFIER_V1",
+/* ------------------------------------------------------------------ *
+ * Traduccion a lenguaje llano. Nada de "maturity" ni "ready_for_policy"
+ * en pantalla: cada modelo es un vigilante con nombre corto.
+ * ------------------------------------------------------------------ */
+const VIGILANTES = {
+    WATER_QUALITY_INDEX_ICA: {
+        emoji: "\u{1F4A7}",
+        nombre: "El agua",
+        vigila: "Si el agua esta buena para los peces.",
+        ayuda: "Junta la temperatura, el pH, el oxigeno y el nitrato en una sola nota del 0 al 100. Mientras mas alta, mejor esta el agua.",
+    },
+    TILAPIA_GROWTH_TEMPERATURE: {
+        emoji: "\u{1F41F}",
+        nombre: "El crecimiento",
+        vigila: "Si los peces crecen como deberian.",
+        ayuda: "Compara cuanto deberian crecer con la temperatura que hay, contra lo que se midio la ultima vez que se pesaron.",
+    },
+    SVM_OD_FORECAST_1H: {
+        emoji: "\u{1F4A8}",
+        nombre: "El oxigeno",
+        vigila: "Si va a faltar oxigeno dentro de una hora.",
+        ayuda: "Mira como venia el agua en las ultimas horas para adivinar el oxigeno de la proxima hora.",
+    },
+    LIGHT_FEED_RESPONSE_CLASSIFIER_V1: {
+        emoji: "☀️",
+        nombre: "La luz",
+        vigila: "Si la luz ayuda a que los peces coman.",
+        ayuda: "Necesita un sensor de luz dentro del agua y que se anote cuanto comen. Todavia no esta instalado.",
+    },
 };
 
-const modelIcons = {
-    [MODEL_CODES.ica]: Connection,
-    [MODEL_CODES.growth]: TrendCharts,
-    [MODEL_CODES.svm]: DataAnalysis,
-    [MODEL_CODES.light]: Sunny,
+const ESTADOS = {
+    vigilando: { texto: "Vigilando", tono: "ok", explica: "Esta encendido. Si algo se sale de lo normal, avisa solo." },
+    apagado: { texto: "Falta encenderlo", tono: "aviso", explica: "Ya sabe hacer la cuenta, pero nadie le ha dicho todavia a partir de que punto debe avisar." },
+    sin_datos: { texto: "Le faltan datos", tono: "off", explica: "No puede trabajar porque le faltan mediciones que hoy nadie registra." },
+    pensando: { texto: "Pensando...", tono: "calc", explica: "Esta haciendo la cuenta en este momento." },
+};
+
+/* Bandas oficiales del backend (models_engine/deterministic/water_quality.py) */
+const notaAgua = (valor) => {
+    const n = Number(valor);
+    if (!Number.isFinite(n)) return null;
+    if (n >= 90) return "Excelente";
+    if (n >= 70) return "Buena";
+    if (n >= 50) return "Regular";
+    if (n >= 25) return "Mala";
+    return "Muy mala";
+};
+
+const GRAVEDAD = {
+    emergencia: { texto: "Urgente", tono: "malo" },
+    critico: { texto: "Grave", tono: "malo" },
+    advertencia: { texto: "Ojo", tono: "aviso" },
 };
 
 const loading = ref(false);
@@ -41,7 +68,8 @@ const scenarioLoading = ref(false);
 const errorMessage = ref("");
 const response = ref(null);
 const lightScenarioResult = ref(null);
-const selectedCode = ref(new URLSearchParams(window.location.search).get("modelo") || MODEL_CODES.ica);
+const detalle = ref(null);
+const verAjustes = ref([]);
 const piscigranjas = ref([]);
 const piscinas = ref([]);
 const requestController = ref(null);
@@ -63,72 +91,116 @@ const lightScenario = ref({
 });
 
 const windowOptions = [
-    { value: 6, label: "Ultimas 6 horas" },
-    { value: 24, label: "Ultimas 24 horas" },
-    { value: 168, label: "Ultimos 7 dias" },
-    { value: 720, label: "Ultimos 30 dias" },
+    { value: 6, label: "Las ultimas 6 horas" },
+    { value: 24, label: "El ultimo dia" },
+    { value: 168, label: "La ultima semana" },
+    { value: 720, label: "El ultimo mes" },
 ];
 
 const models = computed(() => response.value?.models ?? []);
 const summary = computed(() => response.value?.summary ?? {});
 const light = computed(() => response.value?.light ?? {});
-const events = computed(() => response.value?.events ?? []);
+const avisos = computed(() => response.value?.events ?? []);
 const observations = computed(() => response.value?.technical_observations ?? []);
-const activeModel = computed(() => models.value.find((model) => model.code === selectedCode.value) ?? models.value[0] ?? null);
-const isLight = computed(() => activeModel.value?.code === MODEL_CODES.light);
-const activeChart = computed(() => {
-    if (isLight.value && lightScenarioResult.value?.chart) return lightScenarioResult.value.chart;
-    return activeModel.value?.projection?.chart ?? null;
+const calculando = computed(() => Boolean(response.value?.meta?.warming));
+
+/* ---------------- La unica respuesta que importa ---------------- */
+const estadoGeneral = computed(() => {
+    if (loading.value && !response.value) {
+        return { emoji: "⏳", titulo: "Un momento", frase: "Estamos mirando la piscina.", tono: "calc" };
+    }
+    if (errorMessage.value) {
+        return { emoji: "\u{1F50C}", titulo: "No pudimos mirar", frase: "Vuelve a intentar en un momento.", tono: "off" };
+    }
+    const n = avisos.value.length;
+    if (n > 0) {
+        return {
+            emoji: "\u{1F6A8}",
+            titulo: "Revisa la piscina",
+            frase: n === 1 ? "Hay 1 aviso sin atender." : "Hay " + n + " avisos sin atender.",
+            tono: "malo",
+        };
+    }
+    if (Number(summary.value.can_emit ?? 0) > 0) {
+        return { emoji: "✅", titulo: "Todo esta bien", frase: "Nada fuera de lo normal ahora mismo.", tono: "ok" };
+    }
+    return { emoji: "\u{1F319}", titulo: "Nadie esta vigilando", frase: "Falta encender al menos un vigilante.", tono: "off" };
 });
-const lightLevel = computed(() => Number(
-    lightScenarioResult.value?.twin?.light_level
-    ?? light.value.latest_value
-    ?? lightScenario.value.current_lux
-    ?? 0,
-));
-const lightMode = computed(() => {
-    if (lightScenarioResult.value) return "manual";
-    if (light.value.latest_value !== null && light.value.latest_value !== undefined) return "observed";
-    return "unavailable";
-});
-const lightPhase = computed(() => lightScenarioResult.value?.twin?.phase ?? "sin fase medida");
-const dataSourceLabel = computed(() => ({
-    fastapi_model_alert_contract: "Alarmas calculadas por FastAPI local",
-    legacy_fastapi_adapter: "Datos locales disponibles",
-    unavailable: "Backend no disponible",
-}[response.value?.meta?.source] ?? "FastAPI local"));
 
-const formatNumber = (value, unit = "") => {
-    if (value === null || value === undefined || value === "") return "N/D";
-    const number = Number(value);
-    if (!Number.isFinite(number)) return "N/D";
-    const formatted = number.toLocaleString("es-PE", { maximumFractionDigits: 3 });
-    return unit ? `${formatted} ${unit}` : formatted;
+/* ---------------- Los vigilantes, en simple ---------------- */
+const vigilantes = computed(() => models.value.map((m) => {
+    const base = VIGILANTES[m.code] ?? { emoji: "\u{1F514}", nombre: m.name, vigila: m.purpose, ayuda: m.purpose };
+    let estado = ESTADOS.sin_datos;
+    if (m.alarm_state === "warming" || calculando.value) estado = ESTADOS.pensando;
+    else if (m.can_emit) estado = ESTADOS.vigilando;
+    else if (m.maturity === "ready_for_policy") estado = ESTADOS.apagado;
+
+    /* Si no esta trabajando, no mostramos un numero: confunde. */
+    let dato = null;
+    if (estado !== ESTADOS.sin_datos) {
+        if (m.code === "WATER_QUALITY_INDEX_ICA") {
+            const nota = notaAgua(m.current_value);
+            if (nota) dato = { grande: nota, chico: "nota " + Math.round(Number(m.current_value)) + " de 100" };
+        } else if (m.current_value !== null && m.current_value !== undefined) {
+            dato = {
+                grande: Number(m.current_value).toLocaleString("es-PE", { maximumFractionDigits: 1 }),
+                chico: m.unit ?? "",
+            };
+        }
+    }
+
+    return { ...base, estado, dato, raw: m };
+}));
+
+/* El backend redacta para un tecnico. Aqui se dice en simple. */
+const mensajeSimple = (a) => {
+    const code = a?.model?.code;
+    /* el backend manda predicted_value; el controlador de Laravel lo reexpone como value */
+    const v = Number(a?.predicted_value ?? a?.value);
+    if (code === "WATER_QUALITY_INDEX_ICA" && Number.isFinite(v)) {
+        return "La nota del agua esta en " + Math.round(v) + " de 100 (" + notaAgua(v) + ").";
+    }
+    if (code === "SVM_OD_FORECAST_1H" && Number.isFinite(v)) {
+        return "El oxigeno puede llegar a " + v.toLocaleString("es-PE", { maximumFractionDigits: 1 }) + " mg/L dentro de una hora.";
+    }
+    if (code === "TILAPIA_GROWTH_TEMPERATURE") {
+        return "El crecimiento se esta saliendo de lo esperado.";
+    }
+    if (code === "LIGHT_FEED_RESPONSE_CLASSIFIER_V1") {
+        return "La luz no esta acompanando la alimentacion.";
+    }
+    return a?.message ?? "";
 };
 
-const formatDate = (value) => {
-    if (!value) return "N/D";
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? "N/D" : date.toLocaleString("es-PE");
+const reglaEnPalabras = (m) => {
+    const p = m?.policy;
+    if (!p || p.status !== "approved" || p.threshold === null || p.threshold === undefined) return null;
+    const dir = { lt: "baje de", lte: "baje de o llegue a", gt: "pase de", gte: "llegue o pase de" }[p.operator] ?? "llegue a";
+    const cosa = m.code === "WATER_QUALITY_INDEX_ICA" ? "la nota del agua" : "el valor";
+    return "Avisa cuando " + cosa + " " + dir + " " + Number(p.threshold).toLocaleString("es-PE") + ".";
 };
 
-const maturityLabel = (maturity) => ({
-    active: "Activo",
-    ready_for_policy: "Listo para politica",
-    shadow: "Modo sombra",
-    collecting_data: "Recopilando datos",
-    blocked_inputs: "Bloqueado por datos",
-    candidate: "Candidato",
-}[maturity] ?? "Sin evaluar");
+const faltantes = (m) => (m?.missing_inputs ?? []);
+const esLuz = (m) => m?.code === "LIGHT_FEED_RESPONSE_CLASSIFIER_V1";
 
-const maturityClass = (maturity) => {
-    if (maturity === "active") return "state-active";
-    if (["ready_for_policy", "shadow", "collecting_data"].includes(maturity)) return "state-review";
-    return "state-blocked";
+const graficoDe = (m) => {
+    if (esLuz(m) && lightScenarioResult.value?.chart) return lightScenarioResult.value.chart;
+    return m?.projection?.chart ?? null;
 };
 
-const alarmLabel = (model) => model?.can_emit ? "Puede emitir" : "No emite alarmas";
+const cuando = (value) => {
+    if (!value) return "";
+    const d = new Date(value);
+    return Number.isNaN(d.getTime())
+        ? ""
+        : d.toLocaleString("es-PE", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+};
 
+const nombreDe = (code) => VIGILANTES[code]?.nombre ?? "Un vigilante";
+const gravedadDe = (sev) => GRAVEDAD[sev] ?? GRAVEDAD.advertencia;
+const textoNota = (o) => (typeof o === "string" ? o : o?.message ?? "");
+
+/* ---------------- Carga ---------------- */
 const loadPiscigranjas = async () => {
     try {
         const { data } = await axios.get(route("piscigranjas.options"));
@@ -145,7 +217,7 @@ const loadPiscinas = async () => {
     }
     try {
         const { data } = await axios.get(route("piscigranjas.piscinas", filters.value.piscigranja_id));
-        piscinas.value = data ?? [];
+        piscinas.value = data.data ?? [];
     } catch {
         piscinas.value = [];
     }
@@ -157,7 +229,6 @@ const loadDashboard = async (refresh = false) => {
     requestController.value = controller;
     loading.value = true;
     errorMessage.value = "";
-
     try {
         const { data } = await axios.get(route("monitoreo.alarmasmodelos.datos"), {
             params: {
@@ -168,20 +239,15 @@ const loadDashboard = async (refresh = false) => {
             signal: controller.signal,
         });
         response.value = data;
-        if (!models.value.some((model) => model.code === selectedCode.value)) {
-            selectedCode.value = models.value[0]?.code ?? MODEL_CODES.ica;
-        }
         if (light.value.latest_value !== null && light.value.latest_value !== undefined) {
             lightScenario.value.current_lux = Number(light.value.latest_value);
             lightScenario.value.maximum_lux = Math.max(1, Number(light.value.latest_value));
         }
         clearTimeout(warmupTimer.value);
-        if (data?.meta?.warming) {
-            warmupTimer.value = setTimeout(() => loadDashboard(false), 3000);
-        }
+        if (data?.meta?.warming) warmupTimer.value = setTimeout(() => loadDashboard(false), 3000);
     } catch (error) {
         if (error?.code !== "ERR_CANCELED") {
-            errorMessage.value = error?.response?.data?.message ?? "No se pudo cargar el estado de las alarmas de modelos.";
+            errorMessage.value = error?.response?.data?.message ?? "No se pudo leer el estado de la piscina.";
         }
     } finally {
         if (requestController.value === controller) loading.value = false;
@@ -201,34 +267,30 @@ const changeFarm = async () => {
 
 const runLightScenario = async () => {
     scenarioLoading.value = true;
-    errorMessage.value = "";
     try {
         const { data } = await axios.post(route("monitoreo.alarmasmodelos.luz.escenario"), lightScenario.value);
         lightScenarioResult.value = data;
     } catch (error) {
-        errorMessage.value = error?.response?.data?.message ?? "No se pudo calcular el escenario manual de luz.";
+        errorMessage.value = error?.response?.data?.message ?? "No se pudo calcular el escenario de luz.";
     } finally {
         scenarioLoading.value = false;
     }
 };
 
-const selectModel = (code) => {
-    selectedCode.value = code;
-    if (code === MODEL_CODES.light && !lightScenarioResult.value) runLightScenario();
+const abrirDetalle = (v) => {
+    detalle.value = v;
+    if (esLuz(v.raw) && !lightScenarioResult.value) runLightScenario();
 };
 
 const openTwin = () => {
-    const query = new URLSearchParams({ modelo: activeModel.value?.code ?? MODEL_CODES.ica });
+    const query = new URLSearchParams({ modelo: detalle.value?.raw?.code ?? "WATER_QUALITY_INDEX_ICA" });
     if (filters.value.piscina_id !== "T") query.set("piscina_id", filters.value.piscina_id);
-    window.location.assign(`${route("monitoreo.gemelodigitals.index")}?${query.toString()}`);
+    window.location.assign(route("monitoreo.gemelodigitals.index") + "?" + query.toString());
 };
-
-const openModels = () => window.location.assign(route("monitoreo.modelosmls.index"));
 
 onMounted(async () => {
     await Promise.all([loadPiscigranjas(), loadPiscinas()]);
     await loadDashboard(false);
-    if (selectedCode.value === MODEL_CODES.light) runLightScenario();
     window.Echo?.private("alarmas.modelos").listen(".alarma.generada", () => loadDashboard(false));
 });
 
@@ -242,447 +304,272 @@ onBeforeUnmount(() => {
 
 <template>
     <App :title="title" :toolbar="toolbar">
-        <section class="page-heading mb-6">
-            <div>
-                <div class="text-gray-500 fs-7 mb-1">Predicciones, evidencia y disponibilidad real</div>
-                <h2 class="fs-2 fw-bold text-dark mb-2">Alarmas de modelos</h2>
-                <p class="text-gray-600 fs-6 mb-0">Solo aparecen como productivas las condiciones calculadas por un modelo activo y una politica aprobada.</p>
-            </div>
-            <div class="page-actions">
-                <el-button :icon="ArrowLeft" @click="openModels">Modelos</el-button>
-                <el-button :icon="SetUp" @click="openTwin">Gemelo digital</el-button>
-                <el-button :icon="RefreshRight" :loading="loading" @click="loadDashboard(true)">Actualizar</el-button>
-            </div>
-        </section>
+        <div class="al">
+            <header class="al__top">
+                <el-button type="primary" round :icon="RefreshRight" :loading="loading" @click="loadDashboard(true)">
+                    Actualizar
+                </el-button>
+            </header>
 
-        <section class="filter-band mb-5">
-            <el-form :model="filters" label-position="top" class="w-100">
-                <div class="row g-4">
-                    <div class="col-md-4">
-                        <el-form-item label="Piscigranja" class="mb-0">
+            <!-- 1. LA RESPUESTA -->
+            <section class="estado" :class="'estado--' + estadoGeneral.tono">
+                <span class="estado__emoji">{{ estadoGeneral.emoji }}</span>
+                <div>
+                    <h2 class="estado__titulo">{{ estadoGeneral.titulo }}</h2>
+                    <p class="estado__frase">{{ estadoGeneral.frase }}</p>
+                </div>
+            </section>
+
+            <!-- 2. LOS AVISOS -->
+            <section v-if="avisos.length" class="avisos">
+                <h3 class="al__seccion">Que paso</h3>
+                <article v-for="a in avisos" :key="a.source_event_id ?? a.id" class="aviso">
+                    <span class="aviso__punto" :class="'punto--' + gravedadDe(a.suggested_severity).tono" />
+                    <div class="aviso__cuerpo">
+                        <strong>{{ nombreDe(a.model?.code) }}</strong>
+                        <span>{{ mensajeSimple(a) }}</span>
+                        <el-popover placement="bottom-start" :width="320" trigger="click">
+                            <template #reference>
+                                <button class="aviso__detalle" type="button">Ver el detalle tecnico</button>
+                            </template>
+                            <p class="pop__d">{{ a.message }}</p>
+                        </el-popover>
+                    </div>
+                    <div class="aviso__lado">
+                        <span class="chip" :class="'chip--' + gravedadDe(a.suggested_severity).tono">
+                            {{ gravedadDe(a.suggested_severity).texto }}
+                        </span>
+                        <time>{{ cuando(a.occurred_at) }}</time>
+                    </div>
+                </article>
+            </section>
+
+            <!-- 3. LOS VIGILANTES -->
+            <section class="al__vig">
+                <h3 class="al__seccion">Quien esta cuidando la piscina</h3>
+                <div class="tarjetas">
+                    <article
+                        v-for="v in vigilantes"
+                        :key="v.raw.code"
+                        class="tarjeta"
+                        :class="'tarjeta--' + v.estado.tono"
+                        role="button"
+                        tabindex="0"
+                        @click="abrirDetalle(v)"
+                        @keyup.enter="abrirDetalle(v)"
+                    >
+                        <el-popover placement="top" :width="260" trigger="click">
+                            <template #reference>
+                                <button class="tarjeta__info" type="button" aria-label="Que hace" @click.stop>
+                                    <el-icon><QuestionFilled /></el-icon>
+                                </button>
+                            </template>
+                            <p class="pop__t">{{ v.nombre }}</p>
+                            <p class="pop__d">{{ v.ayuda }}</p>
+                        </el-popover>
+
+                        <span class="tarjeta__emoji">{{ v.emoji }}</span>
+                        <h4 class="tarjeta__nombre">{{ v.nombre }}</h4>
+
+                        <p v-if="v.dato" class="tarjeta__dato">
+                            <span class="tarjeta__grande">{{ v.dato.grande }}</span>
+                            <span class="tarjeta__chico">{{ v.dato.chico }}</span>
+                        </p>
+                        <p v-else class="tarjeta__dato tarjeta__dato--vacio">&mdash;</p>
+
+                        <span class="chip" :class="'chip--' + v.estado.tono">{{ v.estado.texto }}</span>
+                        <span class="tarjeta__mas">Ver mas</span>
+                    </article>
+                </div>
+            </section>
+
+            <!-- 4. AJUSTES, plegados -->
+            <el-collapse v-model="verAjustes" class="ajustes">
+                <el-collapse-item name="ajustes">
+                    <template #title><span class="ajustes__t">Ajustes</span></template>
+                    <div class="ajustes__grid">
+                        <div>
+                            <label>Piscigranja</label>
                             <el-select v-model="filters.piscigranja_id" filterable @change="changeFarm">
                                 <el-option label="Todas" value="T" />
-                                <el-option v-for="item in piscigranjas" :key="item.id" :label="item.nombre" :value="String(item.id)" />
+                                <el-option v-for="i in piscigranjas" :key="i.id" :label="i.nombre" :value="String(i.id)" />
                             </el-select>
-                        </el-form-item>
-                    </div>
-                    <div class="col-md-4">
-                        <el-form-item label="Piscina" class="mb-0">
-                            <el-select v-model="filters.piscina_id" filterable @change="scheduleReload">
-                                <el-option label="Piscina principal" value="T" />
-                                <el-option v-for="item in piscinas" :key="item.id" :label="item.nombre" :value="String(item.id)" />
-                            </el-select>
-                        </el-form-item>
-                    </div>
-                    <div class="col-md-4">
-                        <el-form-item label="Ventana de evidencia" class="mb-0">
-                            <el-select v-model="filters.ventana_horas" @change="scheduleReload">
-                                <el-option v-for="item in windowOptions" :key="item.value" :label="item.label" :value="item.value" />
-                            </el-select>
-                        </el-form-item>
-                    </div>
-                </div>
-            </el-form>
-        </section>
-
-        <el-alert v-if="errorMessage" class="mb-5" type="warning" :title="errorMessage" show-icon :closable="false" />
-        <el-alert
-            v-else-if="response?.meta?.warming"
-            class="mb-5"
-            type="info"
-            :title="response.meta.message"
-            show-icon
-            :closable="false"
-        />
-        <el-alert
-            v-else-if="response?.meta?.degraded || response?.meta?.stale"
-            class="mb-5"
-            type="warning"
-            :title="response.meta.message"
-            show-icon
-            :closable="false"
-        />
-        <el-alert
-            v-if="response?.meta?.alarm_storage?.available === false"
-            class="mb-5"
-            type="warning"
-            title="El esquema compartido de alarmas aun no esta migrado; las predicciones se muestran sin crear notificaciones."
-            show-icon
-            :closable="false"
-        />
-
-        <section v-if="loading && !response" class="initial-loading mb-6" aria-live="polite">
-            <div class="initial-loading__heading">
-                <el-icon class="is-loading"><RefreshRight /></el-icon>
-                <div><strong>Consultando modelos y evidencia local</strong><span>La pantalla permanece disponible mientras FastAPI prepara los resultados.</span></div>
-            </div>
-            <el-skeleton :rows="5" animated />
-        </section>
-
-        <section v-if="response" class="summary-band mb-6" aria-label="Resumen de alarmas de modelos">
-            <div><span>Alarmas activas</span><strong>{{ summary.active_events ?? 0 }}</strong><small>confirmadas por contrato</small></div>
-            <div><span>Pueden emitir</span><strong>{{ summary.can_emit ?? 0 }}</strong><small>modelo y politica activos</small></div>
-            <div><span>Modo sombra</span><strong>{{ summary.shadow ?? 0 }}</strong><small>sin notificar al productor</small></div>
-            <div><span>Bloqueadas</span><strong>{{ summary.blocked ?? 0 }}</strong><small>datos o etiquetas faltantes</small></div>
-            <div><span>Fuente</span><strong class="summary-band__source">{{ dataSourceLabel }}</strong><small>{{ formatDate(response?.generated_at) }}</small></div>
-        </section>
-
-        <section v-if="response" class="model-grid mb-7" aria-label="Modelos que pueden originar alarmas">
-            <button
-                v-for="model in models"
-                :key="model.code"
-                type="button"
-                :class="['model-card', { 'model-card--active': model.code === activeModel?.code }]"
-                @click="selectModel(model.code)"
-            >
-                <span class="model-card__icon"><el-icon><component :is="modelIcons[model.code] ?? Bell" /></el-icon></span>
-                <span class="model-card__content">
-                    <span class="model-card__topline">
-                        <span :class="['model-state', maturityClass(model.maturity)]">{{ maturityLabel(model.maturity) }}</span>
-                        <span :class="['emission-state', { 'emission-state--enabled': model.can_emit }]">{{ alarmLabel(model) }}</span>
-                    </span>
-                    <strong>{{ model.name }}</strong>
-                    <span>{{ model.purpose }}</span>
-                    <small>{{ model.horizon }}</small>
-                </span>
-            </button>
-        </section>
-
-        <template v-if="activeModel">
-            <section class="detail-heading mb-5">
-                <div class="detail-heading__identity">
-                    <span class="detail-heading__icon"><el-icon><component :is="modelIcons[activeModel.code] ?? Bell" /></el-icon></span>
-                    <div>
-                        <div class="d-flex align-items-center flex-wrap gap-2 mb-1">
-                            <h3 class="fs-3 fw-bold text-dark mb-0">{{ activeModel.name }}</h3>
-                            <span :class="['model-state', maturityClass(activeModel.maturity)]">{{ maturityLabel(activeModel.maturity) }}</span>
                         </div>
-                        <p class="text-gray-600 fs-7 mb-0">{{ activeModel.status_detail }}</p>
+                        <div>
+                            <label>Piscina</label>
+                            <el-select v-model="filters.piscina_id" filterable @change="scheduleReload">
+                                <el-option label="Principal" value="T" />
+                                <el-option v-for="i in piscinas" :key="i.id" :label="i.nombre" :value="String(i.id)" />
+                            </el-select>
+                        </div>
+                        <div>
+                            <label>Que periodo mirar</label>
+                            <el-select v-model="filters.ventana_horas" @change="scheduleReload">
+                                <el-option v-for="i in windowOptions" :key="i.value" :label="i.label" :value="i.value" />
+                            </el-select>
+                        </div>
                     </div>
-                </div>
-                <el-button :icon="SetUp" @click="openTwin">Abrir en gemelo</el-button>
-            </section>
+                </el-collapse-item>
+            </el-collapse>
 
-            <section class="evidence-band mb-6">
-                <div><span>Valor reciente</span><strong>{{ formatNumber(activeModel.current_value, activeModel.unit) }}</strong><small>{{ formatDate(activeModel.data_timestamp) }}</small></div>
-                <div><span>Horizonte</span><strong>{{ activeModel.horizon }}</strong><small>{{ activeModel.alarm_code }}</small></div>
-                <div><span>Politica</span><strong>{{ activeModel.policy?.status === "approved" ? "Aprobada" : "Borrador" }}</strong><small>{{ activeModel.policy?.condition }}</small></div>
-                <div><span>Emision</span><strong>{{ alarmLabel(activeModel) }}</strong><small>{{ activeModel.can_emit ? "Evento productivo habilitado" : "Sin evento para el productor" }}</small></div>
-            </section>
+            <!-- 5. DETALLE: aqui vive todo lo tecnico -->
+            <el-drawer :model-value="Boolean(detalle)" :with-header="false" size="520px" @close="detalle = null">
+                <div v-if="detalle" class="det">
+                    <header class="det__top">
+                        <span class="det__emoji">{{ detalle.emoji }}</span>
+                        <div>
+                            <h3>{{ detalle.nombre }}</h3>
+                            <span class="chip" :class="'chip--' + detalle.estado.tono">{{ detalle.estado.texto }}</span>
+                        </div>
+                    </header>
 
-            <section class="model-context mb-6">
-                <div>
-                    <h4 class="fs-5 fw-bold text-dark mb-2">Variables utilizadas</h4>
-                    <div class="input-list"><span v-for="input in activeModel.inputs" :key="input">{{ input }}</span></div>
-                </div>
-                <div>
-                    <h4 class="fs-5 fw-bold text-dark mb-2">Condiciones pendientes</h4>
-                    <ul v-if="activeModel.missing_inputs?.length" class="pending-list mb-0">
-                        <li v-for="input in activeModel.missing_inputs" :key="input">{{ input }}</li>
-                    </ul>
-                    <p v-else class="text-gray-600 fs-7 mb-0">Validacion de la politica, persistencia, severidad y ejecucion en sombra.</p>
-                </div>
-            </section>
+                    <p class="det__vigila">{{ detalle.vigila }}</p>
+                    <p class="det__explica">{{ detalle.estado.explica }}</p>
 
-            <section v-if="isLight" class="light-workbench mb-6">
-                <div class="light-readiness">
-                    <div>
-                        <span class="text-gray-500 fs-8 fw-semibold text-uppercase">Sensor de luz</span>
-                        <strong>{{ light.sensor_registered ? "Registrado" : "No registrado" }}</strong>
-                        <small>{{ light.observation_count ?? 0 }} lecturas reconocidas</small>
+                    <div v-if="detalle.dato" class="det__valor">
+                        <span class="det__grande">{{ detalle.dato.grande }}</span>
+                        <span class="det__chico">{{ detalle.dato.chico }}</span>
                     </div>
-                    <div>
-                        <span class="text-gray-500 fs-8 fw-semibold text-uppercase">Ultima lectura</span>
-                        <strong>{{ formatNumber(light.latest_value, light.unit) }}</strong>
-                        <small>{{ formatDate(light.latest_at) }}</small>
+
+                    <div v-if="reglaEnPalabras(detalle.raw)" class="det__regla">
+                        <strong>La regla</strong>
+                        <p>{{ reglaEnPalabras(detalle.raw) }}</p>
                     </div>
-                    <div>
-                        <span class="text-gray-500 fs-8 fw-semibold text-uppercase">Alarma</span>
-                        <strong>No habilitada</strong>
-                        <small>Falta artefacto activo y politica aprobada</small>
+
+                    <div v-if="faltantes(detalle.raw).length" class="det__falta">
+                        <strong>Le falta</strong>
+                        <ul>
+                            <li v-for="f in faltantes(detalle.raw)" :key="f">{{ f }}</li>
+                        </ul>
                     </div>
-                </div>
 
-                <div class="scenario-controls mt-5">
-                    <div><label>Intensidad maxima (lux)</label><el-input-number v-model="lightScenario.maximum_lux" :min="0" :max="200000" :step="50" controls-position="right" /></div>
-                    <div><label>Fotoperiodo (horas)</label><el-input-number v-model="lightScenario.photoperiod_hours" :min="0" :max="24" :step="0.5" controls-position="right" /></div>
-                    <div><label>Inicio de luz (hora)</label><el-input-number v-model="lightScenario.dawn_hour" :min="0" :max="23.5" :step="0.5" controls-position="right" /></div>
-                    <div><label>Horizonte (horas)</label><el-select v-model="lightScenario.horizon_hours"><el-option :value="12" label="12 horas" /><el-option :value="24" label="24 horas" /><el-option :value="48" label="48 horas" /><el-option :value="72" label="72 horas" /></el-select></div>
-                    <el-button type="primary" :icon="Sunny" :loading="scenarioLoading" @click="runLightScenario">Proyectar escenario</el-button>
-                </div>
-                <p class="scenario-disclaimer mb-0">Escenario manual de protocolo. No usa un artefacto entrenado y no se guarda como prediccion real.</p>
-            </section>
+                    <el-collapse class="det__mas">
+                        <el-collapse-item v-if="graficoDe(detalle.raw)" title="Ver el grafico" name="g">
+                            <ChartFisheye :option="graficoDe(detalle.raw)" style="height: 260px" />
+                        </el-collapse-item>
 
-            <section v-if="activeChart" class="projection-panel mb-6">
-                <div class="projection-panel__heading">
-                    <div>
-                        <span class="text-gray-500 fs-8 fw-semibold text-uppercase">{{ isLight ? "Escenario y serie disponible" : "Evidencia del modelo" }}</span>
-                        <h4 class="fs-5 fw-bold text-dark mb-0">{{ isLight ? "Dinamica luminosa" : "Observado y proyectado" }}</h4>
-                    </div>
-                    <span v-if="isLight && lightScenarioResult" class="manual-badge">Escenario manual</span>
-                </div>
-                <ChartFisheye :options="activeChart" height="380px" />
-            </section>
+                        <el-collapse-item v-if="esLuz(detalle.raw)" title="Probar un escenario de luz" name="l">
+                            <div class="luz">
+                                <div>
+                                    <label>Luz maxima (lux)</label>
+                                    <el-input-number v-model="lightScenario.maximum_lux" :min="0" :max="200000" :step="50" controls-position="right" />
+                                </div>
+                                <div>
+                                    <label>Horas de luz</label>
+                                    <el-input-number v-model="lightScenario.photoperiod_hours" :min="0" :max="24" :step="0.5" controls-position="right" />
+                                </div>
+                                <div>
+                                    <label>Hora de amanecer</label>
+                                    <el-input-number v-model="lightScenario.dawn_hour" :min="0" :max="23.5" :step="0.5" controls-position="right" />
+                                </div>
+                                <el-button type="primary" :loading="scenarioLoading" @click="runLightScenario">Calcular</el-button>
+                            </div>
+                        </el-collapse-item>
 
-            <template v-if="isLight">
-                <section class="twin-heading mb-3">
-                    <div><span class="text-gray-500 fs-8 fw-semibold text-uppercase">Gemelo digital</span><h4 class="fs-5 fw-bold text-dark mb-0">Piscina bajo el escenario luminoso</h4></div>
-                    <span class="text-gray-500 fs-8">{{ lightMode === "observed" ? "Dato observado" : lightMode === "manual" ? "Escenario manual" : "Sin sensor" }}</span>
-                </section>
-                <PiscinaDigital3D
-                    :quality-index="70"
-                    :temperature-c="28"
-                    :average-weight-g="0"
-                    :projected-weight-g="0"
-                    :estimated-fish-count="0"
-                    :focused-model="activeModel.name"
-                    :light-level-lux="lightLevel"
-                    :light-mode="lightMode"
-                    :light-phase="lightPhase"
-                />
-                <div class="alarm-preview mt-4 mb-7">
-                    <el-icon><Warning /></el-icon>
-                    <div><strong>Alarma de luz no emitida</strong><span>{{ lightScenarioResult?.alarm_preview?.message ?? light.alarm?.message }}</span></div>
-                </div>
-            </template>
-        </template>
+                        <el-collapse-item v-if="detalle.raw.formula" title="Como lo calcula" name="f">
+                            <p class="det__mono">{{ detalle.raw.formula.expression }}</p>
+                            <p class="det__nota">{{ detalle.raw.formula.detail }}</p>
+                            <ul v-if="detalle.raw.formula.conditions">
+                                <li v-for="c in detalle.raw.formula.conditions" :key="c">{{ c }}</li>
+                            </ul>
+                        </el-collapse-item>
 
-        <section v-if="response" class="events-section mb-7">
-            <div class="section-heading mb-4">
-                <div><span class="text-gray-500 fs-8 fw-semibold text-uppercase">Contrato productivo</span><h3 class="fs-5 fw-bold text-dark mb-0">Eventos de modelos</h3></div>
-                <span class="text-gray-500 fs-8">{{ events.length }} eventos</span>
-            </div>
-            <el-empty v-if="!events.length" :image-size="72" description="Ningun modelo activo ha emitido una alarma productiva." />
-            <el-table v-else :data="events" stripe table-layout="fixed">
-                <el-table-column prop="occurred_at" label="Fecha" width="180"><template #default="scope">{{ formatDate(scope.row.occurred_at) }}</template></el-table-column>
-                <el-table-column prop="model.code" label="Modelo" min-width="190" />
-                <el-table-column prop="title" label="Alarma" min-width="240" />
-                <el-table-column prop="suggested_severity" label="Severidad" width="120" />
-                <el-table-column prop="event_type" label="Evento" width="120" />
-            </el-table>
-            <p v-if="observations.length" class="legacy-note mt-4 mb-0">{{ observations.length }} observacion(es) tecnicas heredadas se conservaron como evidencia y no se cuentan como alarmas productivas.</p>
-        </section>
+                        <el-collapse-item v-if="detalle.raw.policy?.rationale" title="Por que ese limite" name="p">
+                            <p class="det__nota">{{ detalle.raw.policy.rationale }}</p>
+                        </el-collapse-item>
+
+                        <el-collapse-item v-if="observations.length" title="Notas tecnicas" name="o">
+                            <ul>
+                                <li v-for="(o, i) in observations" :key="i">{{ textoNota(o) }}</li>
+                            </ul>
+                        </el-collapse-item>
+                    </el-collapse>
+
+                    <el-button class="det__twin" :icon="SetUp" @click="openTwin">Abrir en el gemelo digital</el-button>
+                </div>
+            </el-drawer>
+        </div>
     </App>
 </template>
 
 <style scoped>
-.page-heading,
-.page-actions,
-.summary-band,
-.model-card,
-.model-card__topline,
-.detail-heading,
-.detail-heading__identity,
-.evidence-band,
-.model-context,
-.light-readiness,
-.scenario-controls,
-.projection-panel__heading,
-.twin-heading,
-.alarm-preview,
-.section-heading {
-    display: flex;
-    align-items: center;
-}
+.al { max-width: 980px; margin: 0 auto; padding: 8px 0 48px; }
+.al__top { display: flex; align-items: center; justify-content: flex-end; margin-bottom: 16px; }
+.al__seccion { font-size: 15px; font-weight: 700; color: #6b7280; margin: 32px 0 12px; }
 
-.page-heading,
-.detail-heading,
-.projection-panel__heading,
-.twin-heading,
-.section-heading {
-    justify-content: space-between;
-    gap: 20px;
-}
+.estado { display: flex; align-items: center; gap: 20px; padding: 28px 32px; border-radius: 20px; border: 2px solid; }
+.estado__emoji { font-size: 56px; line-height: 1; }
+.estado__titulo { font-size: 28px; font-weight: 800; margin: 0 0 4px; }
+.estado__frase { font-size: 16px; margin: 0; opacity: .8; }
+.estado--ok { background: #f0fdf4; border-color: #86efac; color: #166534; }
+.estado--malo { background: #fef2f2; border-color: #fca5a5; color: #991b1b; }
+.estado--aviso { background: #fffbeb; border-color: #fcd34d; color: #92400e; }
+.estado--off { background: #f9fafb; border-color: #e5e7eb; color: #4b5563; }
+.estado--calc { background: #eff6ff; border-color: #93c5fd; color: #1e40af; }
 
-.page-heading { align-items: flex-end; }
-.page-actions { gap: 8px; flex-wrap: wrap; }
+.aviso { display: flex; align-items: flex-start; gap: 14px; padding: 16px 18px; background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; margin-bottom: 10px; }
+.aviso__punto { width: 12px; height: 12px; border-radius: 50%; margin-top: 6px; flex: none; }
+.punto--malo { background: #ef4444; }
+.punto--aviso { background: #f59e0b; }
+.aviso__cuerpo { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.aviso__cuerpo strong { font-size: 16px; color: #1f2937; }
+.aviso__cuerpo span { font-size: 14px; color: #6b7280; }
+.aviso__detalle { align-self: flex-start; margin-top: 4px; border: 0; background: transparent; padding: 0; font-size: 12px; color: #9ca3af; cursor: pointer; text-decoration: underline; }
+.aviso__detalle:hover { color: #4b5563; }
+.aviso__lado { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.aviso__lado time { font-size: 12px; color: #9ca3af; white-space: nowrap; }
 
-.filter-band,
-.initial-loading,
-.summary-band,
-.evidence-band,
-.light-workbench,
-.projection-panel,
-.events-section {
-    border: 1px solid #e1e7ef;
-    background: #ffffff;
-}
+.tarjetas { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+.tarjeta { position: relative; background: #fff; border: 1px solid #e5e7eb; border-radius: 18px; padding: 22px 18px 16px; text-align: center; cursor: pointer; transition: transform .15s, box-shadow .15s, border-color .15s; }
+.tarjeta:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0, 0, 0, .07); }
+.tarjeta--ok { border-color: #bbf7d0; }
+.tarjeta--aviso { border-color: #fde68a; }
+.tarjeta--calc { border-color: #bfdbfe; }
+.tarjeta__info { position: absolute; top: 10px; right: 10px; border: 0; background: transparent; color: #d1d5db; cursor: pointer; padding: 4px; }
+.tarjeta__info:hover { color: #6b7280; }
+.tarjeta__emoji { font-size: 40px; display: block; line-height: 1; }
+.tarjeta__nombre { font-size: 17px; font-weight: 700; color: #1f2937; margin: 10px 0 8px; }
+.tarjeta__dato { margin: 0 0 12px; display: flex; flex-direction: column; gap: 2px; }
+.tarjeta__grande { font-size: 24px; font-weight: 800; color: #111827; }
+.tarjeta__chico { font-size: 12px; color: #9ca3af; }
+.tarjeta__dato--vacio { font-size: 24px; color: #d1d5db; }
+.tarjeta__mas { display: block; margin-top: 10px; font-size: 12px; color: #9ca3af; }
 
-.filter-band { padding: 18px 20px; }
-.filter-band :deep(.el-select) { width: 100%; }
+.chip { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+.chip--ok { background: #dcfce7; color: #166534; }
+.chip--aviso { background: #fef3c7; color: #92400e; }
+.chip--malo { background: #fee2e2; color: #991b1b; }
+.chip--off { background: #f3f4f6; color: #6b7280; }
+.chip--calc { background: #dbeafe; color: #1e40af; }
 
-.initial-loading { padding: 22px; }
-.initial-loading__heading { display: flex; align-items: flex-start; gap: 11px; margin-bottom: 20px; color: #0b7cff; }
-.initial-loading__heading strong,
-.initial-loading__heading span { display: block; }
-.initial-loading__heading strong { color: #172033; font-size: 14px; }
-.initial-loading__heading span { color: #64748b; font-size: 12px; margin-top: 3px; }
+.pop__t { font-weight: 700; margin: 0 0 4px; }
+.pop__d { margin: 0; font-size: 13px; color: #4b5563; line-height: 1.5; }
 
-.summary-band,
-.evidence-band,
-.light-readiness {
-    align-items: stretch;
-    overflow-x: auto;
-}
+.ajustes { margin-top: 36px; border-top: 1px solid #e5e7eb; }
+.ajustes__t { font-weight: 700; color: #6b7280; }
+.ajustes__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+.ajustes__grid label { display: block; font-size: 13px; color: #6b7280; margin-bottom: 6px; }
+.ajustes__grid :deep(.el-select) { width: 100%; }
 
-.summary-band > div,
-.evidence-band > div,
-.light-readiness > div {
-    min-width: 170px;
-    flex: 1;
-    padding: 15px 18px;
-    border-right: 1px solid #edf1f5;
-}
-
-.summary-band > div:last-child,
-.evidence-band > div:last-child,
-.light-readiness > div:last-child { border-right: 0; }
-
-.summary-band span,
-.summary-band small,
-.evidence-band span,
-.evidence-band small,
-.light-readiness span,
-.light-readiness small {
-    display: block;
-    color: #64748b;
-    font-size: 11px;
-    line-height: 1.45;
-}
-
-.summary-band strong,
-.evidence-band strong,
-.light-readiness strong {
-    display: block;
-    color: #172033;
-    font-size: 22px;
-    line-height: 1.25;
-    margin: 4px 0;
-}
-
-.summary-band .summary-band__source { font-size: 14px; max-width: 210px; }
-
-.model-grid {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 14px;
-}
-
-.model-card {
-    align-items: flex-start;
-    gap: 12px;
-    min-height: 210px;
-    padding: 17px;
-    border: 1px solid #dfe6ee;
-    border-radius: 6px;
-    background: #ffffff;
-    color: inherit;
-    text-align: left;
-    transition: border-color .16s ease, box-shadow .16s ease;
-}
-
-.model-card:hover,
-.model-card--active {
-    border-color: #409eff;
-    box-shadow: 0 7px 20px rgba(30, 74, 120, .09);
-}
-
-.model-card__icon,
-.detail-heading__icon {
-    flex: 0 0 auto;
-    display: grid;
-    place-items: center;
-    width: 38px;
-    height: 38px;
-    border: 1px solid #bddcff;
-    border-radius: 6px;
-    background: #eef7ff;
-    color: #0b7cff;
-    font-size: 20px;
-}
-
-.model-card__content { display: flex; flex: 1; min-width: 0; flex-direction: column; height: 100%; }
-.model-card__topline { justify-content: space-between; gap: 6px; margin-bottom: 12px; }
-.model-card__content > strong { color: #172033; font-size: 14px; line-height: 1.35; }
-.model-card__content > span:not(.model-card__topline) { color: #64748b; font-size: 12px; line-height: 1.5; margin-top: 8px; }
-.model-card__content > small { color: #475569; font-size: 11px; font-weight: 700; margin-top: auto; padding-top: 12px; }
-
-.model-state,
-.emission-state,
-.manual-badge {
-    display: inline-flex;
-    align-items: center;
-    min-height: 22px;
-    padding: 3px 7px;
-    border-radius: 4px;
-    font-size: 10px;
-    font-weight: 700;
-    line-height: 1.2;
-}
-
-.state-active { background: #e8f7ee; color: #13783d; }
-.state-review { background: #fff6df; color: #966000; }
-.state-blocked { background: #f1f3f6; color: #526174; }
-.emission-state { background: #f1f3f6; color: #64748b; }
-.emission-state--enabled { background: #e8f7ee; color: #13783d; }
-.manual-badge { background: #fff3d8; color: #8b5a00; }
-
-.detail-heading__identity { align-items: flex-start; gap: 13px; }
-
-.model-context {
-    align-items: stretch;
-    gap: 0;
-    border-top: 1px solid #e1e7ef;
-    border-bottom: 1px solid #e1e7ef;
-}
-
-.model-context > div { width: 50%; padding: 20px 22px; }
-.model-context > div + div { border-left: 1px solid #e1e7ef; }
-.input-list { display: flex; flex-wrap: wrap; gap: 7px; }
-.input-list span { padding: 5px 8px; border: 1px solid #dce5ef; border-radius: 4px; color: #475569; background: #f8fafc; font-size: 11px; }
-.pending-list { padding-left: 18px; color: #5b6878; font-size: 12px; line-height: 1.7; }
-
-.light-workbench,
-.projection-panel,
-.events-section { padding: 21px; }
-.scenario-controls { align-items: flex-end; display: grid; grid-template-columns: repeat(4, minmax(135px, 1fr)) auto; gap: 12px; }
-.scenario-controls label { display: block; color: #475569; font-size: 11px; font-weight: 700; margin-bottom: 6px; }
-.scenario-controls :deep(.el-input-number),
-.scenario-controls :deep(.el-select) { width: 100%; }
-.scenario-disclaimer { color: #64748b; font-size: 11px; margin-top: 11px; }
-.projection-panel__heading { margin-bottom: 12px; }
-
-.alarm-preview {
-    align-items: flex-start;
-    gap: 11px;
-    padding: 14px 16px;
-    border-left: 3px solid #f59e0b;
-    background: #fffaf0;
-    color: #8a5a05;
-}
-
-.alarm-preview strong,
-.alarm-preview span { display: block; }
-.alarm-preview span { color: #6b7280; font-size: 12px; margin-top: 3px; }
-.legacy-note { color: #64748b; font-size: 11px; }
-
-@media (max-width: 1200px) {
-    .model-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .scenario-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-
-@media (max-width: 768px) {
-    .page-heading,
-    .detail-heading,
-    .projection-panel__heading,
-    .twin-heading,
-    .section-heading { align-items: flex-start; flex-direction: column; }
-    .page-actions { width: 100%; }
-    .model-grid { grid-template-columns: 1fr; }
-    .model-context { flex-direction: column; }
-    .model-context > div { width: 100%; }
-    .model-context > div + div { border-left: 0; border-top: 1px solid #e1e7ef; }
-    .scenario-controls { grid-template-columns: 1fr; }
-    .scenario-controls :deep(.el-button) { width: 100%; }
-}
+.det { padding: 8px 4px 24px; }
+.det__top { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+.det__emoji { font-size: 40px; }
+.det__top h3 { font-size: 22px; font-weight: 800; margin: 0 0 6px; color: #1f2937; }
+.det__vigila { font-size: 16px; color: #1f2937; margin: 0 0 6px; }
+.det__explica { font-size: 14px; color: #6b7280; margin: 0 0 20px; }
+.det__valor { display: flex; align-items: baseline; gap: 8px; padding: 16px; background: #f9fafb; border-radius: 14px; margin-bottom: 18px; }
+.det__grande { font-size: 30px; font-weight: 800; color: #111827; }
+.det__chico { font-size: 13px; color: #9ca3af; }
+.det__regla, .det__falta { padding: 14px 16px; border-radius: 14px; margin-bottom: 12px; }
+.det__regla { background: #eff6ff; }
+.det__falta { background: #fffbeb; }
+.det__regla strong, .det__falta strong { display: block; font-size: 13px; margin-bottom: 4px; }
+.det__regla p { margin: 0; font-size: 15px; }
+.det__falta ul { margin: 0; padding-left: 18px; font-size: 14px; }
+.det__mas { margin-top: 18px; }
+.det__mono { font-family: ui-monospace, Menlo, monospace; font-size: 13px; background: #f3f4f6; padding: 10px; border-radius: 8px; overflow-x: auto; }
+.det__nota { font-size: 13px; color: #4b5563; line-height: 1.6; }
+.det__twin { width: 100%; margin-top: 20px; }
+.luz { display: grid; gap: 12px; }
+.luz label { display: block; font-size: 13px; color: #6b7280; margin-bottom: 4px; }
 </style>
