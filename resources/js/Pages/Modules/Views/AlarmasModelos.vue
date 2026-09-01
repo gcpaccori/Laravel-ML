@@ -229,7 +229,208 @@ const mensajeSimple = (a) => {
 };
 
 const esLuz = (m) => m?.code === "LIGHT_FEED_RESPONSE_CLASSIFIER_V1";
-const graficoDe = (m) => (esLuz(m) && lightScenarioResult.value?.chart ? lightScenarioResult.value.chart : m?.projection?.chart ?? null);
+
+/* ------------------------------------------------------------------ *
+ * Gráficos. El backend manda opciones de ECharts crudas: titulo dentro
+ * del lienzo, toolbox con iconos tecnicos, ejes por defecto. Aqui se
+ * reestilizan para que se lean de lejos, en un proyector.
+ * ------------------------------------------------------------------ */
+const PALETA = ["#2563eb", "#0d9488", "#7c3aed", "#ea580c", "#0891b2"];
+
+const BANDAS_ICA = [
+    { min: 90, max: 100, label: "Excelente", color: "rgba(22,163,74,0.10)" },
+    { min: 70, max: 90, label: "Buena", color: "rgba(132,204,22,0.10)" },
+    { min: 50, max: 70, label: "Regular", color: "rgba(245,158,11,0.10)" },
+    { min: 25, max: 50, label: "Mala", color: "rgba(239,68,68,0.10)" },
+    { min: 0, max: 25, label: "Muy mala", color: "rgba(153,27,27,0.12)" },
+];
+
+const tieneDatos = (chart) => (chart?.series ?? []).some((s) => Array.isArray(s.data) && s.data.length > 0);
+
+const ejeLimpio = (eje, esValor) => ({
+    ...(eje ?? {}),
+    /* el nombre del eje se solapa con la esquina; la unidad ya se dice
+       en el titulo de la seccion y en el tooltip */
+    name: "",
+    nameTextStyle: { color: "#94a3b8", fontSize: 11 },
+    axisLine: { show: false },
+    axisTick: { show: false },
+    axisLabel: { color: "#64748b", fontSize: 12, hideOverlap: true },
+    splitLine: esValor ? { lineStyle: { color: "#f1f5f9", width: 1 } } : { show: false },
+});
+
+const mejorarGrafico = (raw, modelo) => {
+    if (!raw) return null;
+    const o = JSON.parse(JSON.stringify(raw));
+
+    /* el titulo ya esta en la interfaz; el toolbox son iconos que nadie
+       usa mientras se expone */
+    delete o.title;
+    delete o.toolbox;
+
+    o.color = PALETA;
+    o.grid = { top: 22, left: 8, right: 18, bottom: 34, containLabel: true };
+    o.legend = {
+        bottom: 0,
+        icon: "roundRect",
+        itemWidth: 14,
+        itemHeight: 4,
+        itemGap: 18,
+        textStyle: { fontSize: 12, color: "#475569" },
+    };
+    o.tooltip = {
+        ...(o.tooltip ?? {}),
+        trigger: "axis",
+        backgroundColor: "rgba(15,23,42,0.94)",
+        borderWidth: 0,
+        padding: [8, 12],
+        textStyle: { color: "#f8fafc", fontSize: 12 },
+        axisPointer: { type: "line", lineStyle: { color: "#cbd5e1", width: 1 } },
+    };
+
+    o.xAxis = Array.isArray(o.xAxis) ? o.xAxis.map((e) => ejeLimpio(e, false)) : ejeLimpio(o.xAxis, false);
+    o.yAxis = Array.isArray(o.yAxis) ? o.yAxis.map((e) => ejeLimpio(e, true)) : ejeLimpio(o.yAxis, true);
+
+    /* zoom con la rueda, sin la barra inferior que ensucia */
+    o.dataZoom = [{ type: "inside", xAxisIndex: [0], filterMode: "none" }];
+
+    o.series = (o.series ?? []).map((s, i) => {
+        if (s.type === "line") {
+            return {
+                ...s,
+                smooth: 0.25,
+                showSymbol: false,
+                lineStyle: { width: i === 0 ? 3 : 2.5, ...(i > 0 ? { type: "dashed" } : {}) },
+                emphasis: { focus: "series" },
+                areaStyle: i === 0
+                    ? { color: { type: "linear", x: 0, y: 0, x2: 0, y2: 1, colorStops: [
+                        { offset: 0, color: "rgba(37,99,235,0.16)" },
+                        { offset: 1, color: "rgba(37,99,235,0.01)" },
+                    ] } }
+                    : undefined,
+            };
+        }
+        if (s.type === "bar") {
+            return {
+                ...s,
+                barMaxWidth: 26,
+                itemStyle: { ...(s.itemStyle ?? {}), borderRadius: [6, 6, 0, 0] },
+                label: { show: true, position: "top", fontSize: 11, color: "#475569" },
+            };
+        }
+        return s;
+    });
+
+    /* El ICA se entiende solo si se ven las bandas de calidad detras */
+    if (modelo?.code === "WATER_QUALITY_INDEX_ICA" && o.series[0]) {
+        o.yAxis = { ...(Array.isArray(o.yAxis) ? o.yAxis[0] : o.yAxis), min: 0, max: 100, scale: false };
+        o.series[0].markArea = {
+            silent: true,
+            data: BANDAS_ICA.map((b) => ([
+                {
+                    yAxis: b.min,
+                    itemStyle: { color: b.color },
+                    label: {
+                        show: true,
+                        position: "insideTopRight",
+                        offset: [-6, 2],
+                        formatter: b.label,
+                        color: "#94a3b8",
+                        fontSize: 11,
+                    },
+                },
+                { yAxis: b.max },
+            ])),
+        };
+        const umbral = modelo?.policy?.status === "approved" ? Number(modelo.policy.threshold) : null;
+        o.series[0].markLine = Number.isFinite(umbral)
+            ? {
+                silent: true,
+                symbol: "none",
+                data: [{
+                    yAxis: umbral,
+                    label: {
+                        formatter: "Avisa por debajo de " + umbral,
+                        position: "insideStartBottom",
+                        color: "#dc2626",
+                        fontSize: 11,
+                        fontWeight: "bold",
+                        backgroundColor: "rgba(255,255,255,0.85)",
+                        padding: [3, 6],
+                        borderRadius: 4,
+                    },
+                    lineStyle: { color: "#dc2626", type: "dashed", width: 2 },
+                }],
+            }
+            : undefined;
+    }
+
+    return o;
+};
+
+const graficoDe = (m) => {
+    const raw = esLuz(m) && lightScenarioResult.value?.chart ? lightScenarioResult.value.chart : m?.projection?.chart ?? null;
+    if (!tieneDatos(raw)) return null;
+    return mejorarGrafico(raw, m);
+};
+
+const graficoRelacion = (m) => {
+    const raw = m?.relationship?.chart ?? null;
+    if (!tieneDatos(raw)) return null;
+    return mejorarGrafico(raw, null);
+};
+
+/* ------------------------------------------------------------------ *
+ * Metricas. En vez de volcar r2/mae/rmse, se compara el modelo contra
+ * el metodo simple y se dice quien gana.
+ * ------------------------------------------------------------------ */
+const METRICAS = {
+    r2: "Qué tan bien explica los datos (1 es perfecto)",
+    mae: "Error promedio",
+    rmse: "Error promedio, castigando los fallos grandes",
+    cv_best_mae: "Error promedio durante el entrenamiento",
+    validation_r2: "Explicación sobre datos que nunca vio",
+    validation_mae: "Error sobre datos que nunca vio",
+    validation_rmse: "Error grande sobre datos que nunca vio",
+    persistence_r2: "Explicación del método simple",
+    persistence_mae: "Error del método simple",
+    persistence_rmse: "Error grande del método simple",
+};
+
+const comparativa = (m) => {
+    const x = m?.metrics ?? {};
+    const modelo = Number(x.validation_mae ?? x.mae);
+    const simple = Number(x.persistence_mae);
+    if (!Number.isFinite(modelo) || !Number.isFinite(simple)) return null;
+    const ganaModelo = modelo < simple;
+    const veces = simple > 0 ? modelo / simple : null;
+    return {
+        modelo,
+        simple,
+        ganaModelo,
+        veces,
+        frase: ganaModelo
+            ? "El modelo acierta mejor que el método simple. Por eso se le puede confiar una alarma."
+            : "El método simple —suponer que el valor no cambia— acierta mejor que el modelo."
+                + (veces ? " Se equivoca " + veces.toLocaleString("es-PE", { maximumFractionDigits: 0 }) + " veces más." : "")
+                + " Por eso el sistema no le deja disparar alarmas todavía.",
+    };
+};
+
+const metricaTexto = (k) => METRICAS[k] ?? k.replace(/_/g, " ");
+
+/* El grafico del modelo que si esta vigilando va a la vista principal:
+   es el que se proyecta al exponer. */
+const modeloDestacado = computed(() => models.value.find((m) => m.can_emit && graficoDe(m))
+    ?? models.value.find((m) => graficoDe(m))
+    ?? null);
+const graficoDestacado = computed(() => (modeloDestacado.value ? graficoDe(modeloDestacado.value) : null));
+const tituloDestacado = computed(() => {
+    const m = modeloDestacado.value;
+    if (!m) return "";
+    const corto = MODELOS[m.code]?.corto ?? m.name;
+    return "Como viene " + corto.replace(/^El |^La /, (x) => x.toLowerCase());
+});
 const nombreDe = (code) => MODELOS[code]?.corto ?? "Un modelo";
 const gravedadDe = (sev) => GRAVEDAD[sev] ?? GRAVEDAD.advertencia;
 const textoNota = (o) => (typeof o === "string" ? o : o?.message ?? "");
@@ -472,6 +673,18 @@ onBeforeUnmount(() => {
                 </div>
             </section>
 
+            <!-- 4b. GRAFICO PRINCIPAL -->
+            <section v-if="graficoDestacado" class="al__graf">
+                <h3 class="al__seccion">{{ tituloDestacado }}</h3>
+                <div class="graf">
+                    <ChartFisheye :options="graficoDestacado" height="340px" />
+                    <p class="graf__pie">
+                        Las franjas de color son los rangos de calidad. La linea roja es el limite
+                        a partir del cual el sistema avisa.
+                    </p>
+                </div>
+            </section>
+
             <!-- 5. CONFIGURACION DE ALARMAS -->
             <section class="al__cfg">
                 <h3 class="al__seccion">Configuracion de alarmas</h3>
@@ -608,13 +821,15 @@ onBeforeUnmount(() => {
                             </ul>
                         </el-collapse-item>
 
-                        <el-collapse-item v-if="graficoDe(detalle.raw)" title="Grafico" name="g">
-                            <ChartFisheye :option="graficoDe(detalle.raw)" style="height: 280px" />
+                        <el-collapse-item title="Como viene evolucionando" name="g">
+                            <ChartFisheye v-if="graficoDe(detalle.raw)" :options="graficoDe(detalle.raw)" height="300px" />
+                            <p v-else class="vacio">Todavia no hay mediciones suficientes para dibujar la curva.</p>
                         </el-collapse-item>
 
                         <el-collapse-item v-if="detalle.raw.relationship" title="Que variable pesa mas" name="r">
                             <p class="det__nota">{{ detalle.raw.relationship.description }}</p>
-                            <ChartFisheye v-if="detalle.raw.relationship.chart" :option="detalle.raw.relationship.chart" style="height: 240px" />
+                            <ChartFisheye v-if="graficoRelacion(detalle.raw)" :options="graficoRelacion(detalle.raw)" height="260px" />
+                            <p v-else class="vacio">Sin datos para comparar el peso de cada variable.</p>
                         </el-collapse-item>
 
                         <el-collapse-item v-if="esLuz(detalle.raw)" title="Probar un escenario de luz" name="l">
@@ -637,11 +852,34 @@ onBeforeUnmount(() => {
                         </el-collapse-item>
 
                         <el-collapse-item v-if="entradas(detalle.raw.metrics).length" title="Que tan bien acierta" name="m">
-                            <dl class="dl dl--mini">
-                                <div v-for="[k, v] in entradas(detalle.raw.metrics)" :key="k">
-                                    <dt>{{ k }}</dt><dd>{{ typeof v === "number" ? num(v, 4) : v }}</dd>
+                            <div v-if="comparativa(detalle.raw)" class="vs" :class="{ 'vs--pierde': !comparativa(detalle.raw).ganaModelo }">
+                                <div class="vs__lado">
+                                    <span class="vs__k">Este modelo</span>
+                                    <span class="vs__v">{{ num(comparativa(detalle.raw).modelo, 2) }}</span>
+                                    <span class="vs__u">de error</span>
                                 </div>
-                            </dl>
+                                <span class="vs__sep">vs</span>
+                                <div class="vs__lado">
+                                    <span class="vs__k">Metodo simple</span>
+                                    <span class="vs__v">{{ num(comparativa(detalle.raw).simple, 2) }}</span>
+                                    <span class="vs__u">de error</span>
+                                </div>
+                            </div>
+                            <p v-if="comparativa(detalle.raw)" class="vs__frase">{{ comparativa(detalle.raw).frase }}</p>
+                            <p class="det__nota">
+                                El "metodo simple" es no usar inteligencia artificial: suponer que dentro de una hora
+                                el valor sera el mismo de ahora. Un modelo solo vale la pena si le gana a eso.
+                            </p>
+                            <el-collapse class="det__anidado">
+                                <el-collapse-item title="Ver todos los numeros" name="nums">
+                                    <dl class="dl dl--mini">
+                                        <div v-for="[k, v] in entradas(detalle.raw.metrics)" :key="k">
+                                            <dt>{{ metricaTexto(k) }}</dt>
+                                            <dd>{{ typeof v === "number" ? num(v, 4) : v }} <span class="mono vs__key">{{ k }}</span></dd>
+                                        </div>
+                                    </dl>
+                                </el-collapse-item>
+                            </el-collapse>
                         </el-collapse-item>
 
                         <el-collapse-item v-if="detalle.raw.policy?.rationale" title="Por que ese limite" name="p">
@@ -800,6 +1038,22 @@ onBeforeUnmount(() => {
 .checks li { display: flex; gap: 8px; padding: 5px 0; color: #b45309; }
 .checks li.ok { color: #15803d; }
 .checks li span { font-weight: 800; }
+
+.graf { background: #fff; border: 1px solid #e5e7eb; border-radius: 18px; padding: 16px 12px 10px; }
+.graf__pie { font-size: 12px; color: #9ca3af; margin: 6px 0 0; padding: 0 8px; }
+
+.vacio { font-size: 13px; color: #9ca3af; background: #f9fafb; border-radius: 10px; padding: 18px; text-align: center; margin: 0; }
+
+.vs { display: flex; align-items: center; gap: 14px; background: #f0fdf4; border-radius: 14px; padding: 16px; margin-bottom: 10px; }
+.vs--pierde { background: #fffbeb; }
+.vs__lado { flex: 1; display: flex; flex-direction: column; gap: 2px; text-align: center; }
+.vs__k { font-size: 11px; color: #6b7280; text-transform: uppercase; letter-spacing: .04em; }
+.vs__v { font-size: 24px; font-weight: 800; color: #111827; }
+.vs__u { font-size: 11px; color: #9ca3af; }
+.vs__sep { font-size: 12px; font-weight: 700; color: #9ca3af; }
+.vs__frase { font-size: 14px; color: #374151; line-height: 1.6; margin: 0 0 8px; }
+.vs__key { color: #cbd5e1; margin-left: 6px; }
+.det__anidado { margin-top: 10px; }
 
 .pop__t { font-weight: 700; margin: 0 0 4px; }
 .pop__d { margin: 0 0 6px; font-size: 13px; color: #4b5563; line-height: 1.55; }
