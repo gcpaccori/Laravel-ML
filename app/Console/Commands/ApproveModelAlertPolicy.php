@@ -14,6 +14,7 @@ class ApproveModelAlertPolicy extends Command
         'SVM_OD_FORECAST_1H',
         'TILAPIA_GROWTH_TEMPERATURE',
         'LIGHT_FEED_RESPONSE_CLASSIFIER_V1',
+        'PHOTOPERIOD_GREENHOUSE_V1',
     ];
 
     private const OPERATORS = ['lt', 'lte', 'gt', 'gte'];

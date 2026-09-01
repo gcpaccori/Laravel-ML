@@ -20,6 +20,7 @@ class ModelAlarmPersistenceService
         'SVM_OD_FORECAST_1H',
         'OXYGEN_STATUS_MODEL',
         'LIGHT_FEED_RESPONSE_CLASSIFIER_V1',
+        'PHOTOPERIOD_GREENHOUSE_V1',
     ];
 
     private const PARAMETER_BY_MODEL = [
@@ -29,6 +30,7 @@ class ModelAlarmPersistenceService
         'SVM_OD_FORECAST_1H' => 'oxigeno_disuelto',
         'OXYGEN_STATUS_MODEL' => 'oxigeno_disuelto',
         'LIGHT_FEED_RESPONSE_CLASSIFIER_V1' => 'luz_subacuatica',
+        'PHOTOPERIOD_GREENHOUSE_V1' => 'fotoperiodo',
     ];
 
     public function available(): bool

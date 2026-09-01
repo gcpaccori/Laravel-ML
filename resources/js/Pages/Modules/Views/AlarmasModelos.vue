@@ -26,6 +26,11 @@ const MODELOS = {
         corto: "El oxigeno",
         ayuda: "Es el unico que de verdad aprende de datos pasados. Mira como venia el agua e intenta adivinar el oxigeno de la proxima hora.",
     },
+    PHOTOPERIOD_GREENHOUSE_V1: {
+        emoji: "🌗",
+        corto: "El fotoperiodo",
+        ayuda: "Compara la luz que mide el sensor dentro del vivero con la luz natural que deberia haber afuera ese dia, segun la ubicacion de la piscigranja. De ahi sale cuantas horas hay luz suficiente para que la tilapia coma, y cuanta luz esta frenando la cubierta.",
+    },
     LIGHT_FEED_RESPONSE_CLASSIFIER_V1: {
         emoji: "☀️",
         corto: "La luz",
@@ -210,7 +215,10 @@ const reglaEnPalabras = (m) => {
     const p = m?.policy;
     if (!p || p.status !== "approved" || p.threshold === null || p.threshold === undefined) return null;
     const dir = { lt: "baje de", lte: "baje de o llegue a", gt: "pase de", gte: "llegue o pase de" }[p.operator] ?? "llegue a";
-    const cosa = m.code === "WATER_QUALITY_INDEX_ICA" ? "la nota del agua" : "el valor";
+    const cosa = {
+        WATER_QUALITY_INDEX_ICA: "la nota del agua",
+        PHOTOPERIOD_GREENHOUSE_V1: "las horas de luz util",
+    }[m.code] ?? "el valor";
     return "Avisa cuando " + cosa + " " + dir + " " + Number(p.threshold).toLocaleString("es-PE") + ".";
 };
 
@@ -222,6 +230,10 @@ const mensajeSimple = (a) => {
     }
     if (code === "SVM_OD_FORECAST_1H" && Number.isFinite(v)) {
         return "El oxigeno puede llegar a " + v.toLocaleString("es-PE", { maximumFractionDigits: 1 }) + " mg/L dentro de una hora.";
+    }
+    if (code === "PHOTOPERIOD_GREENHOUSE_V1" && Number.isFinite(v)) {
+        return "Solo hay " + v.toLocaleString("es-PE", { maximumFractionDigits: 0 })
+            + " horas de luz util al dia; lo recomendado son 10 o mas.";
     }
     if (code === "TILAPIA_GROWTH_TEMPERATURE") return "El crecimiento se esta saliendo de lo esperado.";
     if (code === "LIGHT_FEED_RESPONSE_CLASSIFIER_V1") return "La luz no esta acompanando la alimentacion.";
