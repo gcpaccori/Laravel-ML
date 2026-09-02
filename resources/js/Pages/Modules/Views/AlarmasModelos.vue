@@ -534,6 +534,41 @@ const mejorarGrafico = (raw, modelo) => {
     return o;
 };
 
+
+/* Version reducida del grafico de proyeccion para meterla dentro de la
+   tarjeta: sin ejes, sin leyenda, sin rejilla. Solo la forma. */
+const miniGrafico = (m) => {
+    const raw = esLuz(m) && lightScenarioResult.value?.chart
+        ? lightScenarioResult.value.chart
+        : m?.projection?.chart ?? null;
+    if (!tieneDatos(raw)) return null;
+    const o = JSON.parse(JSON.stringify(raw));
+    const color = { ok: "#16a34a", aviso: "#d97706", eval: "#7c3aed", off: "#9ca3af", calc: "#2563eb" };
+    const tono = estadoDe(m).tono;
+    const linea = color[tono] ?? "#2563eb";
+    return {
+        grid: { top: 4, left: 2, right: 2, bottom: 2, containLabel: false },
+        xAxis: { type: o.xAxis?.type === "time" ? "time" : "category", show: false,
+                 data: Array.isArray(o.xAxis) ? undefined : o.xAxis?.data },
+        yAxis: { type: "value", show: false, scale: true },
+        tooltip: { trigger: "axis", backgroundColor: "rgba(15,23,42,.94)", borderWidth: 0,
+                   textStyle: { color: "#f8fafc", fontSize: 11 } },
+        series: (o.series ?? []).slice(0, 2).map((serie, i) => ({
+            name: serie.name,
+            type: serie.type === "bar" ? "bar" : "line",
+            data: serie.data,
+            smooth: 0.3,
+            showSymbol: false,
+            lineStyle: { width: i === 0 ? 2.5 : 1.8, type: i === 0 ? "solid" : "dashed", color: linea },
+            itemStyle: { color: linea, borderRadius: [3, 3, 0, 0] },
+            areaStyle: i === 0 && serie.type !== "bar"
+                ? { color: { type: "linear", x: 0, y: 0, x2: 0, y2: 1, colorStops: [
+                    { offset: 0, color: linea + "33" }, { offset: 1, color: linea + "05" }] } }
+                : undefined,
+        })),
+    };
+};
+
 const graficoDe = (m) => {
     const raw = esLuz(m) && lightScenarioResult.value?.chart ? lightScenarioResult.value.chart : m?.projection?.chart ?? null;
     if (!tieneDatos(raw)) return null;
@@ -857,6 +892,9 @@ onBeforeUnmount(() => {
                         </p>
                         <p v-else class="tarjeta__dato tarjeta__dato--vacio">Sin valor</p>
 
+                        <div v-if="miniGrafico(t.raw)" class="tarjeta__mini" @click.stop>
+                            <ChartFisheye :options="miniGrafico(t.raw)" height="56px" />
+                        </div>
                         <span class="chip" :class="'chip--' + t.estado.tono">{{ t.estado.texto }}</span>
                         <p class="tarjeta__horizonte" v-if="t.raw.horizon">{{ t.raw.horizon }}</p>
                         <span class="tarjeta__mas">Ver todo el detalle</span>
@@ -877,8 +915,17 @@ onBeforeUnmount(() => {
             </section>
 
             <!-- 5. CONFIGURACION DE ALARMAS -->
-            <section class="al__cfg">
-                <h3 class="al__seccion">Configuracion de alarmas</h3>
+            <el-collapse v-model="abiertos" class="expl al__cfg">
+                <el-collapse-item name="config">
+                    <template #title>
+                        <span class="expl__t">
+                            Configuracion de alarmas
+                            <span class="cfg__resumen">
+                                {{ configuraciones.filter((c) => c.activa).length }} activas
+                                de {{ configuraciones.length }}
+                            </span>
+                        </span>
+                    </template>
                 <p class="cfg__intro">
                     Cada modelo calcula un numero. La alarma es la regla que decide a partir de
                     que punto ese numero merece que alguien mire la piscina.
@@ -967,7 +1014,8 @@ onBeforeUnmount(() => {
                         </el-collapse-item>
                     </el-collapse>
                 </article>
-            </section>
+                </el-collapse-item>
+            </el-collapse>
 
             <!-- 6. NOTAS TECNICAS -->
             <el-collapse v-if="observations.length" v-model="abiertos" class="expl">
@@ -1251,6 +1299,10 @@ onBeforeUnmount(() => {
 .cfg__pie code { background: #f3f4f6; padding: 2px 6px; border-radius: 4px; font-size: 11px; }
 
 
+
+.tarjeta__mini { margin: 0 -6px 10px; pointer-events: none; }
+.cfg__resumen { font-size: 11px; font-weight: 600; color: #9ca3af; margin-left: 10px; padding: 2px 8px; background: #f3f4f6; border-radius: 999px; }
+.al__cfg :deep(.el-collapse-item__content) { padding-bottom: 8px; }
 .cfg__intro { font-size: 13px; color: #6b7280; margin: -4px 0 14px; line-height: 1.6; }
 .ac { background: #fff; border: 1px solid #e5e7eb; border-radius: 18px; padding: 18px 20px; margin-bottom: 12px; }
 .ac--off { background: #fcfcfd; }
