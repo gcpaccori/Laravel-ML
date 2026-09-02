@@ -228,7 +228,7 @@ const tarjetas = computed(() => models.value.map((m) => {
             chico: (m.unit ?? "").replace(/^\//, "de "),
         };
     }
-    return { ...base, estado, dato, raw: m };
+    return { ...base, estado, dato, tecnica: tecnicaDe(m.code), raw: m };
 }));
 
 /* Definicion e interpretacion de la alarma de cada modelo: que vigila, como
@@ -657,10 +657,44 @@ const antiguedadDe = (m) => {
     return { texto, nivel: f.level ?? "unknown" };
 };
 
-const desfaseDe = (m) => {
-    const d = m?.data_freshness?.clock_drift_days;
-    return d && Math.abs(d) >= 1 ? Math.round(Math.abs(d)) : null;
+
+
+/* Que hay dentro de cada modelo. Distingue lo que es aprendizaje automatico
+   de lo que es una formula cerrada: no es lo mismo un artefacto entrenado
+   con datos de esta piscigranja que una ecuacion publicada. */
+const TECNICA = {
+    WATER_QUALITY_INDEX_ICA: {
+        ml: false,
+        etiqueta: "Formula",
+        metodo: "Indice ponderado (ICA)",
+        explica: "No aprende de datos: es una suma ponderada fija de cuatro medidas. Siempre da el mismo resultado con las mismas entradas.",
+    },
+    TILAPIA_GROWTH_TEMPERATURE: {
+        ml: false,
+        etiqueta: "Formula",
+        metodo: "Regresion lineal de Soderberg",
+        explica: "Es una recta publicada en la literatura, no entrenada aqui. Solo usa temperatura: no ve el oxigeno ni el pH.",
+    },
+    SVM_OD_FORECAST_1H: {
+        ml: true,
+        etiqueta: "ML",
+        metodo: "SVR con nucleo RBF",
+        explica: "Aprendizaje automatico de verdad: hay un artefacto entrenado con los datos de esta piscigranja, validado contra el metodo simple.",
+    },
+    LIGHT_FEED_RESPONSE_CLASSIFIER_V1: {
+        ml: true,
+        etiqueta: "ML",
+        metodo: "Clasificador supervisado",
+        explica: "Sera aprendizaje automatico cuando existan etiquetas de consumo con las que entrenarlo. Todavia no hay artefacto.",
+    },
+    PHOTOPERIOD_GREENHOUSE_V1: {
+        ml: false,
+        etiqueta: "Formula",
+        metodo: "Conteo con umbrales",
+        explica: "No aprende: cuenta horas por encima de un umbral de lux y las compara con la luz natural de la API.",
+    },
 };
+const tecnicaDe = (code) => TECNICA[code] ?? { ml: false, etiqueta: "Formula", metodo: "-", explica: "" };
 
 const nombreDe = (code) => MODELOS[code]?.corto ?? "Un modelo";
 const imagenDe = (code) => MODELOS[code]?.img ?? null;
@@ -904,12 +938,22 @@ onBeforeUnmount(() => {
                                             <el-icon><QuestionFilled /></el-icon>
                                         </button>
                                     </template>
-                                    <p class="pop__t">{{ t.corto }}</p>
+                                    <p class="pop__t">
+                                        {{ t.corto }}
+                                        <span class="tec" :class="t.tecnica.ml ? 'tec--ml' : 'tec--formula'">
+                                            {{ t.tecnica.ml ? "Aprendizaje automatico" : "Formula, no es ML" }}
+                                        </span>
+                                    </p>
+                                    <p class="pop__m">{{ t.tecnica.metodo }}</p>
+                                    <p class="pop__d">{{ t.tecnica.explica }}</p>
                                     <p class="pop__d">{{ t.ayuda }}</p>
                                 </el-popover>
 
                                 <img v-if="t.img" class="tarjeta__img" :src="t.img" :alt="t.corto" width="60" height="60" loading="lazy" />
                                 <span v-else class="tarjeta__img tarjeta__img--vacia" aria-hidden="true"></span>
+                                <span class="tec" :class="t.tecnica.ml ? 'tec--ml' : 'tec--formula'">
+                                    {{ t.tecnica.etiqueta }}
+                                </span>
                                 <h4 class="tarjeta__nombre">{{ t.corto }}</h4>
                                 <p class="tarjeta__real">{{ t.raw.name }}</p>
 
@@ -939,11 +983,6 @@ onBeforeUnmount(() => {
                                         </div>
                                     </dl>
 
-                                    <p class="tarjeta__reloj" :class="{ 'tarjeta__reloj--vacio': !desfaseDe(t.raw) }">
-                                        <template v-if="desfaseDe(t.raw)">
-                                            Reloj del sensor {{ desfaseDe(t.raw) }} dias atrasado
-                                        </template>
-                                    </p>
                                 </div>
                             </article>
                         </div>
@@ -1186,6 +1225,12 @@ onBeforeUnmount(() => {
                         <div>
                             <h3>{{ detalle.corto }}</h3>
                             <p class="det__real">{{ detalle.raw.name }}</p>
+                            <p class="det__tec">
+                                <span class="tec" :class="detalle.tecnica.ml ? 'tec--ml' : 'tec--formula'">
+                                    {{ detalle.tecnica.ml ? "Aprendizaje automatico" : "Formula, no es ML" }}
+                                </span>
+                                <span>{{ detalle.tecnica.metodo }}</span>
+                            </p>
                             <span class="chip" :class="'chip--' + detalle.estado.tono">{{ detalle.estado.texto }}</span>
                         </div>
                     </header>
@@ -1217,13 +1262,6 @@ onBeforeUnmount(() => {
                             <span class="det__k">Ultimo dato</span>
                             <span class="det__v det__v--txt">{{ detalle.raw.data_freshness.label }}</span>
                             <span class="det__u">desde {{ detalle.raw.data_freshness.source_table }}</span>
-                        </div>
-                        <div v-if="Math.abs(detalle.raw.data_freshness?.clock_drift_days ?? 0) >= 1">
-                            <span class="det__k">Reloj del sensor</span>
-                            <span class="det__v det__v--txt det__v--alerta">
-                                {{ Math.round(Math.abs(detalle.raw.data_freshness.clock_drift_days)) }} dias atrasado
-                            </span>
-                            <span class="det__u">sus marcas de tiempo no son la hora real</span>
                         </div>
                     </div>
 
@@ -1433,14 +1471,15 @@ onBeforeUnmount(() => {
 
 /* Se reserva la linea del aviso aunque no haya desfase: si no, unas tarjetas
    crecerian y otras no. */
-/* Misma altura con y sin aviso: si no, las tarjetas con desfase suben su pie
-   unos pixeles y la fila deja de estar alineada. */
-.tarjeta__reloj { width: 100%; margin: 0; box-sizing: border-box; height: 22px;
-                  font-size: 10px; line-height: 1.5; color: #b45309;
-                  background: #fffbeb; border-radius: 7px; padding: 3px 6px;
-                  overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.tarjeta__reloj--vacio { background: transparent; }
 
+.tec { display: inline-block; font-size: 9px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+        padding: 2px 7px; border-radius: 6px; }
+.tec--ml { background: #ede9fe; color: #5b21b6; }
+.tec--formula { background: #f1f5f9; color: #64748b; }
+/* dentro de la tarjeta es columna flex: sin esto el distintivo se estira */
+.tarjeta .tec { align-self: center; margin: 6px 0 0; }
+.pop__m { margin: 6px 0 4px; font-size: 12px; font-weight: 700; color: #334155; }
+.det__tec { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 12px; color: #6b7280; }
 .chip { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
 .chip--ok { background: #dcfce7; color: #166534; }
 .chip--aviso { background: #fef3c7; color: #92400e; }
