@@ -437,6 +437,72 @@ onBeforeUnmount(() => {
                     </div>
                 </section>
 
+                <!-- El agua puede frenar al modelo por debajo de su potencial: la
+                     temperatura marca el techo, el oxigeno y el pH solo restan. -->
+                <section v-if="activeModel.limiting_factors" class="card card-flush mb-6">
+                    <div class="card-header">
+                        <h4 class="card-title fw-bold text-dark fs-5">Que esta frenando este modelo</h4>
+                    </div>
+                    <div class="card-body pt-0">
+                        <p class="text-gray-700 fs-6 mb-4">
+                            Con la temperatura actual podria alcanzar
+                            <strong>{{ formatValue(activeModel.potential_daily_length_gain_mm_day, activeModel.unit) }}</strong>,
+                            pero el agua solo se lo permite a
+                            <strong>{{ formatValue(activeModel.current_value, activeModel.unit) }}</strong>.
+                        </p>
+                        <ul class="ps-4 mb-3">
+                            <li class="fs-7 mb-2"
+                                :class="activeModel.limiting_factors.oxygen.factor < 1 ? 'text-warning fw-semibold' : 'text-gray-600'">
+                                {{ activeModel.limiting_factors.oxygen.detail }}
+                            </li>
+                            <li class="fs-7"
+                                :class="activeModel.limiting_factors.ph.factor < 1 ? 'text-warning fw-semibold' : 'text-gray-600'">
+                                {{ activeModel.limiting_factors.ph.detail }}
+                            </li>
+                        </ul>
+                        <p class="text-gray-500 fs-8 mb-0">
+                            Ley del minimo: manda el factor peor. Sin lecturas de oxigeno o pH no se aplica limitacion.
+                        </p>
+                    </div>
+                </section>
+
+                <!-- Modelo alometrico entrenado con biometria_detalles -->
+                <section v-if="activeModel.traceability?.weight_length_ml" class="card card-flush mb-6">
+                    <div class="card-header">
+                        <h4 class="card-title fw-bold text-dark fs-5">Modelo peso-longitud entrenado</h4>
+                    </div>
+                    <div class="card-body pt-0">
+                        <code class="d-block text-dark fs-7 mb-4">{{ activeModel.traceability.weight_length_ml.formula }}</code>
+                        <div class="row g-4">
+                            <div class="col-sm-3">
+                                <small class="text-gray-500 d-block">Peces medidos</small>
+                                <strong class="fs-5">{{ activeModel.traceability.weight_length_ml.sample_size }}</strong>
+                                <small class="text-gray-500 d-block">
+                                    {{ activeModel.traceability.weight_length_ml.train_size }} entrenamiento /
+                                    {{ activeModel.traceability.weight_length_ml.test_size }} prueba
+                                </small>
+                            </div>
+                            <div class="col-sm-3">
+                                <small class="text-gray-500 d-block">Acierto en prueba</small>
+                                <strong class="fs-5">R2 {{ activeModel.traceability.weight_length_ml.metrics.test_r2 }}</strong>
+                                <small class="text-gray-500 d-block">error {{ activeModel.traceability.weight_length_ml.metrics.test_mae_g }} g</small>
+                            </div>
+                            <div class="col-sm-3">
+                                <small class="text-gray-500 d-block">Peso medio</small>
+                                <strong class="fs-5">{{ activeModel.traceability.weight_length_ml.baselines.media.test_mae_g }} g</strong>
+                                <small class="text-gray-500 d-block">de error</small>
+                            </div>
+                            <div class="col-sm-3">
+                                <small class="text-gray-500 d-block">Ley cubica</small>
+                                <strong class="fs-5">{{ activeModel.traceability.weight_length_ml.baselines.isometrico_cubico.test_mae_g }} g</strong>
+                                <small class="text-gray-500 d-block">de error</small>
+                            </div>
+                        </div>
+                        <p class="text-gray-700 fs-7 mt-4 mb-0">{{ activeModel.traceability.weight_length_ml.verdict }}</p>
+                        <p class="text-gray-500 fs-8 mb-0">{{ activeModel.traceability.weight_length_ml.note }}</p>
+                    </div>
+                </section>
+
                 <section class="row g-5 mb-6">
                     <div class="col-xl-8">
                         <div class="card card-flush h-100">
