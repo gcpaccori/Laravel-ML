@@ -787,6 +787,78 @@ onBeforeUnmount(() => {
                 </div>
             </section>
 
+
+            <!-- Dos columnas: lo que se mira a la izquierda, lo que se acumula
+                 a la derecha. Asi los avisos nunca empujan a los graficos. -->
+            <div class="al__cols">
+                <div class="al__main">
+            <!-- 4. MODELOS -->
+            <section class="al__mod">
+                <h3 class="al__seccion">Los modelos que vigilan esta piscina</h3>
+                <div class="tarjetas">
+                    <article
+                        v-for="t in tarjetas"
+                        :key="t.raw.code"
+                        class="tarjeta"
+                        :class="'tarjeta--' + t.estado.tono"
+                        role="button"
+                        tabindex="0"
+                        @click="abrirDetalle(t)"
+                        @keyup.enter="abrirDetalle(t)"
+                    >
+                        <el-popover placement="top" :width="290" trigger="click">
+                            <template #reference>
+                                <button class="tarjeta__info" type="button" aria-label="Que hace" @click.stop>
+                                    <el-icon><QuestionFilled /></el-icon>
+                                </button>
+                            </template>
+                            <p class="pop__t">{{ t.corto }}</p>
+                            <p class="pop__d">{{ t.ayuda }}</p>
+                        </el-popover>
+
+                        <span class="tarjeta__emoji">{{ t.emoji }}</span>
+                        <h4 class="tarjeta__nombre">{{ t.corto }}</h4>
+                        <p class="tarjeta__real">{{ t.raw.name }}</p>
+
+                        <p v-if="t.dato" class="tarjeta__dato">
+                            <span class="tarjeta__grande">{{ t.dato.grande }}</span>
+                            <span class="tarjeta__chico">{{ t.dato.chico }}</span>
+                        </p>
+                        <p v-else class="tarjeta__dato tarjeta__dato--vacio">Sin valor</p>
+
+                        <div v-if="miniGrafico(t.raw)" class="tarjeta__mini" @click.stop>
+                            <ChartFisheye :options="miniGrafico(t.raw)" height="56px" />
+                        </div>
+                        <span class="chip" :class="'chip--' + t.estado.tono">{{ t.estado.texto }}</span>
+                        <dl class="tarjeta__meta">
+                            <div>
+                                <dt>Datos</dt>
+                                <dd :class="'fresco--' + (t.raw.data_freshness?.level ?? 'unknown')">
+                                    {{ (t.raw.data_freshness?.label ?? "sin fecha").replace("Dato de hace ", "hace ").replace("Dato reciente", "al dia") }}
+                                </dd>
+                            </div>
+                            <div v-if="t.raw.horizon">
+                                <dt>Proyecta</dt>
+                                <dd>{{ t.raw.horizon }}</dd>
+                            </div>
+                        </dl>
+                        <span class="tarjeta__mas">Ver todo el detalle</span>
+                    </article>
+                </div>
+            </section>
+
+            <!-- 4b. GRAFICO PRINCIPAL -->
+            <section v-if="graficoDestacado" class="al__graf">
+                <h3 class="al__seccion">{{ tituloDestacado }}</h3>
+                <div class="graf">
+                    <ChartFisheye :options="graficoDestacado" height="340px" />
+                    <p class="graf__pie">
+                        Las franjas de color son los rangos de calidad. La linea roja es el limite
+                        a partir del cual el sistema avisa.
+                    </p>
+                </div>
+            </section>
+
             <!-- 2. QUE ES ESTO -->
             <el-collapse v-model="abiertos" class="expl">
                 <el-collapse-item name="que-es">
@@ -802,6 +874,24 @@ onBeforeUnmount(() => {
                 </el-collapse-item>
             </el-collapse>
 
+            <!-- 6. NOTAS TECNICAS -->
+            <el-collapse v-if="observations.length" v-model="abiertos" class="expl">
+                <el-collapse-item name="notas">
+                    <template #title><span class="expl__t">Notas tecnicas del calculo ({{ observations.length }})</span></template>
+                    <ul class="lista">
+                        <li v-for="(o, i) in observations" :key="i">{{ textoNota(o) }}</li>
+                    </ul>
+                    <dl class="dl" v-if="meta.source">
+                        <div><dt>Origen</dt><dd>{{ meta.source }}</dd></div>
+                        <div v-if="meta.computed_at"><dt>Calculado</dt><dd>{{ cuando(meta.computed_at) }}</dd></div>
+                        <div v-if="meta.window_hours"><dt>Ventana</dt><dd>{{ meta.window_hours }} h</dd></div>
+                    </dl>
+                </el-collapse-item>
+            </el-collapse>
+
+                </div>
+
+                <aside class="al__lado">
             <!-- 3. AVISOS -->
             <section v-if="avisos.length" class="avisos">
                 <div class="avisos__cab">
@@ -856,62 +946,6 @@ onBeforeUnmount(() => {
                         ? "Mostrar solo los " + TOPE_AVISOS + " mas importantes"
                         : "Ver los " + avisosOrdenados.length + " avisos" }}
                 </button>
-            </section>
-
-            <!-- 4. MODELOS -->
-            <section class="al__mod">
-                <h3 class="al__seccion">Los modelos que vigilan esta piscina</h3>
-                <div class="tarjetas">
-                    <article
-                        v-for="t in tarjetas"
-                        :key="t.raw.code"
-                        class="tarjeta"
-                        :class="'tarjeta--' + t.estado.tono"
-                        role="button"
-                        tabindex="0"
-                        @click="abrirDetalle(t)"
-                        @keyup.enter="abrirDetalle(t)"
-                    >
-                        <el-popover placement="top" :width="290" trigger="click">
-                            <template #reference>
-                                <button class="tarjeta__info" type="button" aria-label="Que hace" @click.stop>
-                                    <el-icon><QuestionFilled /></el-icon>
-                                </button>
-                            </template>
-                            <p class="pop__t">{{ t.corto }}</p>
-                            <p class="pop__d">{{ t.ayuda }}</p>
-                        </el-popover>
-
-                        <span class="tarjeta__emoji">{{ t.emoji }}</span>
-                        <h4 class="tarjeta__nombre">{{ t.corto }}</h4>
-                        <p class="tarjeta__real">{{ t.raw.name }}</p>
-
-                        <p v-if="t.dato" class="tarjeta__dato">
-                            <span class="tarjeta__grande">{{ t.dato.grande }}</span>
-                            <span class="tarjeta__chico">{{ t.dato.chico }}</span>
-                        </p>
-                        <p v-else class="tarjeta__dato tarjeta__dato--vacio">Sin valor</p>
-
-                        <div v-if="miniGrafico(t.raw)" class="tarjeta__mini" @click.stop>
-                            <ChartFisheye :options="miniGrafico(t.raw)" height="56px" />
-                        </div>
-                        <span class="chip" :class="'chip--' + t.estado.tono">{{ t.estado.texto }}</span>
-                        <p class="tarjeta__horizonte" v-if="t.raw.horizon">{{ t.raw.horizon }}</p>
-                        <span class="tarjeta__mas">Ver todo el detalle</span>
-                    </article>
-                </div>
-            </section>
-
-            <!-- 4b. GRAFICO PRINCIPAL -->
-            <section v-if="graficoDestacado" class="al__graf">
-                <h3 class="al__seccion">{{ tituloDestacado }}</h3>
-                <div class="graf">
-                    <ChartFisheye :options="graficoDestacado" height="340px" />
-                    <p class="graf__pie">
-                        Las franjas de color son los rangos de calidad. La linea roja es el limite
-                        a partir del cual el sistema avisa.
-                    </p>
-                </div>
             </section>
 
             <!-- 5. CONFIGURACION DE ALARMAS -->
@@ -1017,20 +1051,8 @@ onBeforeUnmount(() => {
                 </el-collapse-item>
             </el-collapse>
 
-            <!-- 6. NOTAS TECNICAS -->
-            <el-collapse v-if="observations.length" v-model="abiertos" class="expl">
-                <el-collapse-item name="notas">
-                    <template #title><span class="expl__t">Notas tecnicas del calculo ({{ observations.length }})</span></template>
-                    <ul class="lista">
-                        <li v-for="(o, i) in observations" :key="i">{{ textoNota(o) }}</li>
-                    </ul>
-                    <dl class="dl" v-if="meta.source">
-                        <div><dt>Origen</dt><dd>{{ meta.source }}</dd></div>
-                        <div v-if="meta.computed_at"><dt>Calculado</dt><dd>{{ cuando(meta.computed_at) }}</dd></div>
-                        <div v-if="meta.window_hours"><dt>Ventana</dt><dd>{{ meta.window_hours }} h</dd></div>
-                    </dl>
-                </el-collapse-item>
-            </el-collapse>
+                </aside>
+            </div>
 
             <!-- 7. PANEL DE DETALLE -->
             <el-drawer :model-value="Boolean(detalle)" :with-header="false" size="600px" @close="detalle = null">
@@ -1209,8 +1231,33 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.al { max-width: 1080px; margin: 0 auto; padding: 8px 0 48px; }
-.al__seccion { font-size: 15px; font-weight: 700; color: #6b7280; margin: 34px 0 12px; }
+
+/* --- Rejilla general --------------------------------------------------- */
+.al__cols { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; align-items: start; }
+@media (min-width: 1180px) {
+    .al__cols { grid-template-columns: minmax(0, 1fr) 372px; }
+    .al__lado { position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow-y: auto; padding-right: 2px; }
+    .al__lado::-webkit-scrollbar { width: 8px; }
+    .al__lado::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 999px; }
+}
+.al__main { min-width: 0; }
+.al__lado { min-width: 0; }
+.al__lado .al__seccion { margin-top: 0; }
+.al__lado .avisos__lista { max-height: 300px; }
+.al__lado .ac__cuerpo { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.al__lado .expl { margin-top: 16px; }
+.al__lado .ac { padding: 14px 16px; }
+
+/* --- Ficha del modelo: periodo de datos y horizonte -------------------- */
+.tarjeta__meta { display: flex; justify-content: center; gap: 14px; margin: 10px 0 0; flex-wrap: wrap; }
+.tarjeta__meta > div { display: flex; flex-direction: column; gap: 1px; min-width: 0; max-width: 50%; }
+.tarjeta__meta dt { font-size: 9px; text-transform: uppercase; letter-spacing: .05em; color: #cbd5e1; }
+.tarjeta__meta dd { margin: 0; font-size: 11px; color: #6b7280; line-height: 1.35; overflow-wrap: anywhere; }
+.tarjeta__meta dd.fresco--stale, .tarjeta__meta dd.fresco--very_stale { color: #b45309; font-weight: 600; }
+.tarjeta__meta dd.fresco--fresh, .tarjeta__meta dd.fresco--recent { color: #15803d; }
+
+.al { max-width: 1560px; margin: 0 auto; padding: 8px 0 48px; }
+.al__seccion { font-size: 15px; font-weight: 700; color: #6b7280; margin: 26px 0 12px; }
 .mono { font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
 
 .barra { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 22px; }
@@ -1256,7 +1303,7 @@ onBeforeUnmount(() => {
 .aviso__lado { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
 .aviso__lado time { font-size: 12px; color: #9ca3af; white-space: nowrap; }
 
-.tarjetas { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.tarjetas { display: grid; grid-template-columns: repeat(auto-fit, minmax(168px, 1fr)); gap: 12px; }
 .tarjeta { position: relative; background: #fff; border: 1px solid #e5e7eb; border-radius: 18px; padding: 22px 18px 16px; text-align: center; cursor: pointer; transition: transform .15s, box-shadow .15s; }
 .tarjeta:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0, 0, 0, .07); }
 .tarjeta--ok { border-color: #bbf7d0; }
