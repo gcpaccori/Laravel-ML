@@ -632,6 +632,36 @@ const tituloDestacado = computed(() => {
     const corto = MODELOS[m.code]?.corto ?? m.name;
     return "Como viene " + corto.replace(/^El |^La /, (x) => x.toLowerCase());
 });
+
+/* Horizontes cortos: los largos partian la fila en dos alturas distintas. */
+const HORIZONTE_CORTO = {
+    "Estado actual": "ahora",
+    "1 hora": "1 hora",
+    "1 a 365 dias": "1 a 365 dias",
+    "Ultimas 24 horas": "24 horas",
+    "Siguiente evento de alimentacion": "prox. comida",
+};
+const horizonteDe = (m) => {
+    const h = m?.horizon;
+    if (!h) return null;
+    return HORIZONTE_CORTO[h] ?? (h.length > 16 ? h.slice(0, 15) + "\u2026" : h);
+};
+
+/* Antiguedad en dos piezas, para poder darles el mismo formato. */
+const antiguedadDe = (m) => {
+    const f = m?.data_freshness ?? {};
+    const texto = (f.label ?? "sin fecha")
+        .replace("Dato de hace ", "")
+        .replace("Dato reciente", "al dia")
+        .replace("Sin fecha del ultimo dato", "sin fecha");
+    return { texto, nivel: f.level ?? "unknown" };
+};
+
+const desfaseDe = (m) => {
+    const d = m?.data_freshness?.clock_drift_days;
+    return d && Math.abs(d) >= 1 ? Math.round(Math.abs(d)) : null;
+};
+
 const nombreDe = (code) => MODELOS[code]?.corto ?? "Un modelo";
 const imagenDe = (code) => MODELOS[code]?.img ?? null;
 const gravedadDe = (sev) => GRAVEDAD[sev] ?? GRAVEDAD.advertencia;
@@ -889,27 +919,32 @@ onBeforeUnmount(() => {
                                 </p>
                                 <p v-else class="tarjeta__dato tarjeta__dato--vacio">Sin valor</p>
 
-                                <div v-if="miniGrafico(t.raw)" class="tarjeta__mini" @click.stop>
-                                    <ChartFisheye :options="miniGrafico(t.raw)" height="52px" />
+                                <div class="tarjeta__mini" @click.stop>
+                                    <ChartFisheye v-if="miniGrafico(t.raw)" :options="miniGrafico(t.raw)" height="52px" />
                                 </div>
 
-                                <span class="chip" :class="'chip--' + t.estado.tono">{{ t.estado.texto }}</span>
+                                <div class="tarjeta__pie">
+                                    <span class="chip" :class="'chip--' + t.estado.tono">{{ t.estado.texto }}</span>
 
-                                <dl class="tarjeta__meta">
-                                    <div>
-                                        <dt>Datos</dt>
-                                        <dd :class="'fresco--' + (t.raw.data_freshness?.level ?? 'unknown')">
-                                            {{ (t.raw.data_freshness?.label ?? "sin fecha").replace("Dato de hace ", "hace ").replace("Dato reciente", "al dia") }}
-                                        </dd>
-                                    </div>
-                                    <div v-if="t.raw.horizon">
-                                        <dt>Proyecta</dt>
-                                        <dd>{{ t.raw.horizon }}</dd>
-                                    </div>
-                                </dl>
-                                <p v-if="Math.abs(t.raw.data_freshness?.clock_drift_days ?? 0) >= 1" class="tarjeta__reloj">
-                                    Reloj del sensor {{ Math.round(Math.abs(t.raw.data_freshness.clock_drift_days)) }} dias atrasado
-                                </p>
+                                    <dl class="tarjeta__meta">
+                                        <div>
+                                            <dt>Datos</dt>
+                                            <dd class="pill" :class="'pill--' + antiguedadDe(t.raw).nivel">
+                                                {{ antiguedadDe(t.raw).texto }}
+                                            </dd>
+                                        </div>
+                                        <div v-if="horizonteDe(t.raw)">
+                                            <dt>Proyecta</dt>
+                                            <dd class="pill pill--neutro">{{ horizonteDe(t.raw) }}</dd>
+                                        </div>
+                                    </dl>
+
+                                    <p class="tarjeta__reloj" :class="{ 'tarjeta__reloj--vacio': !desfaseDe(t.raw) }">
+                                        <template v-if="desfaseDe(t.raw)">
+                                            Reloj del sensor {{ desfaseDe(t.raw) }} dias atrasado
+                                        </template>
+                                    </p>
+                                </div>
                             </article>
                         </div>
                     </section>
@@ -1369,20 +1404,42 @@ onBeforeUnmount(() => {
 .tarjeta__img { display: block; margin: 0 auto; width: 60px; height: 60px; }
 .tarjeta__img--vacia { background: #f3f4f6; border-radius: 50%; }
 .tarjeta__nombre { font-size: 16px; font-weight: 700; color: #1f2937; margin: 8px 0 2px; }
-.tarjeta__real { font-size: 11px; color: #9ca3af; margin: 0 0 10px; line-height: 1.3; min-height: 28px; }
+.tarjeta__real { font-size: 11px; color: #9ca3af; margin: 0 0 10px; line-height: 1.3; height: 29px;
+                 display: flex; align-items: center; justify-content: center; text-align: center;
+                 overflow: hidden; }
 .tarjeta__dato { margin: 0 0 8px; display: flex; flex-direction: column; gap: 2px; }
 .tarjeta__grande { font-size: 23px; font-weight: 800; color: #111827; }
 .tarjeta__chico { font-size: 11px; color: #9ca3af; }
 .tarjeta__dato--vacio { font-size: 13px; color: #d1d5db; }
-.tarjeta__mini { margin: 0 -4px 10px; pointer-events: none; }
-.tarjeta__meta { display: flex; justify-content: center; gap: 14px; margin: 10px 0 0; flex-wrap: wrap; }
-.tarjeta__meta > div { display: flex; flex-direction: column; gap: 1px; min-width: 0; max-width: 50%; }
-.tarjeta__meta dt { font-size: 9px; text-transform: uppercase; letter-spacing: .05em; color: #cbd5e1; }
-.tarjeta__meta dd { margin: 0; font-size: 11px; color: #6b7280; line-height: 1.35; overflow-wrap: anywhere; }
-.tarjeta__meta dd.fresco--stale, .tarjeta__meta dd.fresco--very_stale { color: #b45309; font-weight: 600; }
-.tarjeta__meta dd.fresco--fresh, .tarjeta__meta dd.fresco--recent { color: #15803d; }
-.tarjeta__reloj { margin: 8px 0 0; font-size: 10px; color: #b45309; background: #fffbeb; border-radius: 8px; padding: 4px 6px; line-height: 1.35; }
-.det__v--alerta { color: #b45309; }
+/* Hueco fijo: con o sin grafico, todas las tarjetas miden lo mismo. */
+.tarjeta__mini { height: 52px; margin: 0 -4px 10px; pointer-events: none; }
+
+/* El pie se ancla abajo para que los chips y las etiquetas queden en linea
+   entre tarjetas, aunque el contenido de arriba varie. */
+.tarjeta__pie { margin-top: auto; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.tarjeta__meta { display: flex; justify-content: center; gap: 8px; margin: 0; width: 100%; }
+.tarjeta__meta > div { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; flex: 1 1 0; }
+.tarjeta__meta dt { font-size: 9px; text-transform: uppercase; letter-spacing: .06em; color: #cbd5e1; font-weight: 700; }
+.tarjeta__meta dd { margin: 0; max-width: 100%; }
+
+/* Un solo tratamiento para las dos etiquetas: misma tipografia, mismo alto. */
+.pill { display: block; font-size: 11px; font-weight: 600; line-height: 1.3; padding: 3px 8px; border-radius: 7px;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.pill--neutro { background: #f3f4f6; color: #6b7280; }
+.pill--fresh, .pill--recent { background: #dcfce7; color: #15803d; }
+.pill--stale { background: #fef3c7; color: #b45309; }
+.pill--very_stale { background: #fee2e2; color: #b91c1c; }
+.pill--unknown { background: #f3f4f6; color: #9ca3af; }
+
+/* Se reserva la linea del aviso aunque no haya desfase: si no, unas tarjetas
+   crecerian y otras no. */
+/* Misma altura con y sin aviso: si no, las tarjetas con desfase suben su pie
+   unos pixeles y la fila deja de estar alineada. */
+.tarjeta__reloj { width: 100%; margin: 0; box-sizing: border-box; height: 22px;
+                  font-size: 10px; line-height: 1.5; color: #b45309;
+                  background: #fffbeb; border-radius: 7px; padding: 3px 6px;
+                  overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.tarjeta__reloj--vacio { background: transparent; }
 
 .chip { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
 .chip--ok { background: #dcfce7; color: #166534; }
