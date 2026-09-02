@@ -231,16 +231,139 @@ const tarjetas = computed(() => models.value.map((m) => {
     return { ...base, estado, dato, raw: m };
 }));
 
-/* Cada modelo con su alarma, para la tabla de configuracion */
-const configuraciones = computed(() => models.value.map((m) => ({
-    corto: MODELOS[m.code]?.corto ?? m.name,
-    emoji: MODELOS[m.code]?.emoji ?? "\u{1F514}",
-    nombre: m.name,
-    alarmCode: m.alarm_code,
-    policy: m.policy ?? {},
-    activa: m.policy?.status === "approved",
-    raw: m,
-})));
+/* Definicion e interpretacion de la alarma de cada modelo: que vigila, como
+   se lee su valor, y que hacer cuando suena. Es lo que convierte un numero
+   suelto en una decision. */
+const INTERPRETACION = {
+    WATER_QUALITY_INDEX_ICA: {
+        vigila: "La calidad general del agua, resumida en una nota del 0 al 100 que pondera temperatura, pH, oxigeno y nitrato.",
+        unidad: "de 100",
+        peor: "abajo",
+        escala: [
+            { min: 90, max: 100, etiqueta: "Excelente", tono: "ok" },
+            { min: 70, max: 90, etiqueta: "Buena", tono: "ok" },
+            { min: 50, max: 70, etiqueta: "Regular", tono: "aviso" },
+            { min: 25, max: 50, etiqueta: "Mala", tono: "malo" },
+            { min: 0, max: 25, etiqueta: "Muy mala", tono: "malo" },
+        ],
+        siSuena: [
+            "Revisar primero oxigeno y pH: son los que mas pesan en la nota.",
+            "Comprobar recambio de agua y si se esta sobrealimentando.",
+            "Por debajo de 50, suspender alimentacion hasta recuperar.",
+        ],
+    },
+    PHOTOPERIOD_GREENHOUSE_V1: {
+        vigila: "Cuantas horas al dia hay luz suficiente dentro del vivero para que la tilapia detecte el alimento y coma.",
+        unidad: "horas de luz util",
+        peor: "abajo",
+        escala: [
+            { min: 0, max: 8, etiqueta: "Muy corto", tono: "malo" },
+            { min: 8, max: 10, etiqueta: "Corto", tono: "aviso" },
+            { min: 10, max: 18, etiqueta: "Adecuado", tono: "ok" },
+            { min: 18, max: 24, etiqueta: "Excesivo", tono: "aviso" },
+        ],
+        siSuena: [
+            "Concentrar las raciones en las horas con mas luz.",
+            "Revisar suciedad, sombra o deterioro de la cubierta del vivero.",
+            "Evaluar iluminacion de apoyo hasta alcanzar 12 h utiles.",
+        ],
+    },
+    TILAPIA_GROWTH_TEMPERATURE: {
+        vigila: "Cuanto deberian crecer los peces cada dia con la temperatura del agua que hay, segun la ecuacion de Soderberg.",
+        unidad: "mm/dia",
+        peor: "abajo",
+        escala: [
+            { min: 0, max: 0.5, etiqueta: "Muy lento", tono: "malo" },
+            { min: 0.5, max: 0.9, etiqueta: "Lento", tono: "aviso" },
+            { min: 0.9, max: 1.3, etiqueta: "Esperado", tono: "ok" },
+        ],
+        siSuena: [
+            "Contrastar con la ultima biometria: si tambien cayo, el problema es real.",
+            "Revisar temperatura del agua; por debajo de 22 C la ganancia se frena.",
+            "Revisar conversion alimenticia: un salto brusco delata alimento sin consumir.",
+        ],
+    },
+    SVM_OD_FORECAST_1H: {
+        vigila: "El oxigeno disuelto que habra dentro de una hora, estimado con un modelo entrenado.",
+        unidad: "mg/L",
+        peor: "abajo",
+        escala: [
+            { min: 0, max: 4, etiqueta: "Critico", tono: "malo" },
+            { min: 4, max: 6.5, etiqueta: "Bajo", tono: "aviso" },
+            { min: 6.5, max: 8, etiqueta: "Optimo", tono: "ok" },
+            { min: 8, max: 20, etiqueta: "Alto", tono: "aviso" },
+        ],
+        siSuena: [
+            "Encender aireacion antes de que el valor llegue al umbral.",
+            "Suspender alimentacion si se proyecta por debajo de 4 mg/L.",
+        ],
+    },
+    LIGHT_FEED_RESPONSE_CLASSIFIER_V1: {
+        vigila: "Si la luz dentro del agua acompana la respuesta alimentaria del pez.",
+        unidad: "lux",
+        peor: "abajo",
+        escala: [],
+        siSuena: ["Todavia no puede sonar: falta instalar el sensor sumergido."],
+    },
+};
+
+/* Cuando un modelo no tiene alarma, se propone una con su justificacion,
+   para que configurarla no sea adivinar un numero. */
+const SUGERIDO = {
+    SVM_OD_FORECAST_1H: {
+        operador: "lt", umbral: 4, unidad: "mg/L", gravedad: "critico",
+        porque: "4 mg/L es el limite critico de oxigeno en la tabla parametro_bandas del propio sistema. Aun asi, este modelo no puede emitir hasta superar al metodo simple en validacion.",
+    },
+    LIGHT_FEED_RESPONSE_CLASSIFIER_V1: {
+        operador: "lt", umbral: 30, unidad: "lux", gravedad: "advertencia",
+        porque: "30 lux es el limite por debajo del cual la tilapia come de forma pobre. Requiere sensor sumergido y etiquetas de consumo antes de activarse.",
+    },
+};
+
+const OPERADOR_TEXTO = { lt: "baje de", lte: "baje de o llegue a", gt: "pase de", gte: "llegue o pase de" };
+
+const bandaDe = (code, valor) => {
+    const escala = INTERPRETACION[code]?.escala ?? [];
+    const n = Number(valor);
+    if (!Number.isFinite(n)) return null;
+    return escala.find((b) => n >= b.min && n < b.max) ?? escala[escala.length - 1] ?? null;
+};
+
+const configuraciones = computed(() => models.value.map((m) => {
+    const meta = MODELOS[m.code] ?? {};
+    const info = INTERPRETACION[m.code] ?? {};
+    const policy = m.policy ?? {};
+    const activa = policy.status === "approved";
+    return {
+        code: m.code,
+        emoji: meta.emoji ?? "\u{1F514}",
+        corto: meta.corto ?? m.name,
+        nombre: m.name,
+        alarmCode: m.alarm_code,
+        policy,
+        activa,
+        puedeEmitir: Boolean(m.can_emit),
+        elegible: m.maturity !== "blocked_inputs",
+        bloqueo: m.status_detail,
+        frescura: m.data_freshness ?? {},
+        valor: m.current_value,
+        banda: bandaDe(m.code, m.current_value),
+        info,
+        sugerido: SUGERIDO[m.code] ?? null,
+        raw: m,
+    };
+}));
+
+const comandoDe = (c) => {
+    const p = c.activa ? c.policy : c.sugerido;
+    if (!p) return null;
+    const op = c.activa ? p.operator : p.operador;
+    const th = c.activa ? p.threshold : p.umbral;
+    const un = c.activa ? p.unit : p.unidad;
+    const sv = c.activa ? p.severity : p.gravedad;
+    const code = c.activa ? p.code : (c.corto.replace(/^El |^La /, "").toUpperCase() + "-NUEVA");
+    return `php artisan model-alerts:approve-policy ${code} \\\n  --model=${c.code} --operator=${op} --threshold=${th} \\\n  --unit=${un} --severity=${sv} --reason="..." --approved-by=1`;
+};
 
 const reglaEnPalabras = (m) => {
     const p = m?.policy;
@@ -756,45 +879,94 @@ onBeforeUnmount(() => {
             <!-- 5. CONFIGURACION DE ALARMAS -->
             <section class="al__cfg">
                 <h3 class="al__seccion">Configuracion de alarmas</h3>
-                <div class="cfg">
-                    <div v-for="c in configuraciones" :key="c.raw.code" class="cfg__fila">
-                        <span class="cfg__emoji">{{ c.emoji }}</span>
-                        <div class="cfg__id">
-                            <strong>{{ c.corto }}</strong>
-                            <span class="mono">{{ c.alarmCode }}</span>
-                        </div>
-                        <div class="cfg__regla">
-                            <template v-if="c.activa">
-                                <span class="chip chip--ok">Activa</span>
-                                <span>{{ reglaEnPalabras(c.raw) }}</span>
-                            </template>
-                            <template v-else>
-                                <span class="chip chip--off">Sin configurar</span>
-                                <span>{{ c.policy.condition }}</span>
-                            </template>
-                        </div>
-                        <div class="cfg__sev">
-                            <span v-if="c.policy.severity" class="chip" :class="'chip--' + gravedadDe(c.policy.severity).tono">
-                                {{ gravedadDe(c.policy.severity).texto }}
-                            </span>
-                            <span v-if="c.policy.version" class="cfg__v">v{{ c.policy.version }}</span>
-                        </div>
-                        <el-popover v-if="c.policy.rationale" placement="left" :width="380" trigger="click">
-                            <template #reference>
-                                <button class="cfg__mas" type="button">Por que</button>
-                            </template>
-                            <p class="pop__t">Justificacion aprobada</p>
-                            <p class="pop__d">{{ c.policy.rationale }}</p>
-                            <p class="pop__d" v-if="c.policy.approved_at">Aprobada el {{ cuando(c.policy.approved_at) }}</p>
-                        </el-popover>
-                        <span v-else class="cfg__mas cfg__mas--off">&mdash;</span>
-                    </div>
-                </div>
-                <p class="cfg__pie">
-                    Las alarmas se aprueban desde la consola con
-                    <code>php artisan model-alerts:approve-policy</code>. Se hace ahi a proposito: cada limite queda con
-                    su justificacion escrita y su version, para que se sepa quien lo puso y por que.
+                <p class="cfg__intro">
+                    Cada modelo calcula un numero. La alarma es la regla que decide a partir de
+                    que punto ese numero merece que alguien mire la piscina.
                 </p>
+
+                <article v-for="c in configuraciones" :key="c.code" class="ac" :class="{ 'ac--off': !c.activa }">
+                    <header class="ac__cab">
+                        <span class="ac__emoji">{{ c.emoji }}</span>
+                        <div class="ac__id">
+                            <strong>{{ c.corto }}</strong>
+                            <span class="ac__nom">{{ c.nombre }}</span>
+                            <span class="mono ac__code">{{ c.alarmCode }}</span>
+                        </div>
+                        <div class="ac__estado">
+                            <span class="chip" :class="c.activa ? 'chip--ok' : 'chip--off'">
+                                {{ c.activa ? "Alarma activa" : "Sin alarma" }}
+                            </span>
+                            <span class="fresco" :class="'fresco--' + (c.frescura.level ?? 'unknown')">
+                                {{ c.frescura.label ?? "Sin fecha" }}
+                            </span>
+                        </div>
+                    </header>
+
+                    <p class="ac__vigila">{{ c.info.vigila ?? c.raw.purpose }}</p>
+
+                    <div class="ac__cuerpo">
+                        <div class="ac__col">
+                            <span class="ac__k">La regla</span>
+                            <p v-if="c.activa" class="ac__regla">
+                                Avisa cuando {{ c.corto.replace(/^El |^La /, "").toLowerCase() }}
+                                {{ OPERADOR_TEXTO[c.policy.operator] ?? "llegue a" }}
+                                <strong>{{ c.policy.threshold }} {{ c.policy.unit }}</strong>,
+                                con gravedad <strong>{{ gravedadDe(c.policy.severity).texto.toLowerCase() }}</strong>.
+                            </p>
+                            <template v-else>
+                                <p class="ac__regla ac__regla--prop" v-if="c.sugerido">
+                                    Propuesta: avisar cuando
+                                    {{ OPERADOR_TEXTO[c.sugerido.operador] }}
+                                    <strong>{{ c.sugerido.umbral }} {{ c.sugerido.unidad }}</strong>.
+                                </p>
+                                <p class="ac__regla ac__regla--prop" v-else>
+                                    Sin regla definida todavia.
+                                </p>
+                                <p class="ac__nota">{{ c.sugerido?.porque ?? c.bloqueo }}</p>
+                            </template>
+                            <p v-if="c.activa && c.policy.rationale" class="ac__nota">{{ c.policy.rationale }}</p>
+                        </div>
+
+                        <div class="ac__col" v-if="(c.info.escala ?? []).length">
+                            <span class="ac__k">Como se lee el valor</span>
+                            <div class="esc">
+                                <div
+                                    v-for="b in c.info.escala"
+                                    :key="b.etiqueta"
+                                    class="esc__b"
+                                    :class="['esc__b--' + b.tono, { 'esc__b--aqui': c.banda && c.banda.etiqueta === b.etiqueta }]"
+                                >
+                                    <span class="esc__r">{{ b.min }}&ndash;{{ b.max }}</span>
+                                    <span class="esc__e">{{ b.etiqueta }}</span>
+                                </div>
+                            </div>
+                            <p v-if="c.banda" class="ac__nota">
+                                Ahora: <strong>{{ num(c.valor, 2) }} {{ c.info.unidad }}</strong>
+                                &rarr; {{ c.banda.etiqueta.toLowerCase() }}.
+                            </p>
+                        </div>
+
+                        <div class="ac__col" v-if="(c.info.siSuena ?? []).length">
+                            <span class="ac__k">Si suena, que hacer</span>
+                            <ol class="ac__pasos">
+                                <li v-for="a in c.info.siSuena" :key="a">{{ a }}</li>
+                            </ol>
+                        </div>
+                    </div>
+
+                    <el-collapse class="ac__mas">
+                        <el-collapse-item :title="c.activa ? 'Cambiar este limite' : 'Activar esta alarma'" :name="c.code">
+                            <p class="ac__nota">
+                                Se hace por consola a proposito: cada limite queda con su justificacion
+                                escrita, su version y quien lo aprobo.
+                            </p>
+                            <pre class="ac__cmd">{{ comandoDe(c) }}</pre>
+                            <p v-if="!c.elegible" class="ac__bloqueo">
+                                Aunque le pongas la regla, este modelo no emitira: {{ c.bloqueo }}
+                            </p>
+                        </el-collapse-item>
+                    </el-collapse>
+                </article>
             </section>
 
             <!-- 6. NOTAS TECNICAS -->
@@ -1078,6 +1250,40 @@ onBeforeUnmount(() => {
 .cfg__pie { font-size: 12px; color: #6b7280; margin-top: 10px; line-height: 1.6; }
 .cfg__pie code { background: #f3f4f6; padding: 2px 6px; border-radius: 4px; font-size: 11px; }
 
+
+.cfg__intro { font-size: 13px; color: #6b7280; margin: -4px 0 14px; line-height: 1.6; }
+.ac { background: #fff; border: 1px solid #e5e7eb; border-radius: 18px; padding: 18px 20px; margin-bottom: 12px; }
+.ac--off { background: #fcfcfd; }
+.ac__cab { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 10px; }
+.ac__emoji { font-size: 26px; line-height: 1; }
+.ac__id { flex: 1; display: flex; flex-direction: column; gap: 1px; }
+.ac__id strong { font-size: 16px; color: #1f2937; }
+.ac__nom { font-size: 12px; color: #9ca3af; }
+.ac__code { color: #cbd5e1; }
+.ac__estado { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+.fresco { font-size: 11px; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.fresco--fresh { background: #dcfce7; color: #166534; }
+.fresco--recent { background: #ecfeff; color: #155e75; }
+.fresco--stale { background: #fef3c7; color: #92400e; }
+.fresco--very_stale { background: #fee2e2; color: #991b1b; }
+.fresco--unknown { background: #f3f4f6; color: #6b7280; }
+.ac__vigila { font-size: 14px; color: #374151; line-height: 1.6; margin: 0 0 14px; }
+.ac__cuerpo { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 18px; }
+.ac__k { display: block; font-size: 11px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 6px; }
+.ac__regla { font-size: 14px; color: #1f2937; margin: 0 0 6px; line-height: 1.55; }
+.ac__regla--prop { color: #6b7280; font-style: italic; }
+.ac__nota { font-size: 12px; color: #6b7280; line-height: 1.6; margin: 0; }
+.ac__pasos { margin: 0; padding-left: 18px; font-size: 13px; color: #4b5563; line-height: 1.65; }
+.esc { display: flex; flex-direction: column; gap: 3px; }
+.esc__b { display: flex; align-items: center; gap: 8px; padding: 3px 8px; border-radius: 8px; font-size: 12px; }
+.esc__b--ok { background: #f0fdf4; color: #166534; }
+.esc__b--aviso { background: #fffbeb; color: #92400e; }
+.esc__b--malo { background: #fef2f2; color: #991b1b; }
+.esc__b--aqui { outline: 2px solid #3b82f6; font-weight: 700; }
+.esc__r { font-variant-numeric: tabular-nums; opacity: .7; min-width: 62px; }
+.ac__mas { margin-top: 12px; }
+.ac__cmd { font-family: ui-monospace, Menlo, monospace; font-size: 11px; background: #0f172a; color: #e2e8f0; padding: 12px; border-radius: 10px; overflow-x: auto; white-space: pre; margin: 8px 0; }
+.ac__bloqueo { font-size: 12px; color: #92400e; background: #fffbeb; padding: 8px 10px; border-radius: 8px; margin: 0; }
 .det { padding: 8px 4px 24px; }
 .det__top { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 16px; }
 .det__emoji { font-size: 38px; }
