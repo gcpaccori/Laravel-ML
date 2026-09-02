@@ -1,6 +1,6 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { InfoFilled, QuestionFilled, RefreshRight, SetUp } from "@element-plus/icons-vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { Delete, InfoFilled, QuestionFilled, RefreshRight, Setting, SetUp } from "@element-plus/icons-vue";
 import ChartFisheye from "@/Components/ChartFisheye.vue";
 
 defineProps({
@@ -734,6 +734,57 @@ const openTwin = () => {
 
 const openModels = () => window.location.assign(route("monitoreo.modelosmls.index"));
 
+
+/* ---- Navegacion y filtros del historial de alarmas ---- */
+const pestana = ref("panorama");
+const configAbierta = ref(false);
+
+const filtroAlarmas = ref({ rango: null, gravedad: "T", modelo: "T" });
+const pagina = ref(1);
+const porPagina = ref(10);
+
+const modelosConAviso = computed(() => {
+    const vistos = new Map();
+    for (const a of avisos.value) {
+        const code = a.model?.code;
+        if (code && !vistos.has(code)) vistos.set(code, nombreDe(code));
+    }
+    return [...vistos].map(([value, label]) => ({ value, label }));
+});
+
+const avisosFiltrados = computed(() => avisosOrdenados.value.filter((a) => {
+    if (filtroAlarmas.value.gravedad !== "T" && a.suggested_severity !== filtroAlarmas.value.gravedad) return false;
+    if (filtroAlarmas.value.modelo !== "T" && a.model?.code !== filtroAlarmas.value.modelo) return false;
+    const rango = filtroAlarmas.value.rango;
+    if (Array.isArray(rango) && rango[0] && rango[1]) {
+        const t = new Date(a.occurred_at).getTime();
+        if (Number.isNaN(t)) return false;
+        const desde = new Date(rango[0]).setHours(0, 0, 0, 0);
+        const hasta = new Date(rango[1]).setHours(23, 59, 59, 999);
+        if (t < desde || t > hasta) return false;
+    }
+    return true;
+}));
+
+const avisosPagina = computed(() => {
+    const ini = (pagina.value - 1) * porPagina.value;
+    return avisosFiltrados.value.slice(ini, ini + porPagina.value);
+});
+
+const limpiarFiltros = () => {
+    filtroAlarmas.value = { rango: null, gravedad: "T", modelo: "T" };
+    pagina.value = 1;
+};
+
+watch(avisosFiltrados, () => { pagina.value = 1; });
+
+const cuandoLargo = (v) => {
+    if (!v) return "";
+    const d = new Date(v);
+    return Number.isNaN(d.getTime()) ? "" : d.toLocaleString("es-PE",
+        { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+};
+
 onMounted(async () => {
     await Promise.all([loadPiscigranjas(), loadPiscinas()]);
     await loadDashboard(false);
@@ -751,311 +802,344 @@ onBeforeUnmount(() => {
 <template>
     <App :title="title" :toolbar="toolbar">
         <div class="al">
-            <!-- FILTROS VISIBLES -->
-            <section class="barra">
-                <div class="barra__campo">
-                    <label>Piscigranja</label>
-                    <el-select v-model="filters.piscigranja_id" filterable size="large" @change="changeFarm">
-                        <el-option label="Todas" value="T" />
-                        <el-option v-for="i in piscigranjas" :key="i.id" :label="i.nombre" :value="String(i.id)" />
-                    </el-select>
+            <!-- CABECERA: contexto y acciones -->
+            <header class="cab">
+                <div class="cab__filtros">
+                    <div class="campo">
+                        <label>Piscigranja</label>
+                        <el-select v-model="filters.piscigranja_id" filterable @change="changeFarm">
+                            <el-option label="Todas" value="T" />
+                            <el-option v-for="i in piscigranjas" :key="i.id" :label="i.nombre" :value="String(i.id)" />
+                        </el-select>
+                    </div>
+                    <div class="campo">
+                        <label>Piscina</label>
+                        <el-select v-model="filters.piscina_id" filterable @change="scheduleReload">
+                            <el-option label="Principal" value="T" />
+                            <el-option v-for="i in piscinas" :key="i.id" :label="i.nombre" :value="String(i.id)" />
+                        </el-select>
+                    </div>
+                    <div class="campo">
+                        <label>Periodo</label>
+                        <el-select v-model="filters.ventana_horas" @change="scheduleReload">
+                            <el-option v-for="i in windowOptions" :key="i.value" :label="i.label" :value="i.value" />
+                        </el-select>
+                    </div>
                 </div>
-                <div class="barra__campo">
-                    <label>Piscina</label>
-                    <el-select v-model="filters.piscina_id" filterable size="large" @change="scheduleReload">
-                        <el-option label="Principal" value="T" />
-                        <el-option v-for="i in piscinas" :key="i.id" :label="i.nombre" :value="String(i.id)" />
-                    </el-select>
+                <div class="cab__acciones">
+                    <el-button :icon="Setting" @click="configAbierta = true">
+                        Configurar alarmas
+                        <span class="cab__badge">{{ configuraciones.filter((c) => c.activa).length }}/{{ configuraciones.length }}</span>
+                    </el-button>
+                    <el-button type="primary" :icon="RefreshRight" :loading="loading" @click="loadDashboard(true)">
+                        Actualizar
+                    </el-button>
                 </div>
-                <div class="barra__campo">
-                    <label>Periodo</label>
-                    <el-select v-model="filters.ventana_horas" size="large" @change="scheduleReload">
-                        <el-option v-for="i in windowOptions" :key="i.value" :label="i.label" :value="i.value" />
-                    </el-select>
+            </header>
+
+            <!-- ESTADO -->
+            <section class="estado" :class="'estado--' + estadoGeneral.tono">
+                <span class="estado__emoji">{{ estadoGeneral.emoji }}</span>
+                <div class="estado__txt">
+                    <h2>{{ estadoGeneral.titulo }}</h2>
+                    <p>{{ estadoGeneral.frase }}</p>
                 </div>
-                <el-button type="primary" size="large" round :icon="RefreshRight" :loading="loading" @click="loadDashboard(true)">
-                    Actualizar
+                <el-button v-if="avisos.length" text class="estado__ir" @click="pestana = 'alarmas'">
+                    Ver las alarmas
                 </el-button>
             </section>
 
-            <!-- 1. ESTADO -->
-            <section class="estado" :class="'estado--' + estadoGeneral.tono">
-                <span class="estado__emoji">{{ estadoGeneral.emoji }}</span>
-                <div>
-                    <h2 class="estado__titulo">{{ estadoGeneral.titulo }}</h2>
-                    <p class="estado__frase">{{ estadoGeneral.frase }}</p>
-                </div>
-            </section>
+            <!-- PESTANAS -->
+            <el-tabs v-model="pestana" class="tabs">
+                <el-tab-pane name="panorama">
+                    <template #label><span class="tabs__l">Panorama</span></template>
 
+                    <section class="al__mod">
+                        <h3 class="al__seccion">Los modelos que vigilan esta piscina</h3>
+                        <div class="tarjetas">
+                            <article
+                                v-for="t in tarjetas"
+                                :key="t.raw.code"
+                                class="tarjeta"
+                                :class="'tarjeta--' + t.estado.tono"
+                                role="button"
+                                tabindex="0"
+                                @click="abrirDetalle(t)"
+                                @keyup.enter="abrirDetalle(t)"
+                            >
+                                <el-popover placement="top" :width="290" trigger="click">
+                                    <template #reference>
+                                        <button class="tarjeta__info" type="button" aria-label="Que hace" @click.stop>
+                                            <el-icon><QuestionFilled /></el-icon>
+                                        </button>
+                                    </template>
+                                    <p class="pop__t">{{ t.corto }}</p>
+                                    <p class="pop__d">{{ t.ayuda }}</p>
+                                </el-popover>
 
-            <!-- Dos columnas: lo que se mira a la izquierda, lo que se acumula
-                 a la derecha. Asi los avisos nunca empujan a los graficos. -->
-            <div class="al__cols">
-                <div class="al__main">
-            <!-- 4. MODELOS -->
-            <section class="al__mod">
-                <h3 class="al__seccion">Los modelos que vigilan esta piscina</h3>
-                <div class="tarjetas">
-                    <article
-                        v-for="t in tarjetas"
-                        :key="t.raw.code"
-                        class="tarjeta"
-                        :class="'tarjeta--' + t.estado.tono"
-                        role="button"
-                        tabindex="0"
-                        @click="abrirDetalle(t)"
-                        @keyup.enter="abrirDetalle(t)"
-                    >
-                        <el-popover placement="top" :width="290" trigger="click">
-                            <template #reference>
-                                <button class="tarjeta__info" type="button" aria-label="Que hace" @click.stop>
-                                    <el-icon><QuestionFilled /></el-icon>
-                                </button>
-                            </template>
-                            <p class="pop__t">{{ t.corto }}</p>
-                            <p class="pop__d">{{ t.ayuda }}</p>
-                        </el-popover>
+                                <span class="tarjeta__emoji">{{ t.emoji }}</span>
+                                <h4 class="tarjeta__nombre">{{ t.corto }}</h4>
+                                <p class="tarjeta__real">{{ t.raw.name }}</p>
 
-                        <span class="tarjeta__emoji">{{ t.emoji }}</span>
-                        <h4 class="tarjeta__nombre">{{ t.corto }}</h4>
-                        <p class="tarjeta__real">{{ t.raw.name }}</p>
-
-                        <p v-if="t.dato" class="tarjeta__dato">
-                            <span class="tarjeta__grande">{{ t.dato.grande }}</span>
-                            <span class="tarjeta__chico">{{ t.dato.chico }}</span>
-                        </p>
-                        <p v-else class="tarjeta__dato tarjeta__dato--vacio">Sin valor</p>
-
-                        <div v-if="miniGrafico(t.raw)" class="tarjeta__mini" @click.stop>
-                            <ChartFisheye :options="miniGrafico(t.raw)" height="56px" />
-                        </div>
-                        <span class="chip" :class="'chip--' + t.estado.tono">{{ t.estado.texto }}</span>
-                        <dl class="tarjeta__meta">
-                            <div>
-                                <dt>Datos</dt>
-                                <dd :class="'fresco--' + (t.raw.data_freshness?.level ?? 'unknown')">
-                                    {{ (t.raw.data_freshness?.label ?? "sin fecha").replace("Dato de hace ", "hace ").replace("Dato reciente", "al dia") }}
-                                </dd>
-                            </div>
-                            <div v-if="t.raw.horizon">
-                                <dt>Proyecta</dt>
-                                <dd>{{ t.raw.horizon }}</dd>
-                            </div>
-                        </dl>
-                        <span class="tarjeta__mas">Ver todo el detalle</span>
-                    </article>
-                </div>
-            </section>
-
-            <!-- 4b. GRAFICO PRINCIPAL -->
-            <section v-if="graficoDestacado" class="al__graf">
-                <h3 class="al__seccion">{{ tituloDestacado }}</h3>
-                <div class="graf">
-                    <ChartFisheye :options="graficoDestacado" height="340px" />
-                    <p class="graf__pie">
-                        Las franjas de color son los rangos de calidad. La linea roja es el limite
-                        a partir del cual el sistema avisa.
-                    </p>
-                </div>
-            </section>
-
-            <!-- 2. QUE ES ESTO -->
-            <el-collapse v-model="abiertos" class="expl">
-                <el-collapse-item name="que-es">
-                    <template #title>
-                        <span class="expl__t"><el-icon><InfoFilled /></el-icon> Que es un modelo y en que se diferencia de una alarma</span>
-                    </template>
-                    <div class="expl__cuerpo">
-                        <p><strong>Un modelo</strong> es una cuenta que mira los sensores y saca un numero: la nota del agua, el oxigeno que habra en una hora, cuanto deberian crecer los peces. El modelo solo calcula. Nunca decide molestar a nadie.</p>
-                        <p><strong>Una alarma</strong> es la regla que tu le pones encima a ese numero: "si baja de 70, avisame". Sin esa regla el modelo sigue calculando, pero se queda callado.</p>
-                        <p>Por eso un modelo puede estar funcionando perfecto y aun asi no avisar nunca: le falta la regla. Eso se ve y se cambia mas abajo, en <strong>Configuracion de alarmas</strong>.</p>
-                        <p class="expl__nota">Estas alarmas son distintas de las de la pestana <em>Alertas</em>. Aquellas se disparan cuando un sensor cruza un rango fijo. Estas nacen de un modelo que combina varias medidas o proyecta hacia adelante.</p>
-                    </div>
-                </el-collapse-item>
-            </el-collapse>
-
-            <!-- 6. NOTAS TECNICAS -->
-            <el-collapse v-if="observations.length" v-model="abiertos" class="expl">
-                <el-collapse-item name="notas">
-                    <template #title><span class="expl__t">Notas tecnicas del calculo ({{ observations.length }})</span></template>
-                    <ul class="lista">
-                        <li v-for="(o, i) in observations" :key="i">{{ textoNota(o) }}</li>
-                    </ul>
-                    <dl class="dl" v-if="meta.source">
-                        <div><dt>Origen</dt><dd>{{ meta.source }}</dd></div>
-                        <div v-if="meta.computed_at"><dt>Calculado</dt><dd>{{ cuando(meta.computed_at) }}</dd></div>
-                        <div v-if="meta.window_hours"><dt>Ventana</dt><dd>{{ meta.window_hours }} h</dd></div>
-                    </dl>
-                </el-collapse-item>
-            </el-collapse>
-
-                </div>
-
-                <aside class="al__lado">
-            <!-- 3. AVISOS -->
-            <section v-if="avisos.length" class="avisos">
-                <div class="avisos__cab">
-                    <h3 class="al__seccion avisos__t">Que paso</h3>
-                    <div class="avisos__conteo">
-                        <span v-if="conteoGravedad.emergencia" class="chip chip--malo">
-                            {{ conteoGravedad.emergencia }} urgente<span v-if="conteoGravedad.emergencia > 1">s</span>
-                        </span>
-                        <span v-if="conteoGravedad.critico" class="chip chip--malo">
-                            {{ conteoGravedad.critico }} grave<span v-if="conteoGravedad.critico > 1">s</span>
-                        </span>
-                        <span v-if="conteoGravedad.advertencia" class="chip chip--aviso">
-                            {{ conteoGravedad.advertencia }} de atencion
-                        </span>
-                    </div>
-                </div>
-                <div class="avisos__lista">
-                <article v-for="a in avisosVisibles" :key="a.source_event_id ?? a.id" class="aviso">
-                    <span class="aviso__punto" :class="'punto--' + gravedadDe(a.suggested_severity).tono" />
-                    <div class="aviso__cuerpo">
-                        <strong>{{ nombreDe(a.model?.code) }}</strong>
-                        <span>{{ mensajeSimple(a) }}</span>
-                        <el-collapse class="aviso__col">
-                            <el-collapse-item title="Ver el detalle tecnico" :name="a.source_event_id ?? a.id">
-                                <dl class="dl">
-                                    <div><dt>Mensaje original</dt><dd>{{ a.message }}</dd></div>
-                                    <div v-if="a.alarm_code"><dt>Codigo de alarma</dt><dd>{{ a.alarm_code }}</dd></div>
-                                    <div v-if="a.model?.code"><dt>Modelo</dt><dd>{{ a.model.code }} <span v-if="a.model.version">({{ a.model.version }})</span></dd></div>
-                                    <div v-if="a.policy?.code"><dt>Politica aplicada</dt><dd>{{ a.policy.code }}</dd></div>
-                                    <div v-if="a.value !== null && a.value !== undefined"><dt>Valor</dt><dd>{{ num(a.value) }}</dd></div>
-                                    <div v-if="a.horizon_minutes"><dt>Horizonte</dt><dd>{{ a.horizon_minutes }} min</dd></div>
-                                    <div v-if="a.source_event_id"><dt>Id del evento</dt><dd class="mono">{{ a.source_event_id }}</dd></div>
-                                </dl>
-                            </el-collapse-item>
-                        </el-collapse>
-                    </div>
-                    <div class="aviso__lado">
-                        <span class="chip" :class="'chip--' + gravedadDe(a.suggested_severity).tono">
-                            {{ gravedadDe(a.suggested_severity).texto }}
-                        </span>
-                        <time>{{ cuando(a.occurred_at) }}</time>
-                    </div>
-                </article>
-                </div>
-                <button
-                    v-if="avisosOrdenados.length > TOPE_AVISOS"
-                    class="avisos__mas"
-                    type="button"
-                    @click="verTodosLosAvisos = !verTodosLosAvisos"
-                >
-                    {{ verTodosLosAvisos
-                        ? "Mostrar solo los " + TOPE_AVISOS + " mas importantes"
-                        : "Ver los " + avisosOrdenados.length + " avisos" }}
-                </button>
-            </section>
-
-            <!-- 5. CONFIGURACION DE ALARMAS -->
-            <el-collapse v-model="abiertos" class="expl al__cfg">
-                <el-collapse-item name="config">
-                    <template #title>
-                        <span class="expl__t">
-                            Configuracion de alarmas
-                            <span class="cfg__resumen">
-                                {{ configuraciones.filter((c) => c.activa).length }} activas
-                                de {{ configuraciones.length }}
-                            </span>
-                        </span>
-                    </template>
-                <p class="cfg__intro">
-                    Cada modelo calcula un numero. La alarma es la regla que decide a partir de
-                    que punto ese numero merece que alguien mire la piscina.
-                </p>
-
-                <article v-for="c in configuraciones" :key="c.code" class="ac" :class="{ 'ac--off': !c.activa }">
-                    <header class="ac__cab">
-                        <span class="ac__emoji">{{ c.emoji }}</span>
-                        <div class="ac__id">
-                            <strong>{{ c.corto }}</strong>
-                            <span class="ac__nom">{{ c.nombre }}</span>
-                            <span class="mono ac__code">{{ c.alarmCode }}</span>
-                        </div>
-                        <div class="ac__estado">
-                            <span class="chip" :class="c.activa ? 'chip--ok' : 'chip--off'">
-                                {{ c.activa ? "Alarma activa" : "Sin alarma" }}
-                            </span>
-                            <span class="fresco" :class="'fresco--' + (c.frescura.level ?? 'unknown')">
-                                {{ c.frescura.label ?? "Sin fecha" }}
-                            </span>
-                        </div>
-                    </header>
-
-                    <p class="ac__vigila">{{ c.info.vigila ?? c.raw.purpose }}</p>
-
-                    <div class="ac__cuerpo">
-                        <div class="ac__col">
-                            <span class="ac__k">La regla</span>
-                            <p v-if="c.activa" class="ac__regla">
-                                Avisa cuando {{ c.corto.replace(/^El |^La /, "").toLowerCase() }}
-                                {{ OPERADOR_TEXTO[c.policy.operator] ?? "llegue a" }}
-                                <strong>{{ c.policy.threshold }} {{ c.policy.unit }}</strong>,
-                                con gravedad <strong>{{ gravedadDe(c.policy.severity).texto.toLowerCase() }}</strong>.
-                            </p>
-                            <template v-else>
-                                <p class="ac__regla ac__regla--prop" v-if="c.sugerido">
-                                    Propuesta: avisar cuando
-                                    {{ OPERADOR_TEXTO[c.sugerido.operador] }}
-                                    <strong>{{ c.sugerido.umbral }} {{ c.sugerido.unidad }}</strong>.
+                                <p v-if="t.dato" class="tarjeta__dato">
+                                    <span class="tarjeta__grande">{{ t.dato.grande }}</span>
+                                    <span class="tarjeta__chico">{{ t.dato.chico }}</span>
                                 </p>
-                                <p class="ac__regla ac__regla--prop" v-else>
-                                    Sin regla definida todavia.
-                                </p>
-                                <p class="ac__nota">{{ c.sugerido?.porque ?? c.bloqueo }}</p>
-                            </template>
-                            <p v-if="c.activa && c.policy.rationale" class="ac__nota">{{ c.policy.rationale }}</p>
-                        </div>
+                                <p v-else class="tarjeta__dato tarjeta__dato--vacio">Sin valor</p>
 
-                        <div class="ac__col" v-if="(c.info.escala ?? []).length">
-                            <span class="ac__k">Como se lee el valor</span>
-                            <div class="esc">
-                                <div
-                                    v-for="b in c.info.escala"
-                                    :key="b.etiqueta"
-                                    class="esc__b"
-                                    :class="['esc__b--' + b.tono, { 'esc__b--aqui': c.banda && c.banda.etiqueta === b.etiqueta }]"
-                                >
-                                    <span class="esc__r">{{ b.min }}&ndash;{{ b.max }}</span>
-                                    <span class="esc__e">{{ b.etiqueta }}</span>
+                                <div v-if="miniGrafico(t.raw)" class="tarjeta__mini" @click.stop>
+                                    <ChartFisheye :options="miniGrafico(t.raw)" height="52px" />
                                 </div>
+
+                                <span class="chip" :class="'chip--' + t.estado.tono">{{ t.estado.texto }}</span>
+
+                                <dl class="tarjeta__meta">
+                                    <div>
+                                        <dt>Datos</dt>
+                                        <dd :class="'fresco--' + (t.raw.data_freshness?.level ?? 'unknown')">
+                                            {{ (t.raw.data_freshness?.label ?? "sin fecha").replace("Dato de hace ", "hace ").replace("Dato reciente", "al dia") }}
+                                        </dd>
+                                    </div>
+                                    <div v-if="t.raw.horizon">
+                                        <dt>Proyecta</dt>
+                                        <dd>{{ t.raw.horizon }}</dd>
+                                    </div>
+                                </dl>
+                            </article>
+                        </div>
+                    </section>
+
+                    <section v-if="graficoDestacado" class="al__graf">
+                        <h3 class="al__seccion">{{ tituloDestacado }}</h3>
+                        <div class="graf">
+                            <ChartFisheye :options="graficoDestacado" height="320px" />
+                            <p class="graf__pie">
+                                Las franjas de color son los rangos de calidad. La linea roja es el
+                                limite a partir del cual el sistema avisa.
+                            </p>
+                        </div>
+                    </section>
+
+                    <el-collapse v-model="abiertos" class="expl">
+                        <el-collapse-item name="que-es">
+                            <template #title>
+                                <span class="expl__t"><el-icon><InfoFilled /></el-icon> Que es un modelo y en que se diferencia de una alarma</span>
+                            </template>
+                            <div class="expl__cuerpo">
+                                <p><strong>Un modelo</strong> es una cuenta que mira los sensores y saca un numero: la nota del agua, el oxigeno que habra en una hora, cuanto deberian crecer los peces. El modelo solo calcula. Nunca decide molestar a nadie.</p>
+                                <p><strong>Una alarma</strong> es la regla que tu le pones encima a ese numero: "si baja de 70, avisame". Sin esa regla el modelo sigue calculando, pero se queda callado.</p>
+                                <p>Por eso un modelo puede estar funcionando perfecto y aun asi no avisar nunca: le falta la regla. Se define con el boton <strong>Configurar alarmas</strong>.</p>
+                                <p class="expl__nota">Estas alarmas son distintas de las de la pestana <em>Alertas</em>. Aquellas se disparan cuando un sensor cruza un rango fijo. Estas nacen de un modelo que combina varias medidas o proyecta hacia adelante.</p>
                             </div>
-                            <p v-if="c.banda" class="ac__nota">
-                                Ahora: <strong>{{ num(c.valor, 2) }} {{ c.info.unidad }}</strong>
-                                &rarr; {{ c.banda.etiqueta.toLowerCase() }}.
-                            </p>
-                        </div>
-
-                        <div class="ac__col" v-if="(c.info.siSuena ?? []).length">
-                            <span class="ac__k">Si suena, que hacer</span>
-                            <ol class="ac__pasos">
-                                <li v-for="a in c.info.siSuena" :key="a">{{ a }}</li>
-                            </ol>
-                        </div>
-                    </div>
-
-                    <el-collapse class="ac__mas">
-                        <el-collapse-item :title="c.activa ? 'Cambiar este limite' : 'Activar esta alarma'" :name="c.code">
-                            <p class="ac__nota">
-                                Se hace por consola a proposito: cada limite queda con su justificacion
-                                escrita, su version y quien lo aprobo.
-                            </p>
-                            <pre class="ac__cmd">{{ comandoDe(c) }}</pre>
-                            <p v-if="!c.elegible" class="ac__bloqueo">
-                                Aunque le pongas la regla, este modelo no emitira: {{ c.bloqueo }}
-                            </p>
+                        </el-collapse-item>
+                        <el-collapse-item v-if="observations.length" name="notas">
+                            <template #title><span class="expl__t">Notas tecnicas del calculo ({{ observations.length }})</span></template>
+                            <ul class="lista"><li v-for="(o, i) in observations" :key="i">{{ textoNota(o) }}</li></ul>
+                            <dl class="dl" v-if="meta.source">
+                                <div><dt>Origen</dt><dd>{{ meta.source }}</dd></div>
+                                <div v-if="meta.computed_at"><dt>Calculado</dt><dd>{{ cuandoLargo(meta.computed_at) }}</dd></div>
+                                <div v-if="meta.window_hours"><dt>Ventana</dt><dd>{{ meta.window_hours }} h</dd></div>
+                            </dl>
                         </el-collapse-item>
                     </el-collapse>
-                </article>
-                </el-collapse-item>
-            </el-collapse>
+                </el-tab-pane>
 
-                </aside>
-            </div>
+                <el-tab-pane name="alarmas">
+                    <template #label>
+                        <span class="tabs__l">
+                            Alarmas
+                            <span v-if="avisos.length" class="tabs__n">{{ avisos.length }}</span>
+                        </span>
+                    </template>
 
-            <!-- 7. PANEL DE DETALLE -->
-            <el-drawer :model-value="Boolean(detalle)" :with-header="false" size="600px" @close="detalle = null">
+                    <div class="hist">
+                        <div class="hist__filtros">
+                            <div class="campo campo--ancho">
+                                <label>Rango de fechas</label>
+                                <el-date-picker
+                                    v-model="filtroAlarmas.rango"
+                                    type="daterange"
+                                    range-separator="a"
+                                    start-placeholder="Desde"
+                                    end-placeholder="Hasta"
+                                    format="DD/MM/YYYY"
+                                    value-format="YYYY-MM-DD"
+                                />
+                            </div>
+                            <div class="campo">
+                                <label>Gravedad</label>
+                                <el-select v-model="filtroAlarmas.gravedad">
+                                    <el-option label="Todas" value="T" />
+                                    <el-option label="Urgente" value="emergencia" />
+                                    <el-option label="Grave" value="critico" />
+                                    <el-option label="Atencion" value="advertencia" />
+                                </el-select>
+                            </div>
+                            <div class="campo">
+                                <label>Modelo</label>
+                                <el-select v-model="filtroAlarmas.modelo">
+                                    <el-option label="Todos" value="T" />
+                                    <el-option v-for="m in modelosConAviso" :key="m.value" :label="m.label" :value="m.value" />
+                                </el-select>
+                            </div>
+                            <el-button :icon="Delete" text @click="limpiarFiltros">Limpiar</el-button>
+                        </div>
+
+                        <div class="hist__conteo">
+                            <span v-if="conteoGravedad.emergencia" class="chip chip--malo">{{ conteoGravedad.emergencia }} urgente<span v-if="conteoGravedad.emergencia > 1">s</span></span>
+                            <span v-if="conteoGravedad.critico" class="chip chip--malo">{{ conteoGravedad.critico }} grave<span v-if="conteoGravedad.critico > 1">s</span></span>
+                            <span v-if="conteoGravedad.advertencia" class="chip chip--aviso">{{ conteoGravedad.advertencia }} de atencion</span>
+                            <span class="hist__resultado">
+                                {{ avisosFiltrados.length }} de {{ avisos.length }} alarmas
+                            </span>
+                        </div>
+
+                        <el-table :data="avisosPagina" class="hist__tabla" empty-text="Ninguna alarma con esos filtros" row-key="source_event_id">
+                            <el-table-column type="expand">
+                                <template #default="{ row }">
+                                    <dl class="dl dl--mini hist__det">
+                                        <div><dt>Mensaje original</dt><dd>{{ row.message }}</dd></div>
+                                        <div v-if="row.alarm_code"><dt>Codigo de alarma</dt><dd class="mono">{{ row.alarm_code }}</dd></div>
+                                        <div v-if="row.model?.code"><dt>Modelo</dt><dd class="mono">{{ row.model.code }}<span v-if="row.model.version"> ({{ row.model.version }})</span></dd></div>
+                                        <div v-if="row.policy?.code"><dt>Politica</dt><dd class="mono">{{ row.policy.code }}</dd></div>
+                                        <div v-if="row.horizon_minutes"><dt>Horizonte</dt><dd>{{ row.horizon_minutes }} min</dd></div>
+                                        <div v-if="row.source_event_id"><dt>Id del evento</dt><dd class="mono">{{ row.source_event_id }}</dd></div>
+                                    </dl>
+                                </template>
+                            </el-table-column>
+                            <el-table-column label="Gravedad" width="118">
+                                <template #default="{ row }">
+                                    <span class="chip" :class="'chip--' + gravedadDe(row.suggested_severity).tono">
+                                        {{ gravedadDe(row.suggested_severity).texto }}
+                                    </span>
+                                </template>
+                            </el-table-column>
+                            <el-table-column label="Modelo" width="170">
+                                <template #default="{ row }">
+                                    <span class="hist__modelo">
+                                        {{ MODELOS[row.model?.code]?.emoji ?? "" }} {{ nombreDe(row.model?.code) }}
+                                    </span>
+                                </template>
+                            </el-table-column>
+                            <el-table-column label="Que paso" min-width="320">
+                                <template #default="{ row }">{{ mensajeSimple(row) }}</template>
+                            </el-table-column>
+                            <el-table-column label="Valor" width="110" align="right">
+                                <template #default="{ row }">{{ num(row.predicted_value ?? row.value, 2) }}</template>
+                            </el-table-column>
+                            <el-table-column label="Cuando" width="190">
+                                <template #default="{ row }">{{ cuandoLargo(row.occurred_at) }}</template>
+                            </el-table-column>
+                        </el-table>
+
+                        <div class="hist__pie">
+                            <el-pagination
+                                v-model:current-page="pagina"
+                                v-model:page-size="porPagina"
+                                :page-sizes="[10, 25, 50, 100]"
+                                :total="avisosFiltrados.length"
+                                layout="total, sizes, prev, pager, next"
+                                background
+                            />
+                        </div>
+                    </div>
+                </el-tab-pane>
+            </el-tabs>
+
+            <!-- CAJON: CONFIGURACION -->
+            <el-drawer v-model="configAbierta" size="760px" :with-header="false">
+                <div class="cfgd">
+                    <header class="cfgd__cab">
+                        <div>
+                            <h3>Configuracion de alarmas</h3>
+                            <p>Cada modelo calcula un numero. La alarma es la regla que decide a partir de que punto ese numero merece que alguien mire la piscina.</p>
+                        </div>
+                        <span class="chip chip--ok">{{ configuraciones.filter((c) => c.activa).length }} activas de {{ configuraciones.length }}</span>
+                    </header>
+
+                    <article v-for="c in configuraciones" :key="c.code" class="ac" :class="{ 'ac--off': !c.activa }">
+                        <header class="ac__cab">
+                            <span class="ac__emoji">{{ c.emoji }}</span>
+                            <div class="ac__id">
+                                <strong>{{ c.corto }}</strong>
+                                <span class="ac__nom">{{ c.nombre }}</span>
+                                <span class="mono ac__code">{{ c.alarmCode }}</span>
+                            </div>
+                            <div class="ac__estado">
+                                <span class="chip" :class="c.activa ? 'chip--ok' : 'chip--off'">
+                                    {{ c.activa ? "Alarma activa" : "Sin alarma" }}
+                                </span>
+                                <span class="fresco" :class="'fresco--' + (c.frescura.level ?? 'unknown')">
+                                    {{ c.frescura.label ?? "Sin fecha" }}
+                                </span>
+                            </div>
+                        </header>
+
+                        <p class="ac__vigila">{{ c.info.vigila ?? c.raw.purpose }}</p>
+
+                        <div class="ac__cuerpo">
+                            <div class="ac__col">
+                                <span class="ac__k">La regla</span>
+                                <p v-if="c.activa" class="ac__regla">
+                                    Avisa cuando {{ c.corto.replace(/^El |^La /, "").toLowerCase() }}
+                                    {{ OPERADOR_TEXTO[c.policy.operator] ?? "llegue a" }}
+                                    <strong>{{ c.policy.threshold }} {{ c.policy.unit }}</strong>,
+                                    con gravedad <strong>{{ gravedadDe(c.policy.severity).texto.toLowerCase() }}</strong>.
+                                </p>
+                                <template v-else>
+                                    <p class="ac__regla ac__regla--prop" v-if="c.sugerido">
+                                        Propuesta: avisar cuando {{ OPERADOR_TEXTO[c.sugerido.operador] }}
+                                        <strong>{{ c.sugerido.umbral }} {{ c.sugerido.unidad }}</strong>.
+                                    </p>
+                                    <p class="ac__regla ac__regla--prop" v-else>Sin regla definida todavia.</p>
+                                    <p class="ac__nota">{{ c.sugerido?.porque ?? c.bloqueo }}</p>
+                                </template>
+                                <p v-if="c.activa && c.policy.rationale" class="ac__nota">{{ c.policy.rationale }}</p>
+                            </div>
+
+                            <div class="ac__col" v-if="(c.info.escala ?? []).length">
+                                <span class="ac__k">Como se lee el valor</span>
+                                <div class="esc">
+                                    <div
+                                        v-for="b in c.info.escala"
+                                        :key="b.etiqueta"
+                                        class="esc__b"
+                                        :class="['esc__b--' + b.tono, { 'esc__b--aqui': c.banda && c.banda.etiqueta === b.etiqueta }]"
+                                    >
+                                        <span class="esc__r">{{ b.min }}&ndash;{{ b.max }}</span>
+                                        <span class="esc__e">{{ b.etiqueta }}</span>
+                                    </div>
+                                </div>
+                                <p v-if="c.banda" class="ac__nota">
+                                    Ahora: <strong>{{ num(c.valor, 2) }} {{ c.info.unidad }}</strong>
+                                    &rarr; {{ c.banda.etiqueta.toLowerCase() }}.
+                                </p>
+                            </div>
+
+                            <div class="ac__col" v-if="(c.info.siSuena ?? []).length">
+                                <span class="ac__k">Si suena, que hacer</span>
+                                <ol class="ac__pasos"><li v-for="a in c.info.siSuena" :key="a">{{ a }}</li></ol>
+                            </div>
+                        </div>
+
+                        <el-collapse class="ac__mas">
+                            <el-collapse-item :title="c.activa ? 'Cambiar este limite' : 'Activar esta alarma'" :name="c.code">
+                                <p class="ac__nota">
+                                    Se hace por consola a proposito: cada limite queda con su justificacion
+                                    escrita, su version y quien lo aprobo.
+                                </p>
+                                <pre class="ac__cmd">{{ comandoDe(c) }}</pre>
+                                <p v-if="!c.elegible" class="ac__bloqueo">
+                                    Aunque le pongas la regla, este modelo no emitira: {{ c.bloqueo }}
+                                </p>
+                            </el-collapse-item>
+                        </el-collapse>
+                    </article>
+                </div>
+            </el-drawer>
+
+            <!-- CAJON: DETALLE DEL MODELO -->
+            <el-drawer :model-value="Boolean(detalle)" :with-header="false" size="620px" @close="detalle = null">
                 <div v-if="detalle" class="det">
                     <header class="det__top">
                         <span class="det__emoji">{{ detalle.emoji }}</span>
@@ -1089,9 +1173,9 @@ onBeforeUnmount(() => {
                             <span class="det__k">Alcance</span>
                             <span class="det__v det__v--txt">{{ detalle.raw.horizon }}</span>
                         </div>
-                        <div v-if="detalle.raw.data_timestamp">
-                            <span class="det__k">Ultimo dato</span>
-                            <span class="det__v det__v--txt">{{ cuando(detalle.raw.data_timestamp) }}</span>
+                        <div v-if="detalle.raw.data_freshness?.label">
+                            <span class="det__k">Antiguedad</span>
+                            <span class="det__v det__v--txt">{{ detalle.raw.data_freshness.label }}</span>
                         </div>
                     </div>
 
@@ -1126,7 +1210,7 @@ onBeforeUnmount(() => {
                         <el-collapse-item v-if="detalle.raw.usage?.activation_criteria" title="Que le falta para que se le confie" name="c">
                             <ul class="checks">
                                 <li v-for="(v, k) in detalle.raw.usage.activation_criteria" :key="k" :class="{ ok: v }">
-                                    <span>{{ v ? "✓" : "✗" }}</span> {{ criterioTexto(k) }}
+                                    <span>{{ v ? "\u2713" : "\u2717" }}</span> {{ criterioTexto(k) }}
                                 </li>
                             </ul>
                         </el-collapse-item>
@@ -1194,10 +1278,6 @@ onBeforeUnmount(() => {
 
                         <el-collapse-item v-if="detalle.raw.policy?.rationale" title="Por que ese limite" name="p">
                             <p class="det__nota">{{ detalle.raw.policy.rationale }}</p>
-                            <dl class="dl dl--mini">
-                                <div v-if="detalle.raw.policy.approved_at"><dt>Aprobada</dt><dd>{{ cuando(detalle.raw.policy.approved_at) }}</dd></div>
-                                <div v-if="detalle.raw.policy.code"><dt>Codigo</dt><dd class="mono">{{ detalle.raw.policy.code }}</dd></div>
-                            </dl>
                         </el-collapse-item>
 
                         <el-collapse-item v-if="entradas(detalle.raw.traceability).length" title="De donde salen los datos" name="t">
@@ -1231,96 +1311,62 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-
-/* --- Rejilla general --------------------------------------------------- */
-.al__cols { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; align-items: start; }
-@media (min-width: 1180px) {
-    .al__cols { grid-template-columns: minmax(0, 1fr) 372px; }
-    .al__lado { position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow-y: auto; padding-right: 2px; }
-    .al__lado::-webkit-scrollbar { width: 8px; }
-    .al__lado::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 999px; }
-}
-.al__main { min-width: 0; }
-.al__lado { min-width: 0; }
-.al__lado .al__seccion { margin-top: 0; }
-.al__lado .avisos__lista { max-height: 300px; }
-.al__lado .ac__cuerpo { grid-template-columns: minmax(0, 1fr); gap: 12px; }
-.al__lado .expl { margin-top: 16px; }
-.al__lado .ac { padding: 14px 16px; }
-
-/* --- Ficha del modelo: periodo de datos y horizonte -------------------- */
-.tarjeta__meta { display: flex; justify-content: center; gap: 14px; margin: 10px 0 0; flex-wrap: wrap; }
-.tarjeta__meta > div { display: flex; flex-direction: column; gap: 1px; min-width: 0; max-width: 50%; }
-.tarjeta__meta dt { font-size: 9px; text-transform: uppercase; letter-spacing: .05em; color: #cbd5e1; }
-.tarjeta__meta dd { margin: 0; font-size: 11px; color: #6b7280; line-height: 1.35; overflow-wrap: anywhere; }
-.tarjeta__meta dd.fresco--stale, .tarjeta__meta dd.fresco--very_stale { color: #b45309; font-weight: 600; }
-.tarjeta__meta dd.fresco--fresh, .tarjeta__meta dd.fresco--recent { color: #15803d; }
-
-.al { max-width: 1560px; margin: 0 auto; padding: 8px 0 48px; }
-.al__seccion { font-size: 15px; font-weight: 700; color: #6b7280; margin: 26px 0 12px; }
+.al { max-width: 1440px; margin: 0 auto; padding: 4px 0 48px; }
+.al__seccion { font-size: 15px; font-weight: 700; color: #6b7280; margin: 4px 0 12px; }
 .mono { font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
 
-.barra { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 22px; }
-.barra__campo { flex: 1 1 180px; min-width: 160px; }
-.barra__campo label { display: block; font-size: 12px; font-weight: 600; color: #6b7280; margin-bottom: 5px; }
-.barra__campo :deep(.el-select) { width: 100%; }
+/* ---------- Cabecera ---------- */
+.cab { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex-wrap: wrap; margin-bottom: 18px; }
+.cab__filtros { display: flex; gap: 14px; flex-wrap: wrap; flex: 1 1 520px; }
+.cab__acciones { display: flex; gap: 10px; align-items: center; }
+.cab__badge { margin-left: 8px; font-size: 11px; font-weight: 700; background: #eef2ff; color: #4338ca; padding: 1px 7px; border-radius: 999px; }
+.campo { flex: 1 1 180px; min-width: 150px; }
+.campo--ancho { flex: 2 1 300px; }
+.campo label { display: block; font-size: 12px; font-weight: 600; color: #6b7280; margin-bottom: 5px; }
+.campo :deep(.el-select), .campo :deep(.el-date-editor) { width: 100%; }
 
-.estado { display: flex; align-items: center; gap: 20px; padding: 26px 30px; border-radius: 20px; border: 2px solid; }
-.estado__emoji { font-size: 52px; line-height: 1; }
-.estado__titulo { font-size: 26px; font-weight: 800; margin: 0 0 4px; }
-.estado__frase { font-size: 15px; margin: 0; opacity: .85; }
+/* ---------- Estado ---------- */
+.estado { display: flex; align-items: center; gap: 18px; padding: 22px 26px; border-radius: 18px; border: 2px solid; margin-bottom: 6px; }
+.estado__emoji { font-size: 46px; line-height: 1; }
+.estado__txt { flex: 1; }
+.estado__txt h2 { font-size: 25px; font-weight: 800; margin: 0 0 3px; }
+.estado__txt p { font-size: 15px; margin: 0; opacity: .85; }
+.estado__ir { font-weight: 600; }
 .estado--ok { background: #f0fdf4; border-color: #86efac; color: #166534; }
 .estado--malo { background: #fef2f2; border-color: #fca5a5; color: #991b1b; }
 .estado--off { background: #f9fafb; border-color: #e5e7eb; color: #4b5563; }
 .estado--calc { background: #eff6ff; border-color: #93c5fd; color: #1e40af; }
 
-.expl { margin-top: 14px; border: 1px solid #e5e7eb; border-radius: 14px; padding: 0 16px; }
-.expl__t { font-weight: 700; color: #4b5563; display: inline-flex; align-items: center; gap: 6px; }
-.expl__cuerpo p { font-size: 14px; line-height: 1.65; color: #374151; margin: 0 0 10px; }
-.expl__nota { border-left: 3px solid #d1d5db; padding-left: 12px; color: #6b7280 !important; }
+/* ---------- Pestanas ---------- */
+.tabs :deep(.el-tabs__header) { margin: 0 0 18px; }
+.tabs :deep(.el-tabs__item) { font-size: 15px; font-weight: 600; height: 46px; }
+.tabs__l { display: inline-flex; align-items: center; gap: 8px; }
+.tabs__n { background: #fee2e2; color: #991b1b; font-size: 11px; font-weight: 800; padding: 1px 8px; border-radius: 999px; }
 
-
-.avisos__cab { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.avisos__t { margin-bottom: 12px; }
-.avisos__conteo { display: flex; gap: 6px; flex-wrap: wrap; }
-/* La lista crece hacia dentro: la pagina no se mueve aunque haya 50 avisos. */
-.avisos__lista { max-height: 340px; overflow-y: auto; padding-right: 4px; }
-.avisos__lista::-webkit-scrollbar { width: 8px; }
-.avisos__lista::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 999px; }
-.avisos__lista::-webkit-scrollbar-thumb:hover { background: #d1d5db; }
-.avisos__mas { display: block; width: 100%; margin-top: 8px; padding: 8px; border: 1px dashed #e5e7eb; background: transparent; border-radius: 12px; font-size: 13px; color: #6b7280; cursor: pointer; }
-.avisos__mas:hover { background: #f9fafb; color: #374151; }
-.aviso { display: flex; align-items: flex-start; gap: 14px; padding: 16px 18px; background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; margin-bottom: 10px; }
-.aviso__punto { width: 12px; height: 12px; border-radius: 50%; margin-top: 6px; flex: none; }
-.punto--malo { background: #ef4444; }
-.punto--aviso { background: #f59e0b; }
-.aviso__cuerpo { flex: 1; display: flex; flex-direction: column; gap: 3px; }
-.aviso__cuerpo strong { font-size: 16px; color: #1f2937; }
-.aviso__cuerpo > span { font-size: 14px; color: #6b7280; }
-.aviso__col { border: 0; }
-.aviso__col :deep(.el-collapse-item__header) { height: 30px; line-height: 30px; font-size: 12px; color: #9ca3af; border: 0; }
-.aviso__col :deep(.el-collapse-item__wrap) { border: 0; }
-.aviso__lado { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
-.aviso__lado time { font-size: 12px; color: #9ca3af; white-space: nowrap; }
-
-.tarjetas { display: grid; grid-template-columns: repeat(auto-fit, minmax(168px, 1fr)); gap: 12px; }
-.tarjeta { position: relative; background: #fff; border: 1px solid #e5e7eb; border-radius: 18px; padding: 22px 18px 16px; text-align: center; cursor: pointer; transition: transform .15s, box-shadow .15s; }
-.tarjeta:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0, 0, 0, .07); }
+/* ---------- Tarjetas de modelo ---------- */
+.tarjetas { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; }
+.tarjeta { position: relative; background: #fff; border: 1px solid #e5e7eb; border-radius: 18px; padding: 20px 16px 14px; text-align: center; cursor: pointer; transition: transform .15s, box-shadow .15s; display: flex; flex-direction: column; }
+.tarjeta:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.07); }
 .tarjeta--ok { border-color: #bbf7d0; }
 .tarjeta--aviso { border-color: #fde68a; }
 .tarjeta--eval { border-color: #ddd6fe; }
 .tarjeta--calc { border-color: #bfdbfe; }
 .tarjeta__info { position: absolute; top: 10px; right: 10px; border: 0; background: transparent; color: #d1d5db; cursor: pointer; padding: 4px; }
 .tarjeta__info:hover { color: #6b7280; }
-.tarjeta__emoji { font-size: 38px; display: block; line-height: 1; }
-.tarjeta__nombre { font-size: 17px; font-weight: 700; color: #1f2937; margin: 10px 0 2px; }
-.tarjeta__real { font-size: 11px; color: #9ca3af; margin: 0 0 10px; line-height: 1.3; }
-.tarjeta__dato { margin: 0 0 12px; display: flex; flex-direction: column; gap: 2px; }
-.tarjeta__grande { font-size: 24px; font-weight: 800; color: #111827; }
-.tarjeta__chico { font-size: 12px; color: #9ca3af; }
-.tarjeta__dato--vacio { font-size: 14px; color: #d1d5db; }
-.tarjeta__horizonte { font-size: 11px; color: #9ca3af; margin: 8px 0 0; }
-.tarjeta__mas { display: block; margin-top: 8px; font-size: 12px; color: #9ca3af; }
+.tarjeta__emoji { font-size: 34px; line-height: 1; }
+.tarjeta__nombre { font-size: 16px; font-weight: 700; color: #1f2937; margin: 8px 0 2px; }
+.tarjeta__real { font-size: 11px; color: #9ca3af; margin: 0 0 10px; line-height: 1.3; min-height: 28px; }
+.tarjeta__dato { margin: 0 0 8px; display: flex; flex-direction: column; gap: 2px; }
+.tarjeta__grande { font-size: 23px; font-weight: 800; color: #111827; }
+.tarjeta__chico { font-size: 11px; color: #9ca3af; }
+.tarjeta__dato--vacio { font-size: 13px; color: #d1d5db; }
+.tarjeta__mini { margin: 0 -4px 10px; pointer-events: none; }
+.tarjeta__meta { display: flex; justify-content: center; gap: 14px; margin: 10px 0 0; flex-wrap: wrap; }
+.tarjeta__meta > div { display: flex; flex-direction: column; gap: 1px; min-width: 0; max-width: 50%; }
+.tarjeta__meta dt { font-size: 9px; text-transform: uppercase; letter-spacing: .05em; color: #cbd5e1; }
+.tarjeta__meta dd { margin: 0; font-size: 11px; color: #6b7280; line-height: 1.35; overflow-wrap: anywhere; }
+.tarjeta__meta dd.fresco--stale, .tarjeta__meta dd.fresco--very_stale { color: #b45309; font-weight: 600; }
+.tarjeta__meta dd.fresco--fresh, .tarjeta__meta dd.fresco--recent { color: #15803d; }
 
 .chip { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
 .chip--ok { background: #dcfce7; color: #166534; }
@@ -1330,33 +1376,40 @@ onBeforeUnmount(() => {
 .chip--off { background: #f3f4f6; color: #6b7280; }
 .chip--calc { background: #dbeafe; color: #1e40af; }
 
-.cfg { border: 1px solid #e5e7eb; border-radius: 14px; overflow: hidden; }
-.cfg__fila { display: grid; grid-template-columns: 32px 1.1fr 2fr auto auto; gap: 14px; align-items: center; padding: 14px 16px; border-bottom: 1px solid #f3f4f6; }
-.cfg__fila:last-child { border-bottom: 0; }
-.cfg__emoji { font-size: 22px; }
-.cfg__id { display: flex; flex-direction: column; gap: 2px; }
-.cfg__id strong { font-size: 14px; color: #1f2937; }
-.cfg__id .mono { color: #9ca3af; }
-.cfg__regla { display: flex; align-items: center; gap: 10px; font-size: 13px; color: #4b5563; }
-.cfg__sev { display: flex; align-items: center; gap: 8px; }
-.cfg__v { font-size: 11px; color: #9ca3af; }
-.cfg__mas { border: 0; background: transparent; color: #3b82f6; font-size: 12px; cursor: pointer; text-decoration: underline; }
-.cfg__mas--off { color: #d1d5db; text-decoration: none; cursor: default; }
-.cfg__pie { font-size: 12px; color: #6b7280; margin-top: 10px; line-height: 1.6; }
-.cfg__pie code { background: #f3f4f6; padding: 2px 6px; border-radius: 4px; font-size: 11px; }
+/* ---------- Grafico principal ---------- */
+.al__graf { margin-top: 26px; }
+.graf { background: #fff; border: 1px solid #e5e7eb; border-radius: 18px; padding: 16px 12px 10px; }
+.graf__pie { font-size: 12px; color: #9ca3af; margin: 6px 0 0; padding: 0 8px; }
 
+/* ---------- Explicadores ---------- */
+.expl { margin-top: 22px; border: 1px solid #e5e7eb; border-radius: 14px; padding: 0 16px; }
+.expl__t { font-weight: 700; color: #4b5563; display: inline-flex; align-items: center; gap: 6px; }
+.expl__cuerpo p { font-size: 14px; line-height: 1.65; color: #374151; margin: 0 0 10px; }
+.expl__nota { border-left: 3px solid #d1d5db; padding-left: 12px; color: #6b7280 !important; }
+.lista { margin: 0; padding-left: 18px; font-size: 13px; color: #4b5563; line-height: 1.7; }
 
+/* ---------- Historial de alarmas ---------- */
+.hist__filtros { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 14px; }
+.hist__conteo { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.hist__resultado { margin-left: auto; font-size: 13px; color: #9ca3af; }
+.hist__tabla { border: 1px solid #e5e7eb; border-radius: 14px; overflow: hidden; }
+.hist__tabla :deep(th) { background: #f9fafb !important; font-size: 12px; color: #6b7280; font-weight: 700; }
+.hist__tabla :deep(td) { font-size: 13px; }
+.hist__modelo { font-weight: 600; color: #374151; }
+.hist__det { padding: 6px 40px 10px; }
+.hist__pie { display: flex; justify-content: flex-end; margin-top: 14px; }
 
-.tarjeta__mini { margin: 0 -6px 10px; pointer-events: none; }
-.cfg__resumen { font-size: 11px; font-weight: 600; color: #9ca3af; margin-left: 10px; padding: 2px 8px; background: #f3f4f6; border-radius: 999px; }
-.al__cfg :deep(.el-collapse-item__content) { padding-bottom: 8px; }
-.cfg__intro { font-size: 13px; color: #6b7280; margin: -4px 0 14px; line-height: 1.6; }
-.ac { background: #fff; border: 1px solid #e5e7eb; border-radius: 18px; padding: 18px 20px; margin-bottom: 12px; }
+/* ---------- Cajon de configuracion ---------- */
+.cfgd { padding: 6px 4px 24px; }
+.cfgd__cab { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+.cfgd__cab h3 { font-size: 20px; font-weight: 800; color: #1f2937; margin: 0 0 4px; }
+.cfgd__cab p { font-size: 13px; color: #6b7280; line-height: 1.6; margin: 0; max-width: 46ch; }
+.ac { background: #fff; border: 1px solid #e5e7eb; border-radius: 16px; padding: 16px 18px; margin-bottom: 12px; }
 .ac--off { background: #fcfcfd; }
 .ac__cab { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 10px; }
-.ac__emoji { font-size: 26px; line-height: 1; }
+.ac__emoji { font-size: 24px; line-height: 1; }
 .ac__id { flex: 1; display: flex; flex-direction: column; gap: 1px; }
-.ac__id strong { font-size: 16px; color: #1f2937; }
+.ac__id strong { font-size: 15px; color: #1f2937; }
 .ac__nom { font-size: 12px; color: #9ca3af; }
 .ac__code { color: #cbd5e1; }
 .ac__estado { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
@@ -1367,7 +1420,7 @@ onBeforeUnmount(() => {
 .fresco--very_stale { background: #fee2e2; color: #991b1b; }
 .fresco--unknown { background: #f3f4f6; color: #6b7280; }
 .ac__vigila { font-size: 14px; color: #374151; line-height: 1.6; margin: 0 0 14px; }
-.ac__cuerpo { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 18px; }
+.ac__cuerpo { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 18px; }
 .ac__k { display: block; font-size: 11px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 6px; }
 .ac__regla { font-size: 14px; color: #1f2937; margin: 0 0 6px; line-height: 1.55; }
 .ac__regla--prop { color: #6b7280; font-style: italic; }
@@ -1383,6 +1436,8 @@ onBeforeUnmount(() => {
 .ac__mas { margin-top: 12px; }
 .ac__cmd { font-family: ui-monospace, Menlo, monospace; font-size: 11px; background: #0f172a; color: #e2e8f0; padding: 12px; border-radius: 10px; overflow-x: auto; white-space: pre; margin: 8px 0; }
 .ac__bloqueo { font-size: 12px; color: #92400e; background: #fffbeb; padding: 8px 10px; border-radius: 8px; margin: 0; }
+
+/* ---------- Cajon de detalle ---------- */
 .det { padding: 8px 4px 24px; }
 .det__top { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 16px; }
 .det__emoji { font-size: 38px; }
@@ -1403,6 +1458,7 @@ onBeforeUnmount(() => {
 .det__nota { font-size: 13px; color: #6b7280; line-height: 1.6; margin: 6px 0 0; }
 .det__expr { background: #f3f4f6; padding: 10px; border-radius: 8px; overflow-x: auto; }
 .det__mas { margin-top: 16px; }
+.det__anidado { margin-top: 10px; }
 .det__acciones { display: flex; gap: 10px; margin-top: 20px; }
 .det__acciones :deep(.el-button) { flex: 1; }
 
@@ -1417,17 +1473,12 @@ onBeforeUnmount(() => {
 .dl dd { margin: 0; font-size: 13px; color: #374151; word-break: break-word; }
 .dl--mini > div { grid-template-columns: 110px 1fr; }
 
-.lista { margin: 0; padding-left: 18px; font-size: 13px; color: #4b5563; line-height: 1.7; }
 .checks { list-style: none; margin: 0; padding: 0; font-size: 13px; }
 .checks li { display: flex; gap: 8px; padding: 5px 0; color: #b45309; }
 .checks li.ok { color: #15803d; }
 .checks li span { font-weight: 800; }
 
-.graf { background: #fff; border: 1px solid #e5e7eb; border-radius: 18px; padding: 16px 12px 10px; }
-.graf__pie { font-size: 12px; color: #9ca3af; margin: 6px 0 0; padding: 0 8px; }
-
 .vacio { font-size: 13px; color: #9ca3af; background: #f9fafb; border-radius: 10px; padding: 18px; text-align: center; margin: 0; }
-
 .vs { display: flex; align-items: center; gap: 14px; background: #f0fdf4; border-radius: 14px; padding: 16px; margin-bottom: 10px; }
 .vs--pierde { background: #fffbeb; }
 .vs__lado { flex: 1; display: flex; flex-direction: column; gap: 2px; text-align: center; }
@@ -1437,7 +1488,6 @@ onBeforeUnmount(() => {
 .vs__sep { font-size: 12px; font-weight: 700; color: #9ca3af; }
 .vs__frase { font-size: 14px; color: #374151; line-height: 1.6; margin: 0 0 8px; }
 .vs__key { color: #cbd5e1; margin-left: 6px; }
-.det__anidado { margin-top: 10px; }
 
 .pop__t { font-weight: 700; margin: 0 0 4px; }
 .pop__d { margin: 0 0 6px; font-size: 13px; color: #4b5563; line-height: 1.55; }
