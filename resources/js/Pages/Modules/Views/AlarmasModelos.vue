@@ -49,6 +49,10 @@ const ESTADOS = {
         texto: "Sin alarma", tono: "aviso",
         explica: "El modelo calcula bien, pero nadie ha definido todavia a partir de que numero debe avisar. Se configura abajo, en Configuracion de alarmas.",
     },
+    sombra: {
+        texto: "En pruebas", tono: "eval",
+        explica: "Ya calcula y su proyeccion se puede revisar, pero todavia esta en modo de prueba: el sistema no le permite disparar alarmas hasta validar su margen de error con biometria real.",
+    },
     candidato_bloqueado: {
         texto: "En evaluacion", tono: "eval",
         explica: "El modelo esta entrenado y da resultados, pero todavia no se gano la confianza: en las pruebas no supera al metodo simple de suponer que todo sigue igual. Por eso no se le deja disparar alarmas.",
@@ -140,6 +144,7 @@ const meta = computed(() => response.value?.meta ?? {});
 const estadoDe = (m) => {
     if (m.alarm_state === "warming" || calculando.value) return ESTADOS.pensando;
     if (m.can_emit) return ESTADOS.en_uso;
+    if (m.maturity === "shadow") return ESTADOS.sombra;
     const u = m.usage?.status;
     if (u === "en_uso") return ESTADOS.listo_sin_alarma;
     if (m.maturity === "ready_for_policy") return ESTADOS.listo_sin_alarma;
@@ -148,6 +153,32 @@ const estadoDe = (m) => {
     if (u === "collecting_data" || m.model_status === "sin_sensor") return ESTADOS.collecting_data;
     return ESTADOS.sin_datos;
 };
+
+const RANGO_GRAVEDAD = { emergencia: 0, critico: 1, advertencia: 2 };
+
+/* Los avisos se ordenan por gravedad y luego por fecha, y la lista se
+   mantiene acotada: crece hacia dentro con scroll, nunca empuja la pagina. */
+const avisosOrdenados = computed(() => [...avisos.value].sort((a, b) => {
+    const ga = RANGO_GRAVEDAD[a.suggested_severity] ?? 9;
+    const gb = RANGO_GRAVEDAD[b.suggested_severity] ?? 9;
+    if (ga !== gb) return ga - gb;
+    return String(b.occurred_at ?? "").localeCompare(String(a.occurred_at ?? ""));
+}));
+
+const verTodosLosAvisos = ref(false);
+const TOPE_AVISOS = 4;
+const avisosVisibles = computed(() => (verTodosLosAvisos.value
+    ? avisosOrdenados.value
+    : avisosOrdenados.value.slice(0, TOPE_AVISOS)));
+
+const conteoGravedad = computed(() => {
+    const total = { emergencia: 0, critico: 0, advertencia: 0 };
+    for (const a of avisos.value) {
+        const key = a.suggested_severity in total ? a.suggested_severity : "advertencia";
+        total[key] += 1;
+    }
+    return total;
+});
 
 const estadoGeneral = computed(() => {
     if (loading.value && !response.value) {
@@ -615,8 +646,22 @@ onBeforeUnmount(() => {
 
             <!-- 3. AVISOS -->
             <section v-if="avisos.length" class="avisos">
-                <h3 class="al__seccion">Que paso</h3>
-                <article v-for="a in avisos" :key="a.source_event_id ?? a.id" class="aviso">
+                <div class="avisos__cab">
+                    <h3 class="al__seccion avisos__t">Que paso</h3>
+                    <div class="avisos__conteo">
+                        <span v-if="conteoGravedad.emergencia" class="chip chip--malo">
+                            {{ conteoGravedad.emergencia }} urgente<span v-if="conteoGravedad.emergencia > 1">s</span>
+                        </span>
+                        <span v-if="conteoGravedad.critico" class="chip chip--malo">
+                            {{ conteoGravedad.critico }} grave<span v-if="conteoGravedad.critico > 1">s</span>
+                        </span>
+                        <span v-if="conteoGravedad.advertencia" class="chip chip--aviso">
+                            {{ conteoGravedad.advertencia }} de atencion
+                        </span>
+                    </div>
+                </div>
+                <div class="avisos__lista">
+                <article v-for="a in avisosVisibles" :key="a.source_event_id ?? a.id" class="aviso">
                     <span class="aviso__punto" :class="'punto--' + gravedadDe(a.suggested_severity).tono" />
                     <div class="aviso__cuerpo">
                         <strong>{{ nombreDe(a.model?.code) }}</strong>
@@ -642,6 +687,17 @@ onBeforeUnmount(() => {
                         <time>{{ cuando(a.occurred_at) }}</time>
                     </div>
                 </article>
+                </div>
+                <button
+                    v-if="avisosOrdenados.length > TOPE_AVISOS"
+                    class="avisos__mas"
+                    type="button"
+                    @click="verTodosLosAvisos = !verTodosLosAvisos"
+                >
+                    {{ verTodosLosAvisos
+                        ? "Mostrar solo los " + TOPE_AVISOS + " mas importantes"
+                        : "Ver los " + avisosOrdenados.length + " avisos" }}
+                </button>
             </section>
 
             <!-- 4. MODELOS -->
@@ -956,6 +1012,17 @@ onBeforeUnmount(() => {
 .expl__cuerpo p { font-size: 14px; line-height: 1.65; color: #374151; margin: 0 0 10px; }
 .expl__nota { border-left: 3px solid #d1d5db; padding-left: 12px; color: #6b7280 !important; }
 
+
+.avisos__cab { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.avisos__t { margin-bottom: 12px; }
+.avisos__conteo { display: flex; gap: 6px; flex-wrap: wrap; }
+/* La lista crece hacia dentro: la pagina no se mueve aunque haya 50 avisos. */
+.avisos__lista { max-height: 340px; overflow-y: auto; padding-right: 4px; }
+.avisos__lista::-webkit-scrollbar { width: 8px; }
+.avisos__lista::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 999px; }
+.avisos__lista::-webkit-scrollbar-thumb:hover { background: #d1d5db; }
+.avisos__mas { display: block; width: 100%; margin-top: 8px; padding: 8px; border: 1px dashed #e5e7eb; background: transparent; border-radius: 12px; font-size: 13px; color: #6b7280; cursor: pointer; }
+.avisos__mas:hover { background: #f9fafb; color: #374151; }
 .aviso { display: flex; align-items: flex-start; gap: 14px; padding: 16px 18px; background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; margin-bottom: 10px; }
 .aviso__punto { width: 12px; height: 12px; border-radius: 50%; margin-top: 6px; flex: none; }
 .punto--malo { background: #ef4444; }
