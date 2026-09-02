@@ -139,6 +139,13 @@ const light = computed(() => response.value?.light ?? {});
 const avisos = computed(() => response.value?.events ?? []);
 const observations = computed(() => response.value?.technical_observations ?? []);
 const calculando = computed(() => Boolean(response.value?.meta?.warming));
+/* Sigue trabajando mientras no haya respuesta, o mientras FastAPI avise de
+   que esta calentando, o si contesto sin modelos todavia. */
+/* Se considera "cargando" mientras no haya una respuesta con modelos dentro.
+   En frio FastAPI contesta sin meta y con la lista vacia, asi que mirar solo
+   meta.warming dejaba la pantalla en el estado "nadie esta vigilando". */
+const cargando = computed(() => !errorMessage.value
+    && (!response.value || calculando.value || models.value.length === 0));
 const meta = computed(() => response.value?.meta ?? {});
 
 const estadoDe = (m) => {
@@ -181,8 +188,13 @@ const conteoGravedad = computed(() => {
 });
 
 const estadoGeneral = computed(() => {
-    if (loading.value && !response.value) {
-        return { emoji: "⏳", titulo: "Un momento", frase: "Leyendo el estado de la piscina.", tono: "calc" };
+    if (cargando.value) {
+        return {
+            emoji: "⏳",
+            titulo: "Preparando los modelos",
+            frase: "Se estan calculando con las lecturas locales. Tarda unos segundos la primera vez.",
+            tono: "calc",
+        };
     }
     if (errorMessage.value) {
         return { emoji: "\u{1F50C}", titulo: "No se pudo leer", frase: errorMessage.value, tono: "off" };
@@ -696,6 +708,15 @@ const TECNICA = {
 };
 const tecnicaDe = (code) => TECNICA[code] ?? { ml: false, etiqueta: "Formula", metodo: "-", explica: "" };
 
+const frenoTexto = (m) => {
+    const pot = Number(m?.potential_value);
+    const real = Number(m?.current_value);
+    if (!Number.isFinite(pot) || !Number.isFinite(real)) return "";
+    const u = m?.unit ?? "";
+    return `Con esta temperatura podria crecer ${pot.toLocaleString("es-PE", { maximumFractionDigits: 2 })} ${u}, `
+        + `pero el agua solo se lo permite a ${real.toLocaleString("es-PE", { maximumFractionDigits: 2 })} ${u}.`;
+};
+
 const nombreDe = (code) => MODELOS[code]?.corto ?? "Un modelo";
 const imagenDe = (code) => MODELOS[code]?.img ?? null;
 const gravedadDe = (sev) => GRAVEDAD[sev] ?? GRAVEDAD.advertencia;
@@ -753,7 +774,9 @@ const loadDashboard = async (refresh = false) => {
             lightScenario.value.maximum_lux = Math.max(1, Number(light.value.latest_value));
         }
         clearTimeout(warmupTimer.value);
-        if (data?.meta?.warming) warmupTimer.value = setTimeout(() => loadDashboard(false), 3000);
+        // Se reintenta tanto si avisa de que calienta como si contesto vacio.
+        const incompleto = Boolean(data?.meta?.warming) || !(data?.models ?? []).length;
+        if (incompleto) warmupTimer.value = setTimeout(() => loadDashboard(false), 2500);
     } catch (error) {
         if (error?.code !== "ERR_CANCELED") {
             errorMessage.value = error?.response?.data?.message ?? "No se pudo leer el estado de la piscina.";
@@ -921,7 +944,23 @@ onBeforeUnmount(() => {
 
                     <section class="al__mod">
                         <h3 class="al__seccion">Los modelos que vigilan esta piscina</h3>
-                        <div class="tarjetas">
+
+                        <div v-if="cargando" class="tarjetas">
+                            <article v-for="n in 5" :key="'esq' + n" class="tarjeta tarjeta--esqueleto">
+                                <el-skeleton animated>
+                                    <template #template>
+                                        <el-skeleton-item variant="circle" style="width: 60px; height: 60px; margin: 0 auto 12px;" />
+                                        <el-skeleton-item variant="text" style="width: 60%; margin: 0 auto 8px;" />
+                                        <el-skeleton-item variant="text" style="width: 85%; margin: 0 auto 16px; height: 10px;" />
+                                        <el-skeleton-item variant="h3" style="width: 50%; margin: 0 auto 18px;" />
+                                        <el-skeleton-item variant="image" style="width: 100%; height: 52px; margin-bottom: 14px;" />
+                                        <el-skeleton-item variant="button" style="width: 70%; margin: 0 auto;" />
+                                    </template>
+                                </el-skeleton>
+                            </article>
+                        </div>
+
+                        <div v-else class="tarjetas">
                             <article
                                 v-for="t in tarjetas"
                                 :key="t.raw.code"
@@ -988,7 +1027,12 @@ onBeforeUnmount(() => {
                         </div>
                     </section>
 
-                    <section v-if="graficoDestacado" class="al__graf">
+                    <section v-if="cargando" class="al__graf">
+                        <h3 class="al__seccion">Como viene el agua</h3>
+                        <div class="graf"><el-skeleton :rows="6" animated /></div>
+                    </section>
+
+                    <section v-else-if="graficoDestacado" class="al__graf">
                         <h3 class="al__seccion">{{ tituloDestacado }}</h3>
                         <div class="graf">
                             <ChartFisheye :options="graficoDestacado" height="320px" />
@@ -1073,7 +1117,8 @@ onBeforeUnmount(() => {
                             </span>
                         </div>
 
-                        <el-table :data="avisosPagina" class="hist__tabla" empty-text="Ninguna alarma con esos filtros" row-key="source_event_id">
+                        <el-skeleton v-if="cargando" :rows="6" animated class="hist__esq" />
+                        <el-table v-else :data="avisosPagina" class="hist__tabla" empty-text="Ninguna alarma con esos filtros" row-key="source_event_id">
                             <el-table-column type="expand">
                                 <template #default="{ row }">
                                     <dl class="dl dl--mini hist__det">
@@ -1265,6 +1310,23 @@ onBeforeUnmount(() => {
                         </div>
                     </div>
 
+                    <div v-if="detalle.raw.limiting_factors" class="det__caja det__caja--limita">
+                        <strong>Que lo esta frenando</strong>
+                        <p>{{ frenoTexto(detalle.raw) }}</p>
+                        <ul class="lim">
+                            <li :class="{ 'lim--frena': detalle.raw.limiting_factors.oxygen.factor < 1 }">
+                                {{ detalle.raw.limiting_factors.oxygen.detail }}
+                            </li>
+                            <li :class="{ 'lim--frena': detalle.raw.limiting_factors.ph.factor < 1 }">
+                                {{ detalle.raw.limiting_factors.ph.detail }}
+                            </li>
+                        </ul>
+                        <p class="det__nota">
+                            La temperatura marca el techo; el oxigeno y el pH solo pueden bajarlo.
+                            Es la ley del minimo: manda el factor peor.
+                        </p>
+                    </div>
+
                     <div class="det__caja det__caja--regla">
                         <strong>Su alarma</strong>
                         <p v-if="reglaEnPalabras(detalle.raw)">{{ reglaEnPalabras(detalle.raw) }}</p>
@@ -1433,6 +1495,9 @@ onBeforeUnmount(() => {
 .tarjetas { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; }
 .tarjeta { position: relative; background: #fff; border: 1px solid #e5e7eb; border-radius: 18px; padding: 20px 16px 14px; text-align: center; cursor: pointer; transition: transform .15s, box-shadow .15s; display: flex; flex-direction: column; }
 .tarjeta:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.07); }
+.tarjeta--esqueleto { cursor: default; }
+.tarjeta--esqueleto:hover { transform: none; box-shadow: none; }
+.hist__esq { padding: 16px; border: 1px solid #e5e7eb; border-radius: 14px; }
 .tarjeta--ok { border-color: #bbf7d0; }
 .tarjeta--aviso { border-color: #fde68a; }
 .tarjeta--eval { border-color: #ddd6fe; }
@@ -1560,6 +1625,9 @@ onBeforeUnmount(() => {
 .det__caja { padding: 14px 16px; border-radius: 14px; margin-bottom: 12px; background: #f9fafb; }
 .det__caja--estado { background: #f5f3ff; }
 .det__caja--regla { background: #eff6ff; }
+.det__caja--limita { background: #fff7ed; }
+.lim { margin: 6px 0; padding-left: 18px; font-size: 13px; color: #6b7280; line-height: 1.65; }
+.lim--frena { color: #b45309; font-weight: 600; }
 .det__caja strong { display: block; font-size: 13px; margin-bottom: 6px; color: #374151; }
 .det__caja p { margin: 0 0 6px; font-size: 14px; line-height: 1.6; color: #4b5563; }
 .det__cifras { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 14px; }
