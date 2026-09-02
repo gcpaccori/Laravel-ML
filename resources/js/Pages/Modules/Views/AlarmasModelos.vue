@@ -12,27 +12,27 @@ defineProps({
    sigue mostrando al lado, no se reemplaza. */
 const MODELOS = {
     WATER_QUALITY_INDEX_ICA: {
-        emoji: "\u{1F4A7}",
+        img: "/images/modelos/agua.svg",
         corto: "El agua",
         ayuda: "Junta cuatro medidas del agua (temperatura, pH, oxigeno y nitrato) en una sola nota del 0 al 100. Es una formula fija: no aprende, siempre calcula igual.",
     },
     TILAPIA_GROWTH_TEMPERATURE: {
-        emoji: "\u{1F41F}",
+        img: "/images/modelos/crecimiento.svg",
         corto: "El crecimiento",
         ayuda: "Con la temperatura del agua calcula cuantos milimetros deberian crecer los peces por dia, y lo compara con lo que se midio al pesarlos.",
     },
     SVM_OD_FORECAST_1H: {
-        emoji: "\u{1F4A8}",
+        img: "/images/modelos/oxigeno.svg",
         corto: "El oxigeno",
         ayuda: "Es el unico que de verdad aprende de datos pasados. Mira como venia el agua e intenta adivinar el oxigeno de la proxima hora.",
     },
     PHOTOPERIOD_GREENHOUSE_V1: {
-        emoji: "🌗",
+        img: "/images/modelos/fotoperiodo.svg",
         corto: "El fotoperiodo",
         ayuda: "Compara la luz que mide el sensor dentro del vivero con la luz natural que deberia haber afuera ese dia, segun la ubicacion de la piscigranja. De ahi sale cuantas horas hay luz suficiente para que la tilapia coma, y cuanta luz esta frenando la cubierta.",
     },
     LIGHT_FEED_RESPONSE_CLASSIFIER_V1: {
-        emoji: "☀️",
+        img: "/images/modelos/luz.svg",
         corto: "La luz",
         ayuda: "Buscara relacionar la luz dentro del agua con las ganas de comer de los peces. Todavia no existe: falta instalar el sensor y anotar cuanto comen.",
     },
@@ -216,7 +216,7 @@ const estadoGeneral = computed(() => {
 });
 
 const tarjetas = computed(() => models.value.map((m) => {
-    const base = MODELOS[m.code] ?? { emoji: "\u{1F514}", corto: m.name, ayuda: m.purpose };
+    const base = MODELOS[m.code] ?? { img: null, corto: m.name, ayuda: m.purpose };
     const estado = estadoDe(m);
 
     let dato = null;
@@ -336,7 +336,7 @@ const configuraciones = computed(() => models.value.map((m) => {
     const activa = policy.status === "approved";
     return {
         code: m.code,
-        emoji: meta.emoji ?? "\u{1F514}",
+        img: meta.img ?? null,
         corto: meta.corto ?? m.name,
         nombre: m.name,
         alarmCode: m.alarm_code,
@@ -633,6 +633,7 @@ const tituloDestacado = computed(() => {
     return "Como viene " + corto.replace(/^El |^La /, (x) => x.toLowerCase());
 });
 const nombreDe = (code) => MODELOS[code]?.corto ?? "Un modelo";
+const imagenDe = (code) => MODELOS[code]?.img ?? null;
 const gravedadDe = (sev) => GRAVEDAD[sev] ?? GRAVEDAD.advertencia;
 const textoNota = (o) => (typeof o === "string" ? o : o?.message ?? "");
 const criterioTexto = (k) => CRITERIOS[k] ?? k.replace(/_/g, " ");
@@ -877,7 +878,8 @@ onBeforeUnmount(() => {
                                     <p class="pop__d">{{ t.ayuda }}</p>
                                 </el-popover>
 
-                                <span class="tarjeta__emoji">{{ t.emoji }}</span>
+                                <img v-if="t.img" class="tarjeta__img" :src="t.img" :alt="t.corto" width="60" height="60" loading="lazy" />
+                                <span v-else class="tarjeta__img tarjeta__img--vacia" aria-hidden="true"></span>
                                 <h4 class="tarjeta__nombre">{{ t.corto }}</h4>
                                 <p class="tarjeta__real">{{ t.raw.name }}</p>
 
@@ -1017,7 +1019,7 @@ onBeforeUnmount(() => {
                             <el-table-column label="Modelo" width="170">
                                 <template #default="{ row }">
                                     <span class="hist__modelo">
-                                        {{ MODELOS[row.model?.code]?.emoji ?? "" }} {{ nombreDe(row.model?.code) }}
+                                        <img v-if="imagenDe(row.model?.code)" class="hist__img" :src="imagenDe(row.model?.code)" alt="" width="22" height="22" />{{ nombreDe(row.model?.code) }}
                                     </span>
                                 </template>
                             </el-table-column>
@@ -1059,7 +1061,7 @@ onBeforeUnmount(() => {
 
                     <article v-for="c in configuraciones" :key="c.code" class="ac" :class="{ 'ac--off': !c.activa }">
                         <header class="ac__cab">
-                            <span class="ac__emoji">{{ c.emoji }}</span>
+                            <img v-if="c.img" class="ac__img" :src="c.img" alt="" width="34" height="34" />
                             <div class="ac__id">
                                 <strong>{{ c.corto }}</strong>
                                 <span class="ac__nom">{{ c.nombre }}</span>
@@ -1142,7 +1144,7 @@ onBeforeUnmount(() => {
             <el-drawer :model-value="Boolean(detalle)" :with-header="false" size="620px" @close="detalle = null">
                 <div v-if="detalle" class="det">
                     <header class="det__top">
-                        <span class="det__emoji">{{ detalle.emoji }}</span>
+                        <img v-if="detalle.img" class="det__img" :src="detalle.img" alt="" width="46" height="46" />
                         <div>
                             <h3>{{ detalle.corto }}</h3>
                             <p class="det__real">{{ detalle.raw.name }}</p>
@@ -1353,7 +1355,8 @@ onBeforeUnmount(() => {
 .tarjeta--calc { border-color: #bfdbfe; }
 .tarjeta__info { position: absolute; top: 10px; right: 10px; border: 0; background: transparent; color: #d1d5db; cursor: pointer; padding: 4px; }
 .tarjeta__info:hover { color: #6b7280; }
-.tarjeta__emoji { font-size: 34px; line-height: 1; }
+.tarjeta__img { display: block; margin: 0 auto; width: 60px; height: 60px; }
+.tarjeta__img--vacia { background: #f3f4f6; border-radius: 50%; }
 .tarjeta__nombre { font-size: 16px; font-weight: 700; color: #1f2937; margin: 8px 0 2px; }
 .tarjeta__real { font-size: 11px; color: #9ca3af; margin: 0 0 10px; line-height: 1.3; min-height: 28px; }
 .tarjeta__dato { margin: 0 0 8px; display: flex; flex-direction: column; gap: 2px; }
@@ -1395,7 +1398,8 @@ onBeforeUnmount(() => {
 .hist__tabla { border: 1px solid #e5e7eb; border-radius: 14px; overflow: hidden; }
 .hist__tabla :deep(th) { background: #f9fafb !important; font-size: 12px; color: #6b7280; font-weight: 700; }
 .hist__tabla :deep(td) { font-size: 13px; }
-.hist__modelo { font-weight: 600; color: #374151; }
+.hist__modelo { font-weight: 600; color: #374151; display: inline-flex; align-items: center; gap: 7px; }
+.hist__img { width: 22px; height: 22px; flex: none; }
 .hist__det { padding: 6px 40px 10px; }
 .hist__pie { display: flex; justify-content: flex-end; margin-top: 14px; }
 
@@ -1407,7 +1411,7 @@ onBeforeUnmount(() => {
 .ac { background: #fff; border: 1px solid #e5e7eb; border-radius: 16px; padding: 16px 18px; margin-bottom: 12px; }
 .ac--off { background: #fcfcfd; }
 .ac__cab { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 10px; }
-.ac__emoji { font-size: 24px; line-height: 1; }
+.ac__img { display: block; width: 34px; height: 34px; flex: none; }
 .ac__id { flex: 1; display: flex; flex-direction: column; gap: 1px; }
 .ac__id strong { font-size: 15px; color: #1f2937; }
 .ac__nom { font-size: 12px; color: #9ca3af; }
@@ -1440,7 +1444,7 @@ onBeforeUnmount(() => {
 /* ---------- Cajon de detalle ---------- */
 .det { padding: 8px 4px 24px; }
 .det__top { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 16px; }
-.det__emoji { font-size: 38px; }
+.det__img { display: block; width: 46px; height: 46px; flex: none; }
 .det__top h3 { font-size: 21px; font-weight: 800; margin: 0; color: #1f2937; }
 .det__real { font-size: 12px; color: #9ca3af; margin: 2px 0 8px; }
 .det__purpose { font-size: 15px; color: #374151; line-height: 1.6; margin: 0 0 18px; }
