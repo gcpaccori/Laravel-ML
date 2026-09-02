@@ -907,6 +907,9 @@ onBeforeUnmount(() => {
                                         <dd>{{ t.raw.horizon }}</dd>
                                     </div>
                                 </dl>
+                                <p v-if="Math.abs(t.raw.data_freshness?.clock_drift_days ?? 0) >= 1" class="tarjeta__reloj">
+                                    Reloj del sensor {{ Math.round(Math.abs(t.raw.data_freshness.clock_drift_days)) }} dias atrasado
+                                </p>
                             </article>
                         </div>
                     </section>
@@ -1176,8 +1179,16 @@ onBeforeUnmount(() => {
                             <span class="det__v det__v--txt">{{ detalle.raw.horizon }}</span>
                         </div>
                         <div v-if="detalle.raw.data_freshness?.label">
-                            <span class="det__k">Antiguedad</span>
+                            <span class="det__k">Ultimo dato</span>
                             <span class="det__v det__v--txt">{{ detalle.raw.data_freshness.label }}</span>
+                            <span class="det__u">desde {{ detalle.raw.data_freshness.source_table }}</span>
+                        </div>
+                        <div v-if="Math.abs(detalle.raw.data_freshness?.clock_drift_days ?? 0) >= 1">
+                            <span class="det__k">Reloj del sensor</span>
+                            <span class="det__v det__v--txt det__v--alerta">
+                                {{ Math.round(Math.abs(detalle.raw.data_freshness.clock_drift_days)) }} dias atrasado
+                            </span>
+                            <span class="det__u">sus marcas de tiempo no son la hora real</span>
                         </div>
                     </div>
 
@@ -1370,6 +1381,8 @@ onBeforeUnmount(() => {
 .tarjeta__meta dd { margin: 0; font-size: 11px; color: #6b7280; line-height: 1.35; overflow-wrap: anywhere; }
 .tarjeta__meta dd.fresco--stale, .tarjeta__meta dd.fresco--very_stale { color: #b45309; font-weight: 600; }
 .tarjeta__meta dd.fresco--fresh, .tarjeta__meta dd.fresco--recent { color: #15803d; }
+.tarjeta__reloj { margin: 8px 0 0; font-size: 10px; color: #b45309; background: #fffbeb; border-radius: 8px; padding: 4px 6px; line-height: 1.35; }
+.det__v--alerta { color: #b45309; }
 
 .chip { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
 .chip--ok { background: #dcfce7; color: #166534; }
