@@ -1354,6 +1354,34 @@ onBeforeUnmount(() => {
                         </p>
                     </div>
 
+                    <div v-if="detalle.raw.traceability?.weight_length_ml" class="det__caja det__caja--ml">
+                        <strong>Modelo entrenado peso-longitud <span class="tec tec--ml">ML</span></strong>
+                        <p class="mono det__expr">{{ detalle.raw.traceability.weight_length_ml.formula }}</p>
+                        <dl class="dl dl--mini">
+                            <div>
+                                <dt>Peces medidos</dt>
+                                <dd>{{ detalle.raw.traceability.weight_length_ml.sample_size }}
+                                    ({{ detalle.raw.traceability.weight_length_ml.train_size }} entrenamiento /
+                                    {{ detalle.raw.traceability.weight_length_ml.test_size }} prueba)</dd>
+                            </div>
+                            <div>
+                                <dt>Acierto en prueba</dt>
+                                <dd>R&sup2; {{ detalle.raw.traceability.weight_length_ml.metrics.test_r2 }},
+                                    error medio {{ detalle.raw.traceability.weight_length_ml.metrics.test_mae_g }} g</dd>
+                            </div>
+                            <div>
+                                <dt>Contra el peso medio</dt>
+                                <dd>{{ detalle.raw.traceability.weight_length_ml.baselines.media.test_mae_g }} g de error</dd>
+                            </div>
+                            <div>
+                                <dt>Contra la ley cubica</dt>
+                                <dd>{{ detalle.raw.traceability.weight_length_ml.baselines.isometrico_cubico.test_mae_g }} g de error</dd>
+                            </div>
+                        </dl>
+                        <p class="det__nota">{{ detalle.raw.traceability.weight_length_ml.verdict }}</p>
+                        <p class="det__nota">{{ detalle.raw.traceability.weight_length_ml.note }}</p>
+                    </div>
+
                     <el-collapse class="det__mas">
                         <el-collapse-item v-if="detalle.raw.usage?.activation_criteria" title="Que le falta para que se le confie" name="c">
                             <ul class="checks">
@@ -1626,6 +1654,7 @@ onBeforeUnmount(() => {
 .det__caja--estado { background: #f5f3ff; }
 .det__caja--regla { background: #eff6ff; }
 .det__caja--limita { background: #fff7ed; }
+.det__caja--ml { background: #f5f3ff; }
 .lim { margin: 6px 0; padding-left: 18px; font-size: 13px; color: #6b7280; line-height: 1.65; }
 .lim--frena { color: #b45309; font-weight: 600; }
 .det__caja strong { display: block; font-size: 13px; margin-bottom: 6px; color: #374151; }
