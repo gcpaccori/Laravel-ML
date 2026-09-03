@@ -187,45 +187,6 @@ const conteoGravedad = computed(() => {
     return total;
 });
 
-const estadoGeneral = computed(() => {
-    if (cargando.value) {
-        return {
-            emoji: "⏳",
-            titulo: "Preparando los modelos",
-            frase: "Se estan calculando con las lecturas locales. Tarda unos segundos la primera vez.",
-            tono: "calc",
-        };
-    }
-    if (errorMessage.value) {
-        return { emoji: "\u{1F50C}", titulo: "No se pudo leer", frase: errorMessage.value, tono: "off" };
-    }
-    const n = avisos.value.length;
-    if (n > 0) {
-        return {
-            emoji: "\u{1F6A8}",
-            titulo: "Revisa la piscina",
-            frase: n === 1 ? "Hay 1 aviso sin atender." : "Hay " + n + " avisos sin atender.",
-            tono: "malo",
-        };
-    }
-    const vigilando = Number(summary.value.can_emit ?? 0);
-    if (vigilando > 0) {
-        return {
-            emoji: "✅",
-            titulo: "Todo esta bien",
-            frase: vigilando === 1
-                ? "1 modelo esta vigilando y no encontro nada raro."
-                : vigilando + " modelos estan vigilando y no encontraron nada raro.",
-            tono: "ok",
-        };
-    }
-    return {
-        emoji: "\u{1F319}",
-        titulo: "Nadie esta vigilando",
-        frase: "Ningun modelo tiene una alarma configurada todavia.",
-        tono: "off",
-    };
-});
 
 const tarjetas = computed(() => models.value.map((m) => {
     const base = MODELOS[m.code] ?? { img: null, corto: m.name, ayuda: m.purpose };
@@ -587,6 +548,40 @@ const graficoDe = (m) => {
     return mejorarGrafico(raw, m);
 };
 
+/* El freno en imagen: lo que el calor permitiria frente a lo que el agua
+   deja de verdad. Dos barras se leen de un vistazo, y el hueco entre ambas
+   es exactamente lo que estan restando el oxigeno y el pH. */
+const graficoLimitantes = (m) => {
+    const lf = m?.limiting_factors;
+    const real = Number(m?.current_value);
+    const techo = Number(m?.potential_value);
+    if (!lf || !Number.isFinite(real) || !Number.isFinite(techo) || techo <= 0) return null;
+
+    const frenado = techo - real > techo * 0.01;
+    return {
+        color: PALETA,
+        grid: { top: 10, left: 8, right: 60, bottom: 8, containLabel: true },
+        tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
+        xAxis: { type: "value", max: techo * 1.15, axisLabel: { show: false },
+                 splitLine: { show: false }, axisTick: { show: false }, axisLine: { show: false } },
+        yAxis: {
+            type: "category",
+            data: ["Con el agua de hoy", "Si solo mandara la temperatura"],
+            axisTick: { show: false }, axisLine: { show: false },
+            axisLabel: { fontSize: 13, color: "#374151" },
+        },
+        series: [{
+            type: "bar", barWidth: 26,
+            data: [
+                { value: real,  itemStyle: { color: frenado ? "#ea580c" : "#0d9488", borderRadius: [0, 5, 5, 0] } },
+                { value: techo, itemStyle: { color: "#cbd5e1", borderRadius: [0, 5, 5, 0] } },
+            ],
+            label: { show: true, position: "right", fontSize: 12, color: "#374151",
+                     formatter: (t) => t.value.toFixed(2) + " " + (m.unit ?? "") },
+        }],
+    };
+};
+
 const graficoRelacion = (m) => {
     const raw = m?.relationship?.chart ?? null;
     if (!tieneDatos(raw)) return null;
@@ -925,17 +920,10 @@ onBeforeUnmount(() => {
                 </div>
             </header>
 
-            <!-- ESTADO -->
-            <section class="estado" :class="'estado--' + estadoGeneral.tono">
-                <span class="estado__emoji">{{ estadoGeneral.emoji }}</span>
-                <div class="estado__txt">
-                    <h2>{{ estadoGeneral.titulo }}</h2>
-                    <p>{{ estadoGeneral.frase }}</p>
-                </div>
-                <el-button v-if="avisos.length" text class="estado__ir" @click="pestana = 'alarmas'">
-                    Ver las alarmas
-                </el-button>
-            </section>
+            <!-- Si la lectura falla hay que decirlo, pero sin dramatizar: una
+                 linea discreta basta. El numero de avisos ya viaja en la
+                 pestana "Alarmas", de modo que no hace falta un cartel aparte. -->
+            <p v-if="errorMessage" class="fallo">{{ errorMessage }}</p>
 
             <!-- PESTANAS -->
             <el-tabs v-model="pestana" class="tabs">
@@ -1391,6 +1379,15 @@ onBeforeUnmount(() => {
                             </ul>
                         </el-collapse-item>
 
+                        <el-collapse-item v-if="detalle.raw.limiting_factors" title="Que lo esta frenando" name="lim">
+                            <ChartFisheye v-if="graficoLimitantes(detalle.raw)" :options="graficoLimitantes(detalle.raw)" height="150px" />
+                            <ul class="lim">
+                                <li :class="{ 'lim--pesa': detalle.raw.limiting_factors.oxygen.factor < 1 }">{{ detalle.raw.limiting_factors.oxygen.detail }}</li>
+                                <li :class="{ 'lim--pesa': detalle.raw.limiting_factors.ph.factor < 1 }">{{ detalle.raw.limiting_factors.ph.detail }}</li>
+                            </ul>
+                            <p class="det__nota">Manda el factor peor, no la suma: es la ley del minimo.</p>
+                        </el-collapse-item>
+
                         <el-collapse-item title="Como viene evolucionando" name="g">
                             <ChartFisheye v-if="graficoDe(detalle.raw)" :options="graficoDe(detalle.raw)" height="300px" />
                             <p v-else class="vacio">Todavia no hay mediciones suficientes para dibujar la curva.</p>
@@ -1502,20 +1499,16 @@ onBeforeUnmount(() => {
 .campo :deep(.el-select), .campo :deep(.el-date-editor) { width: 100%; }
 
 /* ---------- Estado ---------- */
-.estado { display: flex; align-items: center; gap: 18px; padding: 22px 26px; border-radius: 18px; border: 2px solid; margin-bottom: 6px; }
-.estado__emoji { font-size: 46px; line-height: 1; }
-.estado__txt { flex: 1; }
 .estado__txt h2 { font-size: 25px; font-weight: 800; margin: 0 0 3px; }
 .estado__txt p { font-size: 15px; margin: 0; opacity: .85; }
-.estado__ir { font-weight: 600; }
-.estado--ok { background: #f0fdf4; border-color: #86efac; color: #166534; }
-.estado--malo { background: #fef2f2; border-color: #fca5a5; color: #991b1b; }
-.estado--off { background: #f9fafb; border-color: #e5e7eb; color: #4b5563; }
-.estado--calc { background: #eff6ff; border-color: #93c5fd; color: #1e40af; }
-
 /* ---------- Pestanas ---------- */
 .tabs :deep(.el-tabs__header) { margin: 0 0 18px; }
 .tabs :deep(.el-tabs__item) { font-size: 15px; font-weight: 600; height: 46px; }
+.fallo { margin: 0 0 6px; padding: 10px 14px; border-left: 3px solid #9ca3af;
+         background: #f9fafb; color: #4b5563; font-size: 14px; border-radius: 0 6px 6px 0; }
+.lim { list-style: none; padding: 0; margin: 14px 0 6px; }
+.lim li { font-size: 14px; color: #6b7280; padding: 5px 0 5px 14px; border-left: 2px solid #e5e7eb; margin-bottom: 4px; }
+.lim--pesa { color: #9a3412; border-left-color: #ea580c; font-weight: 600; }
 .tabs__l { display: inline-flex; align-items: center; gap: 8px; }
 .tabs__n { background: #fee2e2; color: #991b1b; font-size: 11px; font-weight: 800; padding: 1px 8px; border-radius: 999px; }
 

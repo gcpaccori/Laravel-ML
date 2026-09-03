@@ -446,7 +446,7 @@ onBeforeUnmount(() => {
                     <div class="card-body pt-0">
                         <p class="text-gray-700 fs-6 mb-4">
                             Con la temperatura actual podria alcanzar
-                            <strong>{{ formatValue(activeModel.potential_daily_length_gain_mm_day, activeModel.unit) }}</strong>,
+                            <strong>{{ formatValue(activeModel.potential_value, activeModel.unit) }}</strong>,
                             pero el agua solo se lo permite a
                             <strong>{{ formatValue(activeModel.current_value, activeModel.unit) }}</strong>.
                         </p>
