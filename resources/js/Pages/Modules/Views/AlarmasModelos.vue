@@ -26,6 +26,11 @@ const MODELOS = {
         corto: "La condicion",
         ayuda: "Aprendio de los peces de esta piscigranja cuanto deberia pesar uno de cada talla. Con esa vara mide el ultimo muestreo: si pesan menos de lo que su talla promete, algo les esta faltando.",
     },
+    LIGHT_FORECAST_SVR_12H: {
+        img: "/images/modelos/prevision-luz.svg",
+        corto: "La luz de manana",
+        ayuda: "Mira como viene la luz dentro del vivero y estima cuanta habra doce horas despues. De noche eso significa saber si manana temprano habra luz suficiente para que los peces vean el alimento.",
+    },
     SVM_OD_FORECAST_1H: {
         img: "/images/modelos/oxigeno.svg",
         corto: "El oxigeno",
@@ -704,6 +709,12 @@ const TECNICA = {
         etiqueta: "ML",
         metodo: "Regresion potencial ajustada aqui",
         explica: "Entrenado con los peces de esta piscigranja medidos uno a uno. Ajusta W = a*L^b, se reparte en entrenamiento y prueba, y se valida fuera de muestra contra la media y contra la ley cubica.",
+    },
+    LIGHT_FORECAST_SVR_12H: {
+        ml: true,
+        etiqueta: "ML",
+        metodo: "SVR con nucleo RBF",
+        explica: "Entrenado con el sensor de este vivero y validado fuera de muestra contra dos referencias: que la luz siga igual, y la media de esa hora. Le gana a las dos. El horizonte de doce horas no es arbitrario: se midieron seis horizontes y por debajo de seis horas ningun modelo mejora al simple \"seguira parecida\".",
     },
     SVM_OD_FORECAST_1H: {
         ml: true,
