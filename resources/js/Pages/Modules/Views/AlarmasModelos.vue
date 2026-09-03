@@ -21,6 +21,12 @@ const MODELOS = {
         corto: "El crecimiento",
         ayuda: "Con la temperatura del agua calcula cuantos milimetros deberian crecer los peces por dia, y lo compara con lo que se midio al pesarlos.",
     },
+    TILAPIA_WEIGHT_LENGTH_ML: {
+        ml: true,
+        etiqueta: "ML",
+        metodo: "Regresion potencial ajustada aqui",
+        explica: "El unico modelo entrenado con los peces de esta piscigranja, uno a uno. Ajusta W = a*L^b y se valida fuera de muestra contra la media y contra la ley cubica. Sirve de vara de medir: dice cuanto deberia pesar un pez de esa talla aqui.",
+    },
     SVM_OD_FORECAST_1H: {
         img: "/images/modelos/oxigeno.svg",
         corto: "El oxigeno",
@@ -680,7 +686,7 @@ const TECNICA = {
         ml: false,
         etiqueta: "Formula",
         metodo: "Regresion lineal de Soderberg",
-        explica: "Es una recta publicada en la literatura, no entrenada aqui. Solo usa temperatura: no ve el oxigeno ni el pH.",
+        explica: "La recta de Soderberg esta publicada, no entrenada aqui: fija el techo segun la temperatura. Sobre ese techo se aplican despues el oxigeno y el pH, que solo pueden restar.",
     },
     SVM_OD_FORECAST_1H: {
         ml: true,
