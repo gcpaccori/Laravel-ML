@@ -22,10 +22,9 @@ const MODELOS = {
         ayuda: "Con la temperatura del agua calcula cuantos milimetros deberian crecer los peces por dia, y lo compara con lo que se midio al pesarlos.",
     },
     TILAPIA_WEIGHT_LENGTH_ML: {
-        ml: true,
-        etiqueta: "ML",
-        metodo: "Regresion potencial ajustada aqui",
-        explica: "El unico modelo entrenado con los peces de esta piscigranja, uno a uno. Ajusta W = a*L^b y se valida fuera de muestra contra la media y contra la ley cubica. Sirve de vara de medir: dice cuanto deberia pesar un pez de esa talla aqui.",
+        img: "/images/modelos/condicion.svg",
+        corto: "La condicion",
+        ayuda: "Aprendio de los peces de esta piscigranja cuanto deberia pesar uno de cada talla. Con esa vara mide el ultimo muestreo: si pesan menos de lo que su talla promete, algo les esta faltando.",
     },
     SVM_OD_FORECAST_1H: {
         img: "/images/modelos/oxigeno.svg",
@@ -40,7 +39,7 @@ const MODELOS = {
     LIGHT_FEED_RESPONSE_CLASSIFIER_V1: {
         img: "/images/modelos/luz.svg",
         corto: "La luz",
-        ayuda: "Buscara relacionar la luz dentro del agua con las ganas de comer de los peces. Todavia no existe: falta instalar el sensor y anotar cuanto comen.",
+        ayuda: "El luxometro ya esta midiendo dentro del vivero. Falta la otra mitad: anotar cuanta racion se sirve y como responden los peces. Sin ese par no hay nada que aprender.",
     },
 };
 
@@ -68,7 +67,7 @@ const ESTADOS = {
         explica: "La formula solo esta validada dentro de un rango. Las condiciones de ahora estan fuera de ese rango, asi que prefiere no responder antes que responder mal.",
     },
     collecting_data: {
-        texto: "Falta el sensor", tono: "off",
+        texto: "Faltan etiquetas", tono: "off",
         explica: "No hay equipo instalado que tome esta medida, asi que no hay nada que calcular todavia.",
     },
     sin_datos: {
@@ -282,7 +281,7 @@ const INTERPRETACION = {
         unidad: "lux",
         peor: "abajo",
         escala: [],
-        siSuena: ["Todavia no puede sonar: falta instalar el sensor sumergido."],
+        siSuena: ["Todavia no puede sonar: hay luz medida, pero falta anotar racion y respuesta para entrenar."],
     },
 };
 
@@ -295,7 +294,7 @@ const SUGERIDO = {
     },
     LIGHT_FEED_RESPONSE_CLASSIFIER_V1: {
         operador: "lt", umbral: 30, unidad: "lux", gravedad: "advertencia",
-        porque: "30 lux es el limite por debajo del cual la tilapia come de forma pobre. Requiere sensor sumergido y etiquetas de consumo antes de activarse.",
+        porque: "30 lux es el limite por debajo del cual la tilapia come de forma pobre. El sensor ya mide; faltan las etiquetas de consumo para poder entrenar.",
     },
 };
 
@@ -660,14 +659,26 @@ const horizonteDe = (m) => {
     return HORIZONTE_CORTO[h] ?? (h.length > 16 ? h.slice(0, 15) + "\u2026" : h);
 };
 
-/* Antiguedad en dos piezas, para poder darles el mismo formato. */
+/* Antiguedad en tres piezas. Decir solo "al dia" no aclaraba nada: cada
+   modelo bebe de una tabla distinta y no envejecen al mismo ritmo. El agua
+   entra cada diez minutos y la biometria cada varias semanas, asi que la
+   tarjeta nombra su fuente en lugar de dejarlo a la imaginacion. */
+const FUENTE = {
+    parametro_aguas: "Agua",
+    parametro_ambientes: "Luz",
+    biometrias: "Biometria",
+};
 const antiguedadDe = (m) => {
     const f = m?.data_freshness ?? {};
     const texto = (f.label ?? "sin fecha")
-        .replace("Dato de hace ", "")
+        .replace("Dato de hace ", "hace ")
         .replace("Dato reciente", "al dia")
         .replace("Sin fecha del ultimo dato", "sin fecha");
-    return { texto, nivel: f.level ?? "unknown" };
+    return {
+        texto,
+        nivel: f.level ?? "unknown",
+        fuente: FUENTE[f.source_table] ?? "Datos",
+    };
 };
 
 
@@ -687,6 +698,12 @@ const TECNICA = {
         etiqueta: "Formula",
         metodo: "Regresion lineal de Soderberg",
         explica: "La recta de Soderberg esta publicada, no entrenada aqui: fija el techo segun la temperatura. Sobre ese techo se aplican despues el oxigeno y el pH, que solo pueden restar.",
+    },
+    TILAPIA_WEIGHT_LENGTH_ML: {
+        ml: true,
+        etiqueta: "ML",
+        metodo: "Regresion potencial ajustada aqui",
+        explica: "Entrenado con los peces de esta piscigranja medidos uno a uno. Ajusta W = a*L^b, se reparte en entrenamiento y prueba, y se valida fuera de muestra contra la media y contra la ley cubica.",
     },
     SVM_OD_FORECAST_1H: {
         ml: true,
@@ -1005,7 +1022,7 @@ onBeforeUnmount(() => {
 
                                     <dl class="tarjeta__meta">
                                         <div>
-                                            <dt>Datos</dt>
+                                            <dt>{{ antiguedadDe(t.raw).fuente }}</dt>
                                             <dd class="pill" :class="'pill--' + antiguedadDe(t.raw).nivel">
                                                 {{ antiguedadDe(t.raw).texto }}
                                             </dd>
@@ -1300,7 +1317,7 @@ onBeforeUnmount(() => {
                         <div v-if="detalle.raw.data_freshness?.label">
                             <span class="det__k">Ultimo dato</span>
                             <span class="det__v det__v--txt">{{ detalle.raw.data_freshness.label }}</span>
-                            <span class="det__u">desde {{ detalle.raw.data_freshness.source_table }}</span>
+                            <span class="det__u">de la tabla de {{ (antiguedadDe(detalle.raw).fuente || "datos").toLowerCase() }}</span>
                         </div>
                     </div>
 
