@@ -13,37 +13,44 @@ defineProps({
 const MODELOS = {
     WATER_QUALITY_INDEX_ICA: {
         img: "/images/modelos/agua.svg",
-        corto: "El agua",
+        corto: "La nota del agua",
+        teoria: "Indice ICA: media ponderada de cuatro medidas",
         ayuda: "Junta cuatro medidas del agua (temperatura, pH, oxigeno y nitrato) en una sola nota del 0 al 100. Es una formula fija: no aprende, siempre calcula igual.",
     },
     TILAPIA_GROWTH_TEMPERATURE: {
         img: "/images/modelos/crecimiento.svg",
-        corto: "El crecimiento",
+        corto: "Cuanto crecen al dia",
+        teoria: "Recta de Soderberg, recortada por la ley del minimo",
         ayuda: "Con la temperatura del agua calcula cuantos milimetros deberian crecer los peces por dia, y lo compara con lo que se midio al pesarlos.",
     },
     TILAPIA_WEIGHT_LENGTH_ML: {
         img: "/images/modelos/condicion.svg",
-        corto: "La condicion",
+        corto: "Si pesan lo que deben",
+        teoria: "Alometria W=aL^b y factor de condicion de Le Cren",
         ayuda: "Aprendio de los peces de esta piscigranja cuanto deberia pesar uno de cada talla. Con esa vara mide el ultimo muestreo: si pesan menos de lo que su talla promete, algo les esta faltando.",
     },
     LIGHT_FORECAST_SVR_12H: {
         img: "/images/modelos/prevision-luz.svg",
         corto: "La luz de manana",
+        teoria: "Regresion de vectores soporte a doce horas",
         ayuda: "Mira como viene la luz dentro del vivero y estima cuanta habra doce horas despues. De noche eso significa saber si manana temprano habra luz suficiente para que los peces vean el alimento.",
     },
     SVM_OD_FORECAST_1H: {
         img: "/images/modelos/oxigeno.svg",
-        corto: "El oxigeno",
+        corto: "El oxigeno que viene",
+        teoria: "Regresion de vectores soporte a una hora",
         ayuda: "Es el unico que de verdad aprende de datos pasados. Mira como venia el agua e intenta adivinar el oxigeno de la proxima hora.",
     },
     PHOTOPERIOD_GREENHOUSE_V1: {
         img: "/images/modelos/fotoperiodo.svg",
-        corto: "El fotoperiodo",
+        corto: "Horas de luz util",
+        teoria: "Transmitancia de la cubierta contra la luz solar real",
         ayuda: "Compara la luz que mide el sensor dentro del vivero con la luz natural que deberia haber afuera ese dia, segun la ubicacion de la piscigranja. De ahi sale cuantas horas hay luz suficiente para que la tilapia coma, y cuanta luz esta frenando la cubierta.",
     },
     LIGHT_FEED_RESPONSE_CLASSIFIER_V1: {
         img: "/images/modelos/luz.svg",
-        corto: "La luz",
+        corto: "Luz para la proxima toma",
+        teoria: "Umbral visual de 30 lux, clasificador SVC",
         ayuda: "Doce horas antes dice si la proxima toma caera con luz suficiente. La tilapia come por vista: por debajo de treinta lux no distingue el pienso y el alimento acaba en el fondo. Con ese aviso da tiempo a mover la toma.",
     },
 };
@@ -199,7 +206,7 @@ const conteoGravedad = computed(() => {
 
 
 const tarjetas = computed(() => models.value.map((m) => {
-    const base = MODELOS[m.code] ?? { img: null, corto: m.name, ayuda: m.purpose };
+    const base = MODELOS[m.code] ?? { img: null, corto: m.name, teoria: null, ayuda: m.purpose };
     const estado = estadoDe(m);
 
     let dato = null;
@@ -1016,7 +1023,7 @@ onBeforeUnmount(() => {
                                     {{ t.tecnica.etiqueta }}
                                 </span>
                                 <h4 class="tarjeta__nombre">{{ t.corto }}</h4>
-                                <p class="tarjeta__real">{{ t.raw.name }}</p>
+                                <p class="tarjeta__real">{{ t.teoria ?? t.raw.name }}</p>
 
                                 <p v-if="t.dato" class="tarjeta__dato">
                                     <span class="tarjeta__grande">{{ t.dato.grande }}</span>
