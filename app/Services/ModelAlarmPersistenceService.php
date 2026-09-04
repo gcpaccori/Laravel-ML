@@ -113,6 +113,18 @@ class ModelAlarmPersistenceService
                 continue;
             }
 
+            // Una alarma es un estado, no un suceso nuevo cada vez que se mira.
+            // El backend genera un identificador distinto en cada pasada, asi que
+            // el filtro de arriba nunca saltaba y la misma condicion se guardaba
+            // una y otra vez: doce filas identicas del mismo modelo en un dia.
+            // Mientras siga activa y sin resolver, se refresca la que ya existe.
+            $abierta = $this->alarmaActivaDe($modelCode, $piscina->id);
+            if ($abierta) {
+                $this->refrescar($abierta, $event, $modelCode, $sourceEventId, $level);
+                $result['duplicates']++;
+                continue;
+            }
+
             try {
                 $alarma = DB::transaction(function () use ($event, $model, $modelCode, $piscina, $sourceEventId, $level) {
                     $value = $this->numericValue(
@@ -244,6 +256,73 @@ class ModelAlarmPersistenceService
         }
 
         return null;
+    }
+
+
+    /**
+     * La alarma viva de ese modelo en esa piscina, si la hay.
+     */
+    private function alarmaActivaDe(string $modelCode, int $piscinaId): ?Alarma
+    {
+        return Alarma::query()
+            ->where('piscina_id', $piscinaId)
+            ->where('modulo', 'inteligencia')
+            ->where('estado', 'activa')
+            ->whereIn('id', AlarmaModeloEvidencia::query()
+                ->where('model_code', $modelCode)
+                ->select('alarma_id'))
+            ->latest('id')
+            ->first();
+    }
+
+    /**
+     * Pone al dia la alarma abierta con la ultima lectura, sin abrir otra.
+     *
+     * Se guarda tambien la evidencia nueva: interesa saber como evoluciono la
+     * condicion mientras la alarma seguia sin atender, no solo como empezo.
+     */
+    private function refrescar(
+        Alarma $alarma,
+        array $event,
+        string $modelCode,
+        string $sourceEventId,
+        string $level,
+    ): void {
+        $model = is_array($event['model'] ?? null) ? $event['model'] : [];
+        $value = $this->numericValue(
+            $event['predicted_value']
+            ?? $event['value']
+            ?? data_get($event, 'evidence.predicted_value')
+            ?? data_get($event, 'evidence.value'),
+        );
+
+        try {
+            DB::transaction(function () use ($alarma, $event, $model, $modelCode, $sourceEventId, $level, $value) {
+                $alarma->forceFill([
+                    'valor_detectado' => $value,
+                    'nivel' => $level,
+                    'mensaje' => (string) ($event['message'] ?? $event['detail'] ?? $alarma->mensaje),
+                ])->save();
+
+                // La evidencia es una por alarma (hay indice unico), asi que se
+                // actualiza la que ya cuelga en lugar de anadir otra.
+                AlarmaModeloEvidencia::query()
+                    ->where('alarma_id', $alarma->id)
+                    ->update([
+                        'source_event_id' => $sourceEventId,
+                        'model_version' => $model['version'] ?? $event['model_version'] ?? null,
+                        'asset_id' => $model['asset_id'] ?? $event['asset_id'] ?? null,
+                        'policy_code' => data_get($event, 'policy.code') ?? $event['policy_code'] ?? null,
+                        'horizon_minutes' => $this->positiveInteger($event['horizon_minutes'] ?? data_get($event, 'evidence.horizon_minutes')),
+                        'prediction_for' => $event['prediction_for'] ?? data_get($event, 'evidence.prediction_for'),
+                        'predicted_value' => $value,
+                        'evidence' => json_encode($event),
+                        'updated_at' => now(),
+                    ]);
+            });
+        } catch (Throwable) {
+            // Si no se puede refrescar, la alarma abierta sigue siendo valida.
+        }
     }
 
     private function sourceEventId(array $event, string $modelCode, int $piscinaId): string

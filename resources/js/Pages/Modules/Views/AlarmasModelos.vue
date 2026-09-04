@@ -650,6 +650,98 @@ const modeloDestacado = computed(() => models.value.find((m) => m.can_emit && gr
     ?? models.value.find((m) => graficoDe(m))
     ?? null);
 const graficoDestacado = computed(() => (modeloDestacado.value ? graficoDe(modeloDestacado.value) : null));
+
+/* Proyeccion del oxigeno con el margen de error del propio modelo.
+ *
+ * Al lado de la nota del agua tiene sentido lo unico que mira el agua hacia
+ * adelante: la estimacion de oxigeno. Se dibuja el tramo reciente medido, la
+ * trayectoria estimada y, alrededor de esta, una banda de +-MAE. Esa banda no
+ * es decorativa: es el error tipico que el modelo cometio en prueba, asi que
+ * enseña hasta donde conviene fiarse. Un area estrecha es un modelo seguro.
+ */
+const graficoProyeccionML = computed(() => {
+    const m = (models.value ?? []).find((x) => x.code === "SVM_OD_FORECAST_1H");
+    if (!m) return null;
+    const series = m.projection?.chart?.series ?? m.chart?.series ?? [];
+    const medido = series.find((se) => /observado/i.test(se.name ?? ""))?.data ?? [];
+    const estimado = series.find((se) => /estimacion|ia/i.test(se.name ?? ""))?.data ?? [];
+    if (medido.length < 2 || estimado.length < 2) return null;
+
+    const mae = Number(m.metrics?.mae);
+    const margen = Number.isFinite(mae) && mae > 0 ? mae : 0;
+
+    /* solo las ultimas horas: la proyeccion se pierde en un dia entero */
+    const cola = medido.slice(-36);
+    const arranque = cola[cola.length - 1];
+
+    /* la banda se abre con el horizonte: al principio no hay incertidumbre */
+    const tramo = [arranque, ...estimado.slice(1)];
+    const suelo = [];
+    const techo = [];
+    tramo.forEach((punto, i) => {
+        const apertura = margen * (i / Math.max(1, tramo.length - 1));
+        suelo.push([punto[0], Number((punto[1] - apertura).toFixed(3))]);
+        techo.push([punto[0], Number((2 * apertura).toFixed(3))]);
+    });
+
+    const horas = (new Date(estimado[estimado.length - 1][0]) - new Date(arranque[0])) / 3600000;
+
+    return {
+        titulo: `Proyeccion a ${horas.toFixed(0)} h con el margen del modelo`,
+        opciones: {
+            color: ["#0d9488", "#7c3aed"],
+            grid: { top: 30, left: 8, right: 16, bottom: 30, containLabel: true },
+            tooltip: { trigger: "axis" },
+            legend: { bottom: 0, data: ["Medido", "Estimado"] },
+            xAxis: { type: "time" },
+            yAxis: { type: "value", name: m.unit ?? "mg/L", scale: true },
+            series: [
+                {
+                    name: "Medido",
+                    type: "line",
+                    smooth: true,
+                    showSymbol: false,
+                    lineStyle: { width: 2, color: "#0d9488" },
+                    areaStyle: { color: "rgba(13,148,136,0.12)" },
+                    data: cola,
+                },
+                /* el suelo va invisible: solo sostiene la banda de encima */
+                {
+                    name: "margen-base",
+                    type: "line",
+                    stack: "margen",
+                    showSymbol: false,
+                    lineStyle: { opacity: 0 },
+                    silent: true,
+                    tooltip: { show: false },
+                    data: suelo,
+                },
+                {
+                    name: "Margen de error",
+                    type: "line",
+                    stack: "margen",
+                    showSymbol: false,
+                    lineStyle: { opacity: 0 },
+                    areaStyle: { color: "rgba(124,58,237,0.16)" },
+                    silent: true,
+                    tooltip: { show: false },
+                    data: techo,
+                },
+                {
+                    name: "Estimado",
+                    type: "line",
+                    smooth: false,
+                    symbolSize: 8,
+                    lineStyle: { width: 2, type: "dashed", color: "#7c3aed" },
+                    itemStyle: { color: "#7c3aed" },
+                    data: tramo,
+                },
+            ],
+        },
+        mae: margen,
+        unidad: m.unit ?? "mg/L",
+    };
+});
 const tituloDestacado = computed(() => {
     const m = modeloDestacado.value;
     if (!m) return "";
@@ -1062,13 +1154,29 @@ onBeforeUnmount(() => {
                     </section>
 
                     <section v-else-if="graficoDestacado" class="al__graf">
-                        <h3 class="al__seccion">{{ tituloDestacado }}</h3>
-                        <div class="graf">
-                            <ChartFisheye :options="graficoDestacado" height="320px" />
-                            <p class="graf__pie">
-                                Las franjas de color son los rangos de calidad. La linea roja es el
-                                limite a partir del cual el sistema avisa.
-                            </p>
+                        <div class="duo">
+                            <div class="duo__mitad">
+                                <h3 class="al__seccion">{{ tituloDestacado }}</h3>
+                                <div class="graf">
+                                    <ChartFisheye :options="graficoDestacado" height="320px" />
+                                    <p class="graf__pie">
+                                        Las franjas de color son los rangos de calidad. La linea roja es el
+                                        limite a partir del cual el sistema avisa.
+                                    </p>
+                                </div>
+                            </div>
+                            <div v-if="graficoProyeccionML" class="duo__mitad">
+                                <h3 class="al__seccion">{{ graficoProyeccionML.titulo }}</h3>
+                                <div class="graf">
+                                    <ChartFisheye :options="graficoProyeccionML.opciones" height="320px" />
+                                    <p class="graf__pie">
+                                        La zona morada es el margen de error del modelo, que se abre con el
+                                        horizonte: en prueba se equivocaba en
+                                        {{ graficoProyeccionML.mae.toFixed(2) }} {{ graficoProyeccionML.unidad }}
+                                        de media. Cuanto mas estrecha, mas fiable la estimacion.
+                                    </p>
+                                </div>
+                            </div>
                         </div>
                     </section>
 
@@ -1617,6 +1725,9 @@ onBeforeUnmount(() => {
 
 /* ---------- Grafico principal ---------- */
 .al__graf { margin-top: 26px; }
+.duo { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+.duo__mitad { min-width: 0; }
+@media (max-width: 1100px) { .duo { grid-template-columns: 1fr; } }
 .graf { background: #fff; border: 1px solid #e5e7eb; border-radius: 18px; padding: 16px 12px 10px; }
 .graf__pie { font-size: 12px; color: #9ca3af; margin: 6px 0 0; padding: 0 8px; }
 
