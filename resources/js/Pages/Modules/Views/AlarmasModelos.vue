@@ -651,95 +651,84 @@ const modeloDestacado = computed(() => models.value.find((m) => m.can_emit && gr
     ?? null);
 const graficoDestacado = computed(() => (modeloDestacado.value ? graficoDe(modeloDestacado.value) : null));
 
-/* Proyeccion del oxigeno con el margen de error del propio modelo.
+/* Cuanto margen le queda a cada modelo antes de disparar.
  *
- * Al lado de la nota del agua tiene sentido lo unico que mira el agua hacia
- * adelante: la estimacion de oxigeno. Se dibuja el tramo reciente medido, la
- * trayectoria estimada y, alrededor de esta, una banda de +-MAE. Esa banda no
- * es decorativa: es el error tipico que el modelo cometio en prueba, asi que
- * enseña hasta donde conviene fiarse. Un area estrecha es un modelo seguro.
+ * Una proyeccion temporal con todos no se puede: de los siete modelos solo
+ * tres miran hacia adelante, dos de ellos sobre la misma variable, y esos dos
+ * no tienen umbral. Los que si tienen umbral no proyectan. Asi que en vez de
+ * fingir una serie comun se compara lo que de verdad comparten: la distancia
+ * a su propia linea de alarma.
+ *
+ * Todos los umbrales son "por debajo de", asi que se expresa cada valor como
+ * porcentaje de su umbral. Cien por cien es la linea que salta: por encima hay
+ * margen, por debajo el modelo ya esta avisando. Eso pone en un mismo eje
+ * cosas que no comparten unidad -mg/L, lux, mm/dia, horas- sin inventar nada.
  */
-const graficoProyeccionML = computed(() => {
-    const m = (models.value ?? []).find((x) => x.code === "SVM_OD_FORECAST_1H");
-    if (!m) return null;
-    const series = m.projection?.chart?.series ?? m.chart?.series ?? [];
-    const medido = series.find((se) => /observado/i.test(se.name ?? ""))?.data ?? [];
-    const estimado = series.find((se) => /estimacion|ia/i.test(se.name ?? ""))?.data ?? [];
-    if (medido.length < 2 || estimado.length < 2) return null;
+const margenHastaAlarma = computed(() => {
+    const filas = [];
+    for (const m of models.value ?? []) {
+        const umbral = Number(m.policy?.threshold);
+        const valor = Number(m.current_value);
+        if (!Number.isFinite(umbral) || umbral === 0 || !Number.isFinite(valor)) continue;
+        const meta = MODELOS[m.code];
+        filas.push({
+            nombre: meta?.corto ?? m.name,
+            pct: (valor / umbral) * 100,
+            valor,
+            umbral,
+            unidad: m.unit ?? "",
+            proyecta: m.prediction_for ?? null,
+        });
+    }
+    if (filas.length < 2) return null;
+    filas.sort((a, b) => a.pct - b.pct);
 
-    const mae = Number(m.metrics?.mae);
-    const margen = Number.isFinite(mae) && mae > 0 ? mae : 0;
-
-    /* solo las ultimas horas: la proyeccion se pierde en un dia entero */
-    const cola = medido.slice(-36);
-    const arranque = cola[cola.length - 1];
-
-    /* la banda se abre con el horizonte: al principio no hay incertidumbre */
-    const tramo = [arranque, ...estimado.slice(1)];
-    const suelo = [];
-    const techo = [];
-    tramo.forEach((punto, i) => {
-        const apertura = margen * (i / Math.max(1, tramo.length - 1));
-        suelo.push([punto[0], Number((punto[1] - apertura).toFixed(3))]);
-        techo.push([punto[0], Number((2 * apertura).toFixed(3))]);
-    });
-
-    const horas = (new Date(estimado[estimado.length - 1][0]) - new Date(arranque[0])) / 3600000;
-
+    const tope = Math.min(320, Math.max(160, Math.ceil(Math.max(...filas.map((f) => f.pct)) / 20) * 20 + 20));
     return {
-        titulo: `Proyeccion a ${horas.toFixed(0)} h con el margen del modelo`,
+        enAlarma: filas.filter((f) => f.pct < 100).length,
+        total: filas.length,
         opciones: {
-            color: ["#0d9488", "#7c3aed"],
-            grid: { top: 30, left: 8, right: 16, bottom: 30, containLabel: true },
-            tooltip: { trigger: "axis" },
-            legend: { bottom: 0, data: ["Medido", "Estimado"] },
-            xAxis: { type: "time" },
-            yAxis: { type: "value", name: m.unit ?? "mg/L", scale: true },
-            series: [
-                {
-                    name: "Medido",
-                    type: "line",
-                    smooth: true,
-                    showSymbol: false,
-                    lineStyle: { width: 2, color: "#0d9488" },
-                    areaStyle: { color: "rgba(13,148,136,0.12)" },
-                    data: cola,
+            grid: { top: 16, left: 8, right: 62, bottom: 34, containLabel: true },
+            tooltip: {
+                trigger: "axis",
+                axisPointer: { type: "shadow" },
+                formatter: (ps) => {
+                    const f = filas[ps[0].dataIndex];
+                    return `${f.nombre}<br/>ahora ${f.valor.toLocaleString("es-PE", { maximumFractionDigits: 2 })} ${f.unidad}`
+                        + `<br/>umbral ${f.umbral} ${f.unidad}<br/><b>${f.pct.toFixed(0)}% del umbral</b>`;
                 },
-                /* el suelo va invisible: solo sostiene la banda de encima */
-                {
-                    name: "margen-base",
-                    type: "line",
-                    stack: "margen",
-                    showSymbol: false,
-                    lineStyle: { opacity: 0 },
-                    silent: true,
-                    tooltip: { show: false },
-                    data: suelo,
+            },
+            xAxis: {
+                type: "value", max: tope, name: "% de su umbral", nameLocation: "middle", nameGap: 24,
+                axisLabel: { formatter: "{value}%" }, splitLine: { lineStyle: { color: "#f1f5f9" } },
+            },
+            yAxis: {
+                type: "category", data: filas.map((f) => f.nombre),
+                axisTick: { show: false }, axisLine: { show: false },
+                axisLabel: { fontSize: 12, color: "#374151" },
+            },
+            series: [{
+                type: "bar", barWidth: 20,
+                data: filas.map((f) => ({
+                    value: Number(f.pct.toFixed(1)),
+                    itemStyle: {
+                        borderRadius: [0, 4, 4, 0],
+                        /* rojo si ya salto, ambar si le queda poco, verde si sobra */
+                        color: f.pct < 100 ? "#dc2626" : f.pct < 130 ? "#f59e0b" : "#0d9488",
+                    },
+                })),
+                label: {
+                    show: true, position: "right", fontSize: 11, color: "#4b5563",
+                    formatter: (t) => t.value.toFixed(0) + "%",
                 },
-                {
-                    name: "Margen de error",
-                    type: "line",
-                    stack: "margen",
-                    showSymbol: false,
-                    lineStyle: { opacity: 0 },
-                    areaStyle: { color: "rgba(124,58,237,0.16)" },
-                    silent: true,
-                    tooltip: { show: false },
-                    data: techo,
+                markLine: {
+                    silent: true, symbol: "none",
+                    lineStyle: { color: "#dc2626", type: "dashed", width: 2 },
+                    label: { formatter: "dispara", fontSize: 10, color: "#dc2626", position: "end" },
+                    data: [{ xAxis: 100 }],
                 },
-                {
-                    name: "Estimado",
-                    type: "line",
-                    smooth: false,
-                    symbolSize: 8,
-                    lineStyle: { width: 2, type: "dashed", color: "#7c3aed" },
-                    itemStyle: { color: "#7c3aed" },
-                    data: tramo,
-                },
-            ],
+            }],
         },
-        mae: margen,
-        unidad: m.unit ?? "mg/L",
     };
 });
 const tituloDestacado = computed(() => {
@@ -1165,15 +1154,15 @@ onBeforeUnmount(() => {
                                     </p>
                                 </div>
                             </div>
-                            <div v-if="graficoProyeccionML" class="duo__mitad">
-                                <h3 class="al__seccion">{{ graficoProyeccionML.titulo }}</h3>
+                            <div v-if="margenHastaAlarma" class="duo__mitad">
+                                <h3 class="al__seccion">Cuanto margen le queda a cada modelo</h3>
                                 <div class="graf">
-                                    <ChartFisheye :options="graficoProyeccionML.opciones" height="320px" />
+                                    <ChartFisheye :options="margenHastaAlarma.opciones" height="320px" />
                                     <p class="graf__pie">
-                                        La zona morada es el margen de error del modelo, que se abre con el
-                                        horizonte: en prueba se equivocaba en
-                                        {{ graficoProyeccionML.mae.toFixed(2) }} {{ graficoProyeccionML.unidad }}
-                                        de media. Cuanto mas estrecha, mas fiable la estimacion.
+                                        Cada barra es un modelo medido contra su propia linea de alarma, que
+                                        aqui vale 100%. Asi caben en un mismo eje cosas que no comparten
+                                        unidad. A la izquierda de la raya roja el modelo ya esta avisando:
+                                        <strong>{{ margenHastaAlarma.enAlarma }} de {{ margenHastaAlarma.total }}</strong>.
                                     </p>
                                 </div>
                             </div>
