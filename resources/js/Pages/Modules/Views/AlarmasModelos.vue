@@ -666,13 +666,27 @@ const graficoDestacado = computed(() => (modeloDestacado.value ? graficoDe(model
  */
 const margenHastaAlarma = computed(() => {
     const filas = [];
+    const sinUmbral = [];
     for (const m of models.value ?? []) {
+        const meta = MODELOS[m.code];
+        const nombre = meta?.corto ?? m.name;
         const umbral = Number(m.policy?.threshold);
         const valor = Number(m.current_value);
-        if (!Number.isFinite(umbral) || umbral === 0 || !Number.isFinite(valor)) continue;
-        const meta = MODELOS[m.code];
+        /* Sin politica aprobada no hay umbral, y sin umbral no hay margen que
+           medir. Antes se descartaban en silencio y el grafico ensenaba cinco
+           barras para siete tarjetas, que es justo lo que confunde. Ahora
+           aparecen igual, en gris y sin longitud, diciendo por que. */
+        if (!Number.isFinite(umbral) || umbral === 0 || !Number.isFinite(valor)) {
+            sinUmbral.push({
+                nombre,
+                valor: Number.isFinite(valor) ? valor : null,
+                unidad: m.unit ?? "",
+                estado: m.policy?.status ?? "sin politica",
+            });
+            continue;
+        }
         filas.push({
-            nombre: meta?.corto ?? m.name,
+            nombre,
             pct: (valor / umbral) * 100,
             valor,
             umbral,
@@ -682,11 +696,24 @@ const margenHastaAlarma = computed(() => {
     }
     if (filas.length < 2) return null;
     filas.sort((a, b) => a.pct - b.pct);
+    /* los que no se pueden medir van al final, separados de los que si */
+    for (const x of sinUmbral) filas.push({ ...x, pct: null, umbral: null });
 
-    const tope = Math.min(320, Math.max(160, Math.ceil(Math.max(...filas.map((f) => f.pct)) / 20) * 20 + 20));
+    const medibles = filas.filter((f) => f.pct !== null);
+    /* Lo que interesa es la cercania al umbral. Un modelo al 2000% no esta
+       "mas a salvo" que uno al 250%: ambos sobran. Pero dibujado a escala
+       aplasta al resto y deja de verse quien anda justo, que es el unico
+       motivo de mirar esto. Se corta el eje y las barras que se pasan se
+       marcan con su valor real. */
+    const TOPE_EJE = 200;
+    const tope = Math.min(
+        TOPE_EJE,
+        Math.max(140, Math.ceil(Math.max(...medibles.map((f) => f.pct)) / 20) * 20 + 20),
+    );
     return {
-        enAlarma: filas.filter((f) => f.pct < 100).length,
-        total: filas.length,
+        enAlarma: medibles.filter((f) => f.pct < 100).length,
+        total: medibles.length,
+        sinPolitica: sinUmbral.length,
         opciones: {
             grid: { top: 16, left: 8, right: 62, bottom: 34, containLabel: true },
             tooltip: {
@@ -694,7 +721,15 @@ const margenHastaAlarma = computed(() => {
                 axisPointer: { type: "shadow" },
                 formatter: (ps) => {
                     const f = filas[ps[0].dataIndex];
-                    return `${f.nombre}<br/>ahora ${f.valor.toLocaleString("es-PE", { maximumFractionDigits: 2 })} ${f.unidad}`
+                    const ahora = f.valor === null
+                        ? "sin lectura"
+                        : `${f.valor.toLocaleString("es-PE", { maximumFractionDigits: 2 })} ${f.unidad}`;
+                    if (f.pct === null) {
+                        return `${f.nombre}<br/>ahora ${ahora}`
+                            + `<br/><b>sin umbral: su politica esta en ${f.estado}</b>`
+                            + "<br/>no se puede medir margen sin una linea aprobada";
+                    }
+                    return `${f.nombre}<br/>ahora ${ahora}`
                         + `<br/>umbral ${f.umbral} ${f.unidad}<br/><b>${f.pct.toFixed(0)}% del umbral</b>`;
                 },
             },
@@ -710,16 +745,23 @@ const margenHastaAlarma = computed(() => {
             series: [{
                 type: "bar", barWidth: 20,
                 data: filas.map((f) => ({
-                    value: Number(f.pct.toFixed(1)),
+                    value: f.pct === null ? 0 : Number(Math.min(f.pct, tope).toFixed(1)),
                     itemStyle: {
                         borderRadius: [0, 4, 4, 0],
                         /* rojo si ya salto, ambar si le queda poco, verde si sobra */
-                        color: f.pct < 100 ? "#dc2626" : f.pct < 130 ? "#f59e0b" : "#0d9488",
+                        color: f.pct === null
+                            ? "#e5e7eb"
+                            : f.pct < 100 ? "#dc2626" : f.pct < 130 ? "#f59e0b" : "#0d9488",
                     },
                 })),
                 label: {
-                    show: true, position: "right", fontSize: 11, color: "#4b5563",
-                    formatter: (t) => t.value.toFixed(0) + "%",
+                    show: true, position: "right", fontSize: 11,
+                    color: (t) => (filas[t.dataIndex].pct === null ? "#9ca3af" : "#4b5563"),
+                    formatter: (t) => {
+                        const f = filas[t.dataIndex];
+                        if (f.pct === null) return "sin umbral";
+                        return f.pct > tope ? `${f.pct.toFixed(0)}% →` : `${f.pct.toFixed(0)}%`;
+                    },
                 },
                 markLine: {
                     silent: true, symbol: "none",
@@ -1163,6 +1205,12 @@ onBeforeUnmount(() => {
                                         aqui vale 100%. Asi caben en un mismo eje cosas que no comparten
                                         unidad. A la izquierda de la raya roja el modelo ya esta avisando:
                                         <strong>{{ margenHastaAlarma.enAlarma }} de {{ margenHastaAlarma.total }}</strong>.
+                                        <template v-if="margenHastaAlarma.sinPolitica">
+                                            En gris,
+                                            <strong>{{ margenHastaAlarma.sinPolitica }}</strong>
+                                            que calculan pero aun no tienen una politica aprobada, asi que no
+                                            hay umbral contra el que medirlos.
+                                        </template>
                                     </p>
                                 </div>
                             </div>
