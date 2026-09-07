@@ -118,6 +118,11 @@ class ModelAlarmPersistenceService
             // el filtro de arriba nunca saltaba y la misma condicion se guardaba
             // una y otra vez: doce filas identicas del mismo modelo en un dia.
             // Mientras siga activa y sin resolver, se refresca la que ya existe.
+            if ($this->enPeriodoDeGracia($modelCode, $piscina->id)) {
+                $this->skip($result, 'en_periodo_de_gracia');
+                continue;
+            }
+
             $abierta = $this->alarmaActivaDe($modelCode, $piscina->id);
             if ($abierta) {
                 $this->refrescar($abierta, $event, $modelCode, $sourceEventId, $level);
@@ -262,6 +267,29 @@ class ModelAlarmPersistenceService
     /**
      * La alarma viva de ese modelo en esa piscina, si la hay.
      */
+    // Minutos de calma tras resolver antes de volver a abrir la misma alarma.
+    // Sin esto, resolver una alarma cuya condicion sigue viva la reabre en la
+    // siguiente pasada del sincronizador, que corre cada diez minutos: quien la
+    // cierra la ve reaparecer casi al instante y deja de fiarse del boton. Con
+    // la gracia, cerrarla significa 'ya lo se, dame un rato'. Si al terminar el
+    // plazo el problema continua, vuelve a abrirse, que es lo correcto: nadie
+    // silencia un estanque por marcar una casilla.
+    private const GRACIA_MINUTOS = 60;
+
+    // Si alguien acaba de resolver esta misma alarma, se respeta su decision.
+    private function enPeriodoDeGracia(string $modelCode, int $piscinaId): bool
+    {
+        return Alarma::query()
+            ->where('piscina_id', $piscinaId)
+            ->where('modulo', 'inteligencia')
+            ->where('estado', 'resuelta')
+            ->where('resuelta_en', '>=', now()->subMinutes(self::GRACIA_MINUTOS))
+            ->whereIn('id', AlarmaModeloEvidencia::query()
+                ->where('model_code', $modelCode)
+                ->select('alarma_id'))
+            ->exists();
+    }
+
     private function alarmaActivaDe(string $modelCode, int $piscinaId): ?Alarma
     {
         return Alarma::query()

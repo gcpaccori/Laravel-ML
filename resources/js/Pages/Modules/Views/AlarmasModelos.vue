@@ -153,6 +153,7 @@ const avisos = computed(() => response.value?.events ?? []);
 const avisosAbiertos = computed(() => avisos.value.filter((a) => (a.event_type ?? "activa") === "activa"));
 const estaActiva = (fila) => (fila?.event_type ?? "activa") === "activa";
 
+
 // Resolver una alarma. Las que pinta esta tabla no son los eventos crudos del
 // backend: el controlador ya los sustituye por las filas persistidas de Laravel,
 // que si traen id numerico y estado. Por eso se puede cerrar una desde aqui, y
@@ -1034,9 +1035,44 @@ const avisosFiltrados = computed(() => avisosOrdenados.value.filter((a) => {
     return true;
 }));
 
+// Las repeticiones del mismo modelo se juntan en una fila.
+//
+// Una condicion que dura -el crecimiento lento lleva dias- genera una alarma,
+// se resuelve, y al pasar la gracia vuelve a abrirse. Listadas una por una
+// llenan la tabla de lo mismo y esconden lo demas. Se agrupan por modelo y
+// codigo: una fila con el numero de veces y el periodo que abarca, y dentro
+// quedan las individuales por si hay que mirarlas.
+const claseRep = (r) => (estaActiva(r) ? "rep__a" : "rep__r");
+const textoRep = (r) => (estaActiva(r) ? "sin atender" : "resuelta");
+
+const avisosAgrupados = computed(() => {
+    const grupos = new Map();
+    for (const a of avisosFiltrados.value) {
+        const clave = (a.model?.code ?? '?') + '|' + (a.alarm_code ?? '?');
+        if (!grupos.has(clave)) grupos.set(clave, []);
+        grupos.get(clave).push(a);
+    }
+    const filas = [];
+    for (const [clave, lista] of grupos) {
+        lista.sort((x, y) => String(y.occurred_at ?? '').localeCompare(String(x.occurred_at ?? '')));
+        const abiertas = lista.filter(estaActiva);
+        filas.push({
+            ...(abiertas[0] ?? lista[0]),
+            clave,
+            veces: lista.length,
+            abiertas: abiertas.length,
+            desde: lista[lista.length - 1]?.occurred_at ?? null,
+            hasta: lista[0]?.occurred_at ?? null,
+            repeticiones: lista,
+        });
+    }
+    filas.sort((x, y) => String(y.hasta ?? '').localeCompare(String(x.hasta ?? '')));
+    return filas;
+});
+
 const avisosPagina = computed(() => {
     const ini = (pagina.value - 1) * porPagina.value;
-    return avisosFiltrados.value.slice(ini, ini + porPagina.value);
+    return avisosAgrupados.value.slice(ini, ini + porPagina.value);
 });
 
 const limpiarFiltros = () => {
@@ -1044,7 +1080,7 @@ const limpiarFiltros = () => {
     pagina.value = 1;
 };
 
-watch(avisosFiltrados, () => { pagina.value = 1; });
+watch(avisosAgrupados, () => { pagina.value = 1; });
 
 const cuandoLargo = (v) => {
     if (!v) return "";
@@ -1277,12 +1313,12 @@ onBeforeUnmount(() => {
                             <span v-if="conteoGravedad.critico" class="chip chip--malo">{{ conteoGravedad.critico }} grave<span v-if="conteoGravedad.critico > 1">s</span></span>
                             <span v-if="conteoGravedad.advertencia" class="chip chip--aviso">{{ conteoGravedad.advertencia }} de atencion</span>
                             <span class="hist__resultado">
-                                {{ avisosFiltrados.length }} de {{ avisos.length }} alarmas
+                                {{ avisosAgrupados.length }} situaciones, {{ avisosFiltrados.length }} alarmas en total
                             </span>
                         </div>
 
                         <el-skeleton v-if="cargando" :rows="6" animated class="hist__esq" />
-                        <el-table v-else :data="avisosPagina" class="hist__tabla" empty-text="Ninguna alarma con esos filtros" row-key="source_event_id">
+                        <el-table v-else :data="avisosPagina" class="hist__tabla" empty-text="Ninguna alarma con esos filtros" row-key="clave">
                             <el-table-column type="expand">
                                 <template #default="{ row }">
                                     <dl class="dl dl--mini hist__det">
@@ -1293,6 +1329,15 @@ onBeforeUnmount(() => {
                                         <div v-if="row.horizon_minutes"><dt>Horizonte</dt><dd>{{ row.horizon_minutes }} min</dd></div>
                                         <div v-if="row.source_event_id"><dt>Id del evento</dt><dd class="mono">{{ row.source_event_id }}</dd></div>
                                     </dl>
+                                    <div v-if="row.veces > 1" class="rep">
+                                        <p class="rep__t">Se ha repetido {{ row.veces }} veces</p>
+                                        <ul class="rep__l">
+                                            <li v-for="r in row.repeticiones" :key="r.id">
+                                                {{ cuandoLargo(r.occurred_at) }}
+                                                <span :class="claseRep(r)">{{ textoRep(r) }}</span>
+                                            </li>
+                                        </ul>
+                                    </div>
                                 </template>
                             </el-table-column>
                             <el-table-column label="Gravedad" width="118">
@@ -1315,19 +1360,22 @@ onBeforeUnmount(() => {
                             <el-table-column label="Valor" width="110" align="right">
                                 <template #default="{ row }">{{ num(row.predicted_value ?? row.value, 2) }}</template>
                             </el-table-column>
-                            <el-table-column label="Cuando" width="190">
-                                <template #default="{ row }">{{ cuandoLargo(row.occurred_at) }}</template>
+                            <el-table-column label="Cuando" width="210">
+                                <template #default="{ row }">
+                                    {{ cuandoLargo(row.hasta ?? row.occurred_at) }}
+                                    <span v-if="row.veces > 1" class="rep__n">x{{ row.veces }}</span>
+                                </template>
                             </el-table-column>
                             <el-table-column label="Estado" width="150">
                                 <template #default="{ row }">
-                                    <span v-if="estaActiva(row)" class="chip chip--aviso">Sin atender</span>
+                                    <span v-if="row.abiertas" class="chip chip--aviso">Sin atender</span>
                                     <span v-else class="chip chip--ok" :title="cuandoLargo(row.resolved_at)">Resuelta</span>
                                 </template>
                             </el-table-column>
                             <el-table-column width="110" align="right">
                                 <template #default="{ row }">
                                     <el-button
-                                        v-if="estaActiva(row)"
+                                        v-if="row.abiertas"
                                         text
                                         type="primary"
                                         :loading="resolviendo === row.id"
@@ -1344,7 +1392,7 @@ onBeforeUnmount(() => {
                                 v-model:current-page="pagina"
                                 v-model:page-size="porPagina"
                                 :page-sizes="[10, 25, 50, 100]"
-                                :total="avisosFiltrados.length"
+                                :total="avisosAgrupados.length"
                                 layout="total, sizes, prev, pager, next"
                                 background
                             />
@@ -1710,6 +1758,13 @@ onBeforeUnmount(() => {
 .pop__f { font-size: 11px; color: #9ca3af; line-height: 1.5; margin: 6px 0 0; border-top: 1px solid #f1f5f9; padding-top: 6px; }
 .det__fuente { font-size: 12px; color: #6b7280; margin: 2px 0 0; }
 .lista { margin: 0; padding-left: 18px; font-size: 13px; color: #4b5563; line-height: 1.7; }
+.rep { margin: 10px 0 0; }
+.rep__t { font-size: 12px; font-weight: 600; color: #4b5563; margin: 0 0 6px; }
+.rep__l { list-style: none; padding: 0; margin: 0; font-size: 12px; color: #6b7280; }
+.rep__l li { padding: 3px 0; border-bottom: 1px solid #f8fafc; display: flex; gap: 10px; }
+.rep__a { color: #b45309; font-weight: 600; }
+.rep__r { color: #15803d; }
+.rep__n { font-size: 11px; color: #6b7280; background: #f1f5f9; border-radius: 8px; padding: 1px 6px; margin-left: 6px; }
 .tabs__l { display: inline-flex; align-items: center; gap: 8px; }
 .tabs__n { background: #fee2e2; color: #991b1b; font-size: 11px; font-weight: 800; padding: 1px 8px; border-radius: 999px; }
 
