@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { Delete, InfoFilled, QuestionFilled, RefreshRight, Setting, SetUp } from "@element-plus/icons-vue";
+import { Delete, QuestionFilled, RefreshRight, Setting, SetUp } from "@element-plus/icons-vue";
 import ChartFisheye from "@/Components/ChartFisheye.vue";
 
 defineProps({
@@ -116,7 +116,6 @@ const errorMessage = ref("");
 const response = ref(null);
 const lightScenarioResult = ref(null);
 const detalle = ref(null);
-const abiertos = ref([]);
 const piscigranjas = ref([]);
 const piscinas = ref([]);
 const requestController = ref(null);
@@ -873,7 +872,6 @@ const frenoTexto = (m) => {
 const nombreDe = (code) => MODELOS[code]?.corto ?? "Un modelo";
 const imagenDe = (code) => MODELOS[code]?.img ?? null;
 const gravedadDe = (sev) => GRAVEDAD[sev] ?? GRAVEDAD.advertencia;
-const textoNota = (o) => (typeof o === "string" ? o : o?.message ?? "");
 const criterioTexto = (k) => CRITERIOS[k] ?? k.replace(/_/g, " ");
 
 const num = (v, dec = 3) => (v === null || v === undefined || !Number.isFinite(Number(v))
@@ -1184,55 +1182,23 @@ onBeforeUnmount(() => {
                                 <h3 class="al__seccion">{{ tituloDestacado }}</h3>
                                 <div class="graf">
                                     <ChartFisheye :options="graficoDestacado" height="320px" />
-                                    <p class="graf__pie">
-                                        Las franjas de color son los rangos de calidad. La linea roja es el
-                                        limite a partir del cual el sistema avisa.
-                                    </p>
                                 </div>
                             </div>
                             <div v-if="margenHastaAlarma" class="duo__mitad">
-                                <h3 class="al__seccion">Cuanto margen le queda a cada modelo</h3>
+                                <h3 class="al__seccion">Margen hasta la alarma</h3>
                                 <div class="graf">
                                     <ChartFisheye :options="margenHastaAlarma.opciones" height="320px" />
                                     <p class="graf__pie">
-                                        Cada barra es un modelo medido contra su propia linea de alarma, que
-                                        aqui vale 100%. Asi caben en un mismo eje cosas que no comparten
-                                        unidad. A la izquierda de la raya roja el modelo ya esta avisando:
-                                        <strong>{{ margenHastaAlarma.enAlarma }} de {{ margenHastaAlarma.total }}</strong>.
-                                        <template v-if="margenHastaAlarma.sinPolitica">
-                                            En gris,
-                                            <strong>{{ margenHastaAlarma.sinPolitica }}</strong>
-                                            que calculan pero no tienen politica aprobada: no vigilan. El
-                                            motivo queda escrito en su politica.
-                                        </template>
+                                        <strong>{{ margenHastaAlarma.enAlarma }}</strong> de
+                                        {{ margenHastaAlarma.total }} por debajo de su umbral<template
+                                            v-if="margenHastaAlarma.sinPolitica"
+                                        >, {{ margenHastaAlarma.sinPolitica }} sin vigilar</template>
                                     </p>
                                 </div>
                             </div>
                         </div>
                     </section>
 
-                    <el-collapse v-model="abiertos" class="expl">
-                        <el-collapse-item name="que-es">
-                            <template #title>
-                                <span class="expl__t"><el-icon><InfoFilled /></el-icon> Que es un modelo y en que se diferencia de una alarma</span>
-                            </template>
-                            <div class="expl__cuerpo">
-                                <p><strong>Un modelo</strong> es una cuenta que mira los sensores y saca un numero: la nota del agua, el oxigeno que habra en una hora, cuanto deberian crecer los peces. El modelo solo calcula. Nunca decide molestar a nadie.</p>
-                                <p><strong>Una alarma</strong> es la regla que tu le pones encima a ese numero: "si baja de 70, avisame". Sin esa regla el modelo sigue calculando, pero se queda callado.</p>
-                                <p>Por eso un modelo puede estar funcionando perfecto y aun asi no avisar nunca: le falta la regla. Se define con el boton <strong>Configurar alarmas</strong>.</p>
-                                <p class="expl__nota">Estas alarmas son distintas de las de la pestana <em>Alertas</em>. Aquellas se disparan cuando un sensor cruza un rango fijo. Estas nacen de un modelo que combina varias medidas o proyecta hacia adelante.</p>
-                            </div>
-                        </el-collapse-item>
-                        <el-collapse-item v-if="observations.length" name="notas">
-                            <template #title><span class="expl__t">Notas tecnicas del calculo ({{ observations.length }})</span></template>
-                            <ul class="lista"><li v-for="(o, i) in observations" :key="i">{{ textoNota(o) }}</li></ul>
-                            <dl class="dl" v-if="meta.source">
-                                <div><dt>Origen</dt><dd>{{ meta.source }}</dd></div>
-                                <div v-if="meta.computed_at"><dt>Calculado</dt><dd>{{ cuandoLargo(meta.computed_at) }}</dd></div>
-                                <div v-if="meta.window_hours"><dt>Ventana</dt><dd>{{ meta.window_hours }} h</dd></div>
-                            </dl>
-                        </el-collapse-item>
-                    </el-collapse>
                 </el-tab-pane>
 
                 <el-tab-pane name="alarmas">
@@ -1764,10 +1730,6 @@ onBeforeUnmount(() => {
 
 /* ---------- Explicadores ---------- */
 .expl { margin-top: 22px; border: 1px solid #e5e7eb; border-radius: 14px; padding: 0 16px; }
-.expl__t { font-weight: 700; color: #4b5563; display: inline-flex; align-items: center; gap: 6px; }
-.expl__cuerpo p { font-size: 14px; line-height: 1.65; color: #374151; margin: 0 0 10px; }
-.expl__nota { border-left: 3px solid #d1d5db; padding-left: 12px; color: #6b7280 !important; }
-.lista { margin: 0; padding-left: 18px; font-size: 13px; color: #4b5563; line-height: 1.7; }
 
 /* ---------- Historial de alarmas ---------- */
 .hist__filtros { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 14px; }
