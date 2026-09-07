@@ -818,47 +818,53 @@ const antiguedadDe = (m) => {
 
 
 /* Que hay dentro de cada modelo. Distingue lo que es aprendizaje automatico
-   de lo que es una formula cerrada: no es lo mismo un artefacto entrenado
+   de lo que viene de la literatura: no es lo mismo un modelo ajustado
    con datos de esta piscigranja que una ecuacion publicada. */
 const TECNICA = {
     WATER_QUALITY_INDEX_ICA: {
         ml: false,
-        etiqueta: "Formula",
-        metodo: "Indice ponderado (ICA)",
-        explica: "No aprende de datos: es una suma ponderada fija de cuatro medidas. Siempre da el mismo resultado con las mismas entradas.",
+        etiqueta: "Indice",
+        metodo: "Suma ponderada de cuatro medidas",
+        fuente: "Definido en el motor del proyecto (water_quality.py)",
+        explica: "No aprende de datos: pondera temperatura, pH, oxigeno y nitrato con pesos fijos. Con las mismas entradas siempre da el mismo resultado.",
     },
     TILAPIA_GROWTH_TEMPERATURE: {
         ml: false,
-        etiqueta: "Formula",
+        etiqueta: "Literatura",
         metodo: "Regresion lineal de Soderberg",
-        explica: "La recta de Soderberg esta publicada, no entrenada aqui: fija el techo segun la temperatura. Sobre ese techo se aplican despues el oxigeno y el pH, que solo pueden restar.",
-    },
-    TILAPIA_WEIGHT_LENGTH_ML: {
-        ml: true,
-        etiqueta: "ML",
-        metodo: "Regresion potencial ajustada aqui",
-        explica: "Entrenado con los peces de esta piscigranja medidos uno a uno. Ajusta W = a*L^b, se reparte en entrenamiento y prueba, y se valida fuera de muestra contra la media y contra la ley cubica.",
+        fuente: "Informe 17 (marzo 2026), ec. 1: delta L = -1,6707 + 0,09682 T, con R2 de 0,95",
+        explica: "Ecuacion publicada para tilapia del Nilo, no ajustada aqui. Fija el techo de crecimiento segun la temperatura; sobre ese techo el oxigeno y el pH solo pueden restar.",
     },
     SVM_OD_FORECAST_1H: {
         ml: true,
-        etiqueta: "ML",
-        metodo: "SVR con nucleo RBF",
-        explica: "Aprendizaje automatico de verdad: hay un artefacto entrenado con los datos de esta piscigranja, validado contra el metodo simple.",
+        etiqueta: "Entrenado aqui",
+        metodo: "Gradient boosting sobre el cambio de oxigeno",
+        fuente: "Marco de referencia en el Informe 16 (febrero 2026): balance de masas del oxigeno entre respiracion, biofiltro, nitrificacion y aporte superficial",
+        explica: "Aprende de este estanque. Usa el ciclo dia-noche y el deficit de saturacion por Benson-Krause, y predice el cambio en vez del nivel. Se descartan antes las rachas de sensor atascado.",
     },
     LIGHT_FEED_RESPONSE_CLASSIFIER_V1: {
         ml: true,
-        etiqueta: "ML",
-        metodo: "SVC con nucleo RBF",
-        explica: "Entrenado con el luxometro de este vivero. La etiqueta la mide el propio sensor: si la luz de dentro de doce horas llega o no a los treinta lux con los que la tilapia ve el pienso. Validado con reparto temporal contra tres referencias, y les gana a las tres (F1 0.83 frente a 0.00 de la persistencia).",
+        etiqueta: "Entrenado aqui",
+        metodo: "Clasificador SVC con nucleo RBF",
+        fuente: "Umbral visual de 30 lux para un alimentador visual; entrenado con el luxometro de este vivero",
+        explica: "La etiqueta la mide el propio sensor: si la luz de dentro de doce horas llega o no al minimo con el que la tilapia ve el pienso. Validado contra tres referencias y les gana a las tres.",
     },
     PHOTOPERIOD_GREENHOUSE_V1: {
         ml: false,
-        etiqueta: "Formula",
-        metodo: "Conteo con umbrales",
-        explica: "No aprende: cuenta horas por encima de un umbral de lux y las compara con la luz natural de la API.",
+        etiqueta: "Literatura",
+        metodo: "Transmitancia contra irradiancia solar",
+        fuente: "Umbrales de fotoperiodo de la literatura; luz natural de Open-Meteo para las coordenadas de la piscigranja",
+        explica: "No aprende: compara lo que mide el luxometro dentro con la luz que hubo fuera ese dia y cuenta las horas aprovechables.",
+    },
+    TILAPIA_WEIGHT_LENGTH_ML: {
+        ml: true,
+        etiqueta: "Entrenado aqui",
+        metodo: "Regresion potencial ajustada con los peces del centro",
+        fuente: "Ley alometrica del Informe 17, ec. 2; factor de condicion del Informe 18, ec. 1",
+        explica: "Unico modelo ajustado con los peces de esta piscigranja, medidos uno a uno. El exponente que aprende (2,99) confirma la ley cubica del informe, asi que la poblacion crece en proporcion.",
     },
 };
-const tecnicaDe = (code) => TECNICA[code] ?? { ml: false, etiqueta: "Formula", metodo: "-", explica: "" };
+const tecnicaDe = (code) => TECNICA[code] ?? { ml: false, etiqueta: "Sin clasificar", metodo: "-", fuente: "", explica: "" };
 
 const frenoTexto = (m) => {
     const pot = Number(m?.potential_value);
@@ -1123,18 +1129,19 @@ onBeforeUnmount(() => {
                                     </template>
                                     <p class="pop__t">
                                         {{ t.corto }}
-                                        <span class="tec" :class="t.tecnica.ml ? 'tec--ml' : 'tec--formula'">
-                                            {{ t.tecnica.ml ? "Aprendizaje automatico" : "Formula, no es ML" }}
+                                        <span class="tec" :class="t.tecnica.ml ? 'tec--ml' : 'tec--lit'">
+                                            {{ t.tecnica.etiqueta }}
                                         </span>
                                     </p>
                                     <p class="pop__m">{{ t.tecnica.metodo }}</p>
                                     <p class="pop__d">{{ t.tecnica.explica }}</p>
+                                    <p v-if="t.tecnica.fuente" class="pop__f">{{ t.tecnica.fuente }}</p>
                                     <p class="pop__d">{{ t.ayuda }}</p>
                                 </el-popover>
 
                                 <img v-if="t.img" class="tarjeta__img" :src="t.img" :alt="t.corto" width="60" height="60" loading="lazy" />
                                 <span v-else class="tarjeta__img tarjeta__img--vacia" aria-hidden="true"></span>
-                                <span class="tec" :class="t.tecnica.ml ? 'tec--ml' : 'tec--formula'">
+                                <span class="tec" :class="t.tecnica.ml ? 'tec--ml' : 'tec--lit'">
                                     {{ t.tecnica.etiqueta }}
                                 </span>
                                 <h4 class="tarjeta__nombre">{{ t.corto }}</h4>
@@ -1405,10 +1412,13 @@ onBeforeUnmount(() => {
                             <h3>{{ detalle.corto }}</h3>
                             <p class="det__real">{{ detalle.raw.name }}</p>
                             <p class="det__tec">
-                                <span class="tec" :class="detalle.tecnica.ml ? 'tec--ml' : 'tec--formula'">
-                                    {{ detalle.tecnica.ml ? "Aprendizaje automatico" : "Formula, no es ML" }}
+                                <span class="tec" :class="detalle.tecnica.ml ? 'tec--ml' : 'tec--lit'">
+                                    {{ detalle.tecnica.etiqueta }}
                                 </span>
                                 <span>{{ detalle.tecnica.metodo }}</span>
+                            </p>
+                            <p v-if="detalle.tecnica.fuente" class="det__fuente">
+                                {{ detalle.tecnica.fuente }}
                             </p>
                             <span class="chip" :class="'chip--' + detalle.estado.tono">{{ detalle.estado.texto }}</span>
                         </div>
@@ -1655,6 +1665,9 @@ onBeforeUnmount(() => {
 .lim { list-style: none; padding: 0; margin: 14px 0 6px; }
 .lim li { font-size: 14px; color: #6b7280; padding: 5px 0 5px 14px; border-left: 2px solid #e5e7eb; margin-bottom: 4px; }
 .lim--pesa { color: #9a3412; border-left-color: #ea580c; font-weight: 600; }
+.pop__f { font-size: 11px; color: #9ca3af; line-height: 1.5; margin: 6px 0 0; border-top: 1px solid #f1f5f9; padding-top: 6px; }
+.det__fuente { font-size: 12px; color: #6b7280; margin: 2px 0 0; }
+.lista { margin: 0; padding-left: 18px; font-size: 13px; color: #4b5563; line-height: 1.7; }
 .tabs__l { display: inline-flex; align-items: center; gap: 8px; }
 .tabs__n { background: #fee2e2; color: #991b1b; font-size: 11px; font-weight: 800; padding: 1px 8px; border-radius: 999px; }
 
@@ -1707,7 +1720,7 @@ onBeforeUnmount(() => {
 .tec { display: inline-block; font-size: 9px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
         padding: 2px 7px; border-radius: 6px; }
 .tec--ml { background: #ede9fe; color: #5b21b6; }
-.tec--formula { background: #f1f5f9; color: #64748b; }
+.tec--lit { background: #f1f5f9; color: #64748b; }
 /* dentro de la tarjeta es columna flex: sin esto el distintivo se estira */
 .tarjeta .tec { align-self: center; margin: 6px 0 0; }
 .pop__m { margin: 6px 0 4px; font-size: 12px; font-weight: 700; color: #334155; }
