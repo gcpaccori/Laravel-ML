@@ -1194,8 +1194,11 @@ onBeforeUnmount(() => {
                                     </p>
                                     <p class="pop__m">{{ t.tecnica.metodo }}</p>
                                     <p class="pop__d">{{ t.tecnica.explica }}</p>
-                                    <p v-if="t.tecnica.fuente" class="pop__f">{{ t.tecnica.fuente }}</p>
                                     <p class="pop__d">{{ t.ayuda }}</p>
+                                    <p v-if="t.tecnica.fuente" class="pop__f">
+                                        <span class="pop__f__r">De donde sale</span>
+                                        {{ t.tecnica.fuente }}
+                                    </p>
                                 </el-popover>
 
                                 <img v-if="t.img" class="tarjeta__img" :src="t.img" :alt="t.corto" width="60" height="60" loading="lazy" />
@@ -1508,6 +1511,7 @@ onBeforeUnmount(() => {
                                 <span>{{ detalle.tecnica.metodo }}</span>
                             </p>
                             <p v-if="detalle.tecnica.fuente" class="det__fuente">
+                                <span class="det__fuente__r">De donde sale</span>
                                 {{ detalle.tecnica.fuente }}
                             </p>
                             <span class="chip" :class="'chip--' + detalle.estado.tono">{{ detalle.estado.texto }}</span>
@@ -1755,8 +1759,8 @@ onBeforeUnmount(() => {
 .lim { list-style: none; padding: 0; margin: 14px 0 6px; }
 .lim li { font-size: 14px; color: #6b7280; padding: 5px 0 5px 14px; border-left: 2px solid #e5e7eb; margin-bottom: 4px; }
 .lim--pesa { color: #9a3412; border-left-color: #ea580c; font-weight: 600; }
-.pop__f { font-size: 11px; color: #9ca3af; line-height: 1.5; margin: 6px 0 0; border-top: 1px solid #f1f5f9; padding-top: 6px; }
-.det__fuente { font-size: 12px; color: #6b7280; margin: 2px 0 0; }
+.pop__f { font-size: 11px; color: #4b5563; line-height: 1.55; margin: 10px 0 0; border-top: 1px solid #e5e7eb; padding-top: 8px; }
+.det__fuente { font-size: 12px; color: #4b5563; margin: 6px 0 0; line-height: 1.55; }
 .lista { margin: 0; padding-left: 18px; font-size: 13px; color: #4b5563; line-height: 1.7; }
 .rep { margin: 10px 0 0; }
 .rep__t { font-size: 12px; font-weight: 600; color: #4b5563; margin: 0 0 6px; }
@@ -1765,6 +1769,8 @@ onBeforeUnmount(() => {
 .rep__a { color: #b45309; font-weight: 600; }
 .rep__r { color: #15803d; }
 .rep__n { font-size: 11px; color: #6b7280; background: #f1f5f9; border-radius: 8px; padding: 1px 6px; margin-left: 6px; }
+.pop__f__r { display: block; font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #9ca3af; margin-bottom: 2px; }
+.det__fuente__r { display: block; font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #9ca3af; margin-bottom: 2px; }
 .tabs__l { display: inline-flex; align-items: center; gap: 8px; }
 .tabs__n { background: #fee2e2; color: #991b1b; font-size: 11px; font-weight: 800; padding: 1px 8px; border-radius: 999px; }
 
