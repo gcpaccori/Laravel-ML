@@ -676,12 +676,18 @@ const margenHastaAlarma = computed(() => {
            medir. Antes se descartaban en silencio y el grafico ensenaba cinco
            barras para siete tarjetas, que es justo lo que confunde. Ahora
            aparecen igual, en gris y sin longitud, diciendo por que. */
-        if (!Number.isFinite(umbral) || umbral === 0 || !Number.isFinite(valor)) {
+        /* Tener umbral no basta: una politica deshabilitada lleva umbral pero
+           no vigila nada, y pintarla como barra viva daria a entender que
+           alguien esta mirando. */
+        const vigila = m.policy?.status === "approved";
+        if (!vigila || !Number.isFinite(umbral) || umbral === 0 || !Number.isFinite(valor)) {
             sinUmbral.push({
                 nombre,
                 valor: Number.isFinite(valor) ? valor : null,
                 unidad: m.unit ?? "",
-                estado: m.policy?.status ?? "sin politica",
+                estado: m.policy?.status === "disabled"
+                    ? "deshabilitada, con motivo documentado"
+                    : (m.policy?.status ?? "sin politica"),
             });
             continue;
         }
@@ -726,8 +732,8 @@ const margenHastaAlarma = computed(() => {
                         : `${f.valor.toLocaleString("es-PE", { maximumFractionDigits: 2 })} ${f.unidad}`;
                     if (f.pct === null) {
                         return `${f.nombre}<br/>ahora ${ahora}`
-                            + `<br/><b>sin umbral: su politica esta en ${f.estado}</b>`
-                            + "<br/>no se puede medir margen sin una linea aprobada";
+                            + `<br/><b>politica ${f.estado}</b>`
+                            + "<br/>calcula, pero no vigila: no emite alarma";
                     }
                     return `${f.nombre}<br/>ahora ${ahora}`
                         + `<br/>umbral ${f.umbral} ${f.unidad}<br/><b>${f.pct.toFixed(0)}% del umbral</b>`;
@@ -759,7 +765,7 @@ const margenHastaAlarma = computed(() => {
                     color: (t) => (filas[t.dataIndex].pct === null ? "#9ca3af" : "#4b5563"),
                     formatter: (t) => {
                         const f = filas[t.dataIndex];
-                        if (f.pct === null) return "sin umbral";
+                        if (f.pct === null) return "no vigila";
                         return f.pct > tope ? `${f.pct.toFixed(0)}% →` : `${f.pct.toFixed(0)}%`;
                     },
                 },
@@ -1208,8 +1214,8 @@ onBeforeUnmount(() => {
                                         <template v-if="margenHastaAlarma.sinPolitica">
                                             En gris,
                                             <strong>{{ margenHastaAlarma.sinPolitica }}</strong>
-                                            que calculan pero aun no tienen una politica aprobada, asi que no
-                                            hay umbral contra el que medirlos.
+                                            que calculan pero no tienen politica aprobada: no vigilan. El
+                                            motivo queda escrito en su politica.
                                         </template>
                                     </p>
                                 </div>
