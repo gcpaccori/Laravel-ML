@@ -147,6 +147,29 @@ const models = computed(() => response.value?.models ?? []);
 const summary = computed(() => response.value?.summary ?? {});
 const light = computed(() => response.value?.light ?? {});
 const avisos = computed(() => response.value?.events ?? []);
+
+// El contador mira solo lo que sigue sin atender. Una alarma resuelta se
+// conserva en la tabla como historial, pero deja de pesar en la pestana.
+const avisosAbiertos = computed(() => avisos.value.filter((a) => (a.event_type ?? "activa") === "activa"));
+const estaActiva = (fila) => (fila?.event_type ?? "activa") === "activa";
+
+// Resolver una alarma. Las que pinta esta tabla no son los eventos crudos del
+// backend: el controlador ya los sustituye por las filas persistidas de Laravel,
+// que si traen id numerico y estado. Por eso se puede cerrar una desde aqui, y
+// al recargar es el servidor quien confirma el estado.
+const resolviendo = ref(null);
+const resolverAlarma = async (fila) => {
+    if (!fila?.id || resolviendo.value) return;
+    resolviendo.value = fila.id;
+    try {
+        await axios.patch(route("alarmas.resolver", fila.id));
+        await loadDashboard(false);
+    } catch (error) {
+        errorMessage.value = error?.response?.data?.message ?? "No se pudo resolver la alarma.";
+    } finally {
+        resolviendo.value = null;
+    }
+};
 const observations = computed(() => response.value?.technical_observations ?? []);
 const calculando = computed(() => Boolean(response.value?.meta?.warming));
 /* Sigue trabajando mientras no haya respuesta, o mientras FastAPI avise de
@@ -1212,7 +1235,7 @@ onBeforeUnmount(() => {
                     <template #label>
                         <span class="tabs__l">
                             Alarmas
-                            <span v-if="avisos.length" class="tabs__n">{{ avisos.length }}</span>
+                            <span v-if="avisosAbiertos.length" class="tabs__n">{{ avisosAbiertos.length }}</span>
                         </span>
                     </template>
 
@@ -1294,6 +1317,25 @@ onBeforeUnmount(() => {
                             </el-table-column>
                             <el-table-column label="Cuando" width="190">
                                 <template #default="{ row }">{{ cuandoLargo(row.occurred_at) }}</template>
+                            </el-table-column>
+                            <el-table-column label="Estado" width="150">
+                                <template #default="{ row }">
+                                    <span v-if="estaActiva(row)" class="chip chip--aviso">Sin atender</span>
+                                    <span v-else class="chip chip--ok" :title="cuandoLargo(row.resolved_at)">Resuelta</span>
+                                </template>
+                            </el-table-column>
+                            <el-table-column width="110" align="right">
+                                <template #default="{ row }">
+                                    <el-button
+                                        v-if="estaActiva(row)"
+                                        text
+                                        type="primary"
+                                        :loading="resolviendo === row.id"
+                                        @click="resolverAlarma(row)"
+                                    >
+                                        Resolver
+                                    </el-button>
+                                </template>
                             </el-table-column>
                         </el-table>
 
