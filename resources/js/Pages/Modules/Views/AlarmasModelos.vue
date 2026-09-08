@@ -847,37 +847,42 @@ const antiguedadDe = (m) => {
 const TECNICA = {
     WATER_QUALITY_INDEX_ICA: {
         ml: false,
-        etiqueta: "Indice",
+        etiqueta: "Criterio propio",
         metodo: "Suma ponderada de cuatro medidas",
-        fuente: "Definido en el motor del proyecto (water_quality.py)",
-        explica: "No aprende de datos: pondera temperatura, pH, oxigeno y nitrato con pesos fijos. Con las mismas entradas siempre da el mismo resultado.",
+        fuente: "Pesos y bandas fijados por el equipo, sin referencia publicada: 0,25 temperatura, 0,25 pH, 0,35 oxigeno y 0,15 nitrato",
+        autoria: "Definido en water_quality.py por gcpaccori, julio de 2026",
+        explica: "No aprende de datos ni reproduce un indice publicado: es una ponderacion propia. Con las mismas entradas siempre da el mismo resultado.",
     },
     TILAPIA_GROWTH_TEMPERATURE: {
         ml: false,
         etiqueta: "Literatura",
         metodo: "Regresion lineal de Soderberg",
-        fuente: "Informe 17 (marzo 2026), ec. 1: delta L = -1,6707 + 0,09682 T, con R2 de 0,95",
-        explica: "Ecuacion publicada para tilapia del Nilo, no ajustada aqui. Fija el techo de crecimiento segun la temperatura; sobre ese techo el oxigeno y el pH solo pueden restar.",
+        fuente: "Informe 17 (marzo 2026), ec. 1: delta L = -1,6707 + 0,09682 T, con R2 de 0,95 para tilapia del Nilo",
+        autoria: "Implementado por gcpaccori, mayo de 2026. Los factores limitantes de oxigeno y pH se anadieron en septiembre de 2026 y no vienen del informe.",
+        explica: "Ecuacion publicada, no ajustada aqui. Fija el techo de crecimiento segun la temperatura; sobre ese techo el oxigeno y el pH solo pueden restar.",
     },
     SVM_OD_FORECAST_1H: {
         ml: true,
         etiqueta: "Entrenado aqui",
         metodo: "Gradient boosting sobre el cambio de oxigeno",
-        fuente: "Marco de referencia en el Informe 16 (febrero 2026): balance de masas del oxigeno entre respiracion, biofiltro, nitrificacion y aporte superficial",
-        explica: "Aprende de este estanque. Usa el ciclo dia-noche y el deficit de saturacion por Benson-Krause, y predice el cambio en vez del nivel. Se descartan antes las rachas de sensor atascado.",
+        fuente: "Marco conceptual del Informe 16 (febrero 2026), balance de masas del oxigeno. La saturacion se calcula con Benson-Krause, ecuacion estandar en agua dulce.",
+        autoria: "Modelo y variables desarrollados en este proyecto, septiembre de 2026. El informe aporta el marco, no este ajuste.",
+        explica: "Aprende de este estanque. Usa el ciclo dia-noche y el deficit de saturacion, y predice el cambio en vez del nivel. Se descartan antes las rachas de sensor atascado.",
     },
     LIGHT_FEED_RESPONSE_CLASSIFIER_V1: {
         ml: true,
         etiqueta: "Entrenado aqui",
         metodo: "Clasificador SVC con nucleo RBF",
-        fuente: "Umbral visual de 30 lux para un alimentador visual; entrenado con el luxometro de este vivero",
+        fuente: "El umbral de 30 lux procede de la conducta descrita para un alimentador visual, pero no esta respaldado por una cita formal en los informes revisados",
+        autoria: "Desarrollado en este proyecto, septiembre de 2026",
         explica: "La etiqueta la mide el propio sensor: si la luz de dentro de doce horas llega o no al minimo con el que la tilapia ve el pienso. Validado contra tres referencias y les gana a las tres.",
     },
     PHOTOPERIOD_GREENHOUSE_V1: {
         ml: false,
-        etiqueta: "Literatura",
+        etiqueta: "Criterio propio",
         metodo: "Transmitancia contra irradiancia solar",
-        fuente: "Umbrales de fotoperiodo de la literatura; luz natural de Open-Meteo para las coordenadas de la piscigranja",
+        fuente: "Umbrales de 10, 30 y 100 lux y fotoperiodo de 12L:12D a 18L:6D adoptados por el proyecto; falta anclarlos a una referencia citable. La luz natural viene de Open-Meteo.",
+        autoria: "Desarrollado en este proyecto, septiembre de 2026",
         explica: "No aprende: compara lo que mide el luxometro dentro con la luz que hubo fuera ese dia y cuenta las horas aprovechables.",
     },
     TILAPIA_WEIGHT_LENGTH_ML: {
@@ -885,10 +890,11 @@ const TECNICA = {
         etiqueta: "Entrenado aqui",
         metodo: "Regresion potencial ajustada con los peces del centro",
         fuente: "Ley alometrica del Informe 17, ec. 2; factor de condicion del Informe 18, ec. 1",
-        explica: "Unico modelo ajustado con los peces de esta piscigranja, medidos uno a uno. El exponente que aprende (2,99) confirma la ley cubica del informe, asi que la poblacion crece en proporcion.",
+        autoria: "Ajuste y validacion realizados en este proyecto, septiembre de 2026, con los 80 peces de biometria_detalles",
+        explica: "Unico modelo ajustado con los peces de esta piscigranja, medidos uno a uno. El exponente que aprende (2,99) confirma la ley cubica del informe.",
     },
 };
-const tecnicaDe = (code) => TECNICA[code] ?? { ml: false, etiqueta: "Sin clasificar", metodo: "-", fuente: "", explica: "" };
+const tecnicaDe = (code) => TECNICA[code] ?? { ml: false, etiqueta: "Sin clasificar", metodo: "-", fuente: "", autoria: "", explica: "" };
 
 const frenoTexto = (m) => {
     const pot = Number(m?.potential_value);
@@ -1198,6 +1204,10 @@ onBeforeUnmount(() => {
                                     <p v-if="t.tecnica.fuente" class="pop__f">
                                         <span class="pop__f__r">De donde sale</span>
                                         {{ t.tecnica.fuente }}
+                                    </p>
+                                    <p v-if="t.tecnica.autoria" class="pop__f">
+                                        <span class="pop__f__r">Quien lo hizo</span>
+                                        {{ t.tecnica.autoria }}
                                     </p>
                                 </el-popover>
 
@@ -1513,6 +1523,10 @@ onBeforeUnmount(() => {
                             <p v-if="detalle.tecnica.fuente" class="det__fuente">
                                 <span class="det__fuente__r">De donde sale</span>
                                 {{ detalle.tecnica.fuente }}
+                            </p>
+                            <p v-if="detalle.tecnica.autoria" class="det__fuente">
+                                <span class="det__fuente__r">Quien lo hizo</span>
+                                {{ detalle.tecnica.autoria }}
                             </p>
                             <span class="chip" :class="'chip--' + detalle.estado.tono">{{ detalle.estado.texto }}</span>
                         </div>
