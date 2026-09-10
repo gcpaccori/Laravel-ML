@@ -849,52 +849,82 @@ const TECNICA = {
         ml: false,
         etiqueta: "Criterio propio",
         metodo: "Suma ponderada de cuatro medidas",
-        fuente: "Ninguno de los cuatro informes revisados trata un indice de calidad de agua. Los pesos (0,25 temperatura; 0,25 pH; 0,35 oxigeno; 0,15 nitrato) y las bandas son enteramente del equipo.",
-        autoria: "Definido en water_quality.py por gcpaccori, julio de 2026",
+        fuente: "Sin origen en los informes revisados: pesos y bandas son del equipo",
+        linaje: [
+            ["Fundamento", "Agregar varias medidas en una nota unica es practica corriente en calidad de agua, pero aqui no se reproduce ningun indice publicado ni se sigue una norma concreta."],
+            ["Que aportan los informes", "Ninguno. Se rastrearon los cuatro y ninguno trata un indice de calidad de agua ni una ponderacion de parametros."],
+            ["Que puso este proyecto", "Todo. El equipo eligio los cuatro parametros, sus pesos -0,25 temperatura, 0,25 pH, 0,35 oxigeno, 0,15 nitrato- y las cinco bandas de interpretacion. Definido en water_quality.py por gcpaccori en julio de 2026."],
+            ["Como se usa hoy", "Da una nota de 0 a 100 y avisa por debajo de 70, que es el limite inferior de la banda Buena."],
+        ],
         explica: "No aprende de datos ni reproduce un indice publicado: es una ponderacion propia. Con las mismas entradas siempre da el mismo resultado.",
     },
     TILAPIA_GROWTH_TEMPERATURE: {
         ml: false,
-        etiqueta: "Literatura",
-        metodo: "Regresion lineal de Soderberg",
-        fuente: "Informe 17 (marzo 2026), ec. 1: delta L = -1,6707 + 0,09682 T, con R2 de 0,95 para tilapia del Nilo. La correccion multiplicativa sigue la ec. 12 del Informe 16, donde el crecimiento se afecta por factores adimensionales entre 0 y 1 de temperatura, fotoperiodo, oxigeno y amoniaco.",
-        autoria: "Implementado por gcpaccori, mayo de 2026. Los factores limitantes se anadieron en este proyecto en septiembre: se adopta la forma multiplicativa del Informe 16 pero con pH en lugar de amoniaco, que es lo que mide esta estacion, y las rampas concretas son propias.",
-        explica: "Ecuacion publicada, no ajustada aqui. Fija el techo de crecimiento segun la temperatura; sobre ese techo el oxigeno y el pH solo pueden restar.",
+        etiqueta: "Literatura adaptada",
+        metodo: "Recta de Soderberg con factores limitantes",
+        fuente: "Informe 17 ec. 1; forma multiplicativa del Informe 16 ec. 12",
+        linaje: [
+            ["Fundamento", "Regresion lineal de la ganancia diaria de longitud frente a la temperatura para tilapia del Nilo macho, medida en cultivo cerrado: delta L = -1,6707 + 0,09682 T, con R2 de 0,95."],
+            ["Que aportan los informes", "El Informe 17 (marzo 2026) recoge esa ecuacion como su ec. 1 y la ley alometrica como ec. 2. El Informe 16 aporta la ec. 12, donde el crecimiento se ve afectado por factores adimensionales entre 0 y 1 de temperatura, fotoperiodo, oxigeno disuelto y amoniaco no ionizado."],
+            ["Que puso este proyecto", "Septiembre de 2026: se toma Soderberg como techo y se le aplican factores multiplicativos con la forma de la ec. 12, pero con pH en lugar de amoniaco -que es lo que mide esta estacion- y con rampas propias: el oxigeno anula por debajo de 2 mg por litro y sube lineal hasta 5; el pH no resta entre 6,5 y 8,5."],
+            ["Como se usa hoy", "Avisa por debajo de 0,5 mm por dia. El episodio de julio justifica el anadido: con 29 C la recta sola habria dicho 1,14 mientras morian 57 peces con el oxigeno en 2,1."],
+        ],
+        explica: "La recta es publicada y fija el techo segun la temperatura. Sobre ese techo, el oxigeno y el pH solo pueden restar.",
     },
     SVM_OD_FORECAST_1H: {
         ml: true,
         etiqueta: "Entrenado aqui",
         metodo: "Gradient boosting sobre el cambio de oxigeno",
-        fuente: "Marco conceptual del Informe 16 (febrero 2026), balance de masas del oxigeno. La saturacion se calcula con Benson-Krause, ecuacion estandar en agua dulce.",
-        autoria: "Modelo y variables desarrollados en este proyecto, septiembre de 2026. El informe aporta el marco, no este ajuste.",
-        explica: "Aprende de este estanque. Usa el ciclo dia-noche y el deficit de saturacion, y predice el cambio en vez del nivel. Se descartan antes las rachas de sensor atascado.",
+        fuente: "Marco del Informe 16; saturacion por Benson-Krause",
+        linaje: [
+            ["Fundamento", "El oxigeno de un estanque obedece a un balance de masas: lo consumen la respiracion y la nitrificacion, lo aportan la reaireacion y el bombeo, y todo ello oscila con el ciclo dia-noche."],
+            ["Que aportan los informes", "El Informe 16 (febrero 2026) desarrolla ese balance como modelo dinamico, con ecuaciones propias para cada termino y una componente diaria que explica el 42% de la varianza."],
+            ["Que puso este proyecto", "Septiembre de 2026: no se implementa el balance completo, porque faltan biomasa, amonio y caudal medidos. En su lugar se entrena un modelo empirico alimentado con las variables que el balance senala como determinantes: hora del dia, deficit de saturacion por Benson-Krause, temperatura y pH. Se descartan antes las rachas de sensor atascado, que son el 63,6% del historico."],
+            ["Como se usa hoy", "Predice el oxigeno de dentro de una hora y avisa por debajo de 3. Se equivoca en 0,086 frente a 0,120 de no predecir nada."],
+        ],
+        explica: "Aprende de este estanque y predice el cambio en vez del nivel, que es lo unico que aporta sobre suponer que seguira igual.",
     },
     LIGHT_FEED_RESPONSE_CLASSIFIER_V1: {
         ml: true,
         etiqueta: "Entrenado aqui",
         metodo: "Clasificador SVC con nucleo RBF",
-        fuente: "Se apoya en que el fotoperiodo es factor de crecimiento reconocido (Informe 16, ec. 12) y en la conducta visual de la especie. El valor de 30 lux lo fija este proyecto y todavia no tiene cita formal.",
-        autoria: "Desarrollado en este proyecto, septiembre de 2026",
-        explica: "La etiqueta la mide el propio sensor: si la luz de dentro de doce horas llega o no al minimo con el que la tilapia ve el pienso. Validado contra tres referencias y les gana a las tres.",
+        fuente: "Fotoperiodo como factor de crecimiento (Informe 16 ec. 12); umbral propio",
+        linaje: [
+            ["Fundamento", "La tilapia se alimenta por vista: si no distingue el pienso, la toma se desaprovecha y el alimento acaba en el fondo. El fotoperiodo esta reconocido como factor que afecta al crecimiento."],
+            ["Que aportan los informes", "El Informe 16 incluye el fotoperiodo como uno de los factores adimensionales de su ec. 12, y el Informe 17 lo lista entre los ambientales que condicionan el crecimiento. Ninguno fija un umbral en lux."],
+            ["Que puso este proyecto", "Septiembre de 2026: se adopta 30 lux como minimo visual -valor propio, todavia sin cita formal- y se entrena un clasificador que anticipa si la luz de dentro de doce horas alcanzara ese minimo. La etiqueta no es una opinion: la mide el propio luxometro."],
+            ["Como se usa hoy", "Avisa cuando la toma de dentro de doce horas vaya a caer por debajo de 30 lux. Acierta el 79% con F1 0,829, frente a 0,000 de suponer que la luz seguira igual."],
+        ],
+        explica: "Predecir el futuro a partir del pasado con una etiqueta que mide el sensor no tiene nada de circular.",
     },
     PHOTOPERIOD_GREENHOUSE_V1: {
         ml: false,
         etiqueta: "Mixto",
         metodo: "Transmitancia contra irradiancia solar",
-        fuente: "El Informe 16 reconoce el fotoperiodo como factor de crecimiento (kappa en su ec. 12) y el Informe 17 lo lista entre los ambientales que lo afectan. Los umbrales concretos de 10, 30 y 100 lux y la franja 12L:12D a 18L:6D los fija este proyecto y aun no tienen cita formal. La luz natural viene de Open-Meteo.",
-        autoria: "Desarrollado en este proyecto, septiembre de 2026",
-        explica: "No aprende: compara lo que mide el luxometro dentro con la luz que hubo fuera ese dia y cuenta las horas aprovechables.",
+        fuente: "Fotoperiodo del Informe 16 ec. 12; umbrales en lux propios",
+        linaje: [
+            ["Fundamento", "Cuanta luz aprovechable recibe el cultivo depende de la que hubo fuera y de cuanta deja pasar la cubierta. El fotoperiodo condiciona la ingesta y el crecimiento."],
+            ["Que aportan los informes", "El Informe 16 lo formaliza como el factor kappa de su ec. 12, adimensional y entre 0 y 1. El Informe 17 lo cita entre los factores ambientales."],
+            ["Que puso este proyecto", "Septiembre de 2026: se compara la iluminancia medida dentro del vivero con la luz solar real que da Open-Meteo para las coordenadas de la piscigranja, y de ahi salen las horas utiles y la transmitancia de la cubierta. Los umbrales de 10, 30 y 100 lux y la franja de 12L:12D a 18L:6D los fija este proyecto y aun no tienen cita."],
+            ["Como se usa hoy", "Cuenta las horas de luz aprovechable del dia y avisa por debajo de 10. Es el unico modelo que depende de un servicio externo."],
+        ],
+        explica: "No aprende: contrasta lo medido dentro con lo que hubo fuera y cuenta las horas que sirven.",
     },
     TILAPIA_WEIGHT_LENGTH_ML: {
         ml: true,
-        etiqueta: "Entrenado aqui",
+        etiqueta: "Literatura reajustada",
         metodo: "Regresion potencial ajustada con los peces del centro",
-        fuente: "Ley alometrica del Informe 17, ec. 2; factor de condicion del Informe 18, ec. 1",
-        autoria: "Ajuste y validacion realizados en este proyecto, septiembre de 2026, con los 80 peces de biometria_detalles",
-        explica: "Unico modelo ajustado con los peces de esta piscigranja, medidos uno a uno. El exponente que aprende (2,99) confirma la ley cubica del informe.",
+        fuente: "Ley alometrica del Informe 17 ec. 2; factor de condicion del Informe 18 ec. 1",
+        linaje: [
+            ["Fundamento", "El peso de un pez crece con el cubo de su longitud. Comparar el peso medido con el que esa ley predice para la talla da el factor de condicion, que delata a un lote flaco antes de que la talla media lo acuse."],
+            ["Que aportan los informes", "El Informe 17 da la ley para tilapia del Nilo macho en su ec. 2, con exponente 3. El Informe 18 define el factor de condicion en su ec. 1, como cien por el peso entre la longitud al cubo."],
+            ["Que puso este proyecto", "Septiembre de 2026: en vez de usar el coeficiente publicado se ajustan los dos parametros con los 80 peces medidos uno a uno en este centro, con reparto de entrenamiento y prueba y validacion fuera de muestra contra dos referencias. El exponente aprendido, 2,99, coincide con el cubo del informe, lo que confirma que esta poblacion crece en proporcion."],
+            ["Como se usa hoy", "Divide el peso medido entre el que predice la curva propia y avisa por debajo de 0,90. Ahora mismo el lote esta en 0,96, dentro de lo normal pero pegado al umbral."],
+        ],
+        explica: "Unico modelo ajustado con los peces de esta piscigranja. La curva del informe sirve de contraste, no de calculadora.",
     },
 };
-const tecnicaDe = (code) => TECNICA[code] ?? { ml: false, etiqueta: "Sin clasificar", metodo: "-", fuente: "", autoria: "", explica: "" };
+const tecnicaDe = (code) => TECNICA[code] ?? { ml: false, etiqueta: "Sin clasificar", metodo: "-", fuente: "", linaje: [], explica: "" };
 
 const frenoTexto = (m) => {
     const pot = Number(m?.potential_value);
@@ -1524,15 +1554,21 @@ onBeforeUnmount(() => {
                                 <span class="det__fuente__r">De donde sale</span>
                                 {{ detalle.tecnica.fuente }}
                             </p>
-                            <p v-if="detalle.tecnica.autoria" class="det__fuente">
-                                <span class="det__fuente__r">Quien lo hizo</span>
-                                {{ detalle.tecnica.autoria }}
-                            </p>
                             <span class="chip" :class="'chip--' + detalle.estado.tono">{{ detalle.estado.texto }}</span>
                         </div>
                     </header>
 
                     <p class="det__purpose">{{ detalle.raw.purpose }}</p>
+
+                    <ol v-if="detalle.tecnica.linaje?.length" class="lin">
+                        <li v-for="(paso, i) in detalle.tecnica.linaje" :key="i" class="lin__p">
+                            <span class="lin__n">{{ i + 1 }}</span>
+                            <div class="lin__c">
+                                <span class="lin__r">{{ paso[0] }}</span>
+                                <p class="lin__t">{{ paso[1] }}</p>
+                            </div>
+                        </li>
+                    </ol>
 
                     <div class="det__caja det__caja--estado">
                         <strong>Por que esta asi</strong>
@@ -1785,6 +1821,13 @@ onBeforeUnmount(() => {
 .rep__n { font-size: 11px; color: #6b7280; background: #f1f5f9; border-radius: 8px; padding: 1px 6px; margin-left: 6px; }
 .pop__f__r { display: block; font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #9ca3af; margin-bottom: 2px; }
 .det__fuente__r { display: block; font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #9ca3af; margin-bottom: 2px; }
+.lin { list-style: none; margin: 18px 0 4px; padding: 0; }
+.lin__p { display: flex; gap: 12px; padding: 0 0 16px; position: relative; }
+.lin__p:not(:last-child)::before { content: ''; position: absolute; left: 11px; top: 24px; bottom: 0; width: 2px; background: #e5e7eb; }
+.lin__n { flex: none; width: 24px; height: 24px; border-radius: 50%; background: #eef2ff; color: #4338ca; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; z-index: 1; }
+.lin__c { min-width: 0; }
+.lin__r { display: block; font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #6b7280; margin-bottom: 3px; }
+.lin__t { font-size: 13px; line-height: 1.6; color: #374151; margin: 0; }
 .tabs__l { display: inline-flex; align-items: center; gap: 8px; }
 .tabs__n { background: #fee2e2; color: #991b1b; font-size: 11px; font-weight: 800; padding: 1px 8px; border-radius: 999px; }
 

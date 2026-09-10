@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Alarma;
 use App\Services\ModelAlertDashboardService;
 use App\Services\ModelAlarmPersistenceService;
 use Illuminate\Http\JsonResponse;
@@ -52,6 +53,25 @@ class AlarmaModeloController extends Controller
         $dashboard['meta']['alarm_storage'] = $sync;
 
         return response()->json($dashboard);
+    }
+
+    // Cuantas alarmas de modelo siguen sin atender.
+    //
+    // Alimenta el acceso directo de la barra superior. Se filtra por modulo
+    // 'inteligencia', que es el de los modelos, para no mezclarse con las
+    // alarmas de rango fijo que tienen su propia campana.
+    public function pendientes(): JsonResponse
+    {
+        try {
+            $total = Alarma::query()
+                ->where('modulo', 'inteligencia')
+                ->where('estado', 'activa')
+                ->count();
+        } catch (\Throwable) {
+            $total = 0;
+        }
+
+        return response()->json(['pendientes' => $total]);
     }
 
     public function lightScenario(Request $request, ModelAlertDashboardService $service): JsonResponse

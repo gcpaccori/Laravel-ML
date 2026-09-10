@@ -2,6 +2,7 @@
     import { Link, router } from '@inertiajs/vue3';
     import { useThemeMode } from '@/Composables/useThemeMode';
     import AlarmasDropdown from '@/Components/AlarmasDropdown.vue';
+    import AlarmasModeloAcceso from '@/Components/AlarmasModeloAcceso.vue';
 
     const { themeMode, setThemeMode } = useThemeMode();
 
@@ -55,6 +56,7 @@
                 <div class="app-navbar flex-shrink-0">
                     <!--begin::Notifications-->
                     <AlarmasDropdown />
+                    <AlarmasModeloAcceso />
                     <!--end::Notifications-->
                     <!--begin::User menu-->
                     <div class="app-navbar-item ms-1 ms-md-4" id="kt_header_user_menu_toggle">

@@ -40,5 +40,6 @@ Route::patch('/alarmas/{alarma}/resolver', [AlarmaController::class, 'resolver']
 // ALARMAS DERIVADAS DE MODELOS
 Route::get('/alarmas-modelos', [AlarmaModeloController::class, 'index'])->name('monitoreo.alarmasmodelos.index')->middleware('modulo:alarmasmodelo');
 Route::get('/alarmas-modelos/datos', [AlarmaModeloController::class, 'dashboard'])->name('monitoreo.alarmasmodelos.datos')->middleware('modulo:alarmasmodelo');
+Route::get('/alarmas-modelos/pendientes', [AlarmaModeloController::class, 'pendientes'])->name('monitoreo.alarmasmodelos.pendientes');
 Route::get('/alarmas-modelos/luz/estado', [AlarmaModeloController::class, 'lightStatus'])->name('monitoreo.alarmasmodelos.luz.estado')->middleware('modulo:alarmasmodelo');
 Route::post('/alarmas-modelos/luz/escenario', [AlarmaModeloController::class, 'lightScenario'])->name('monitoreo.alarmasmodelos.luz.escenario')->middleware('modulo:alarmasmodelo');
