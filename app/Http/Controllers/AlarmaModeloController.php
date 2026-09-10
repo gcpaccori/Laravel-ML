@@ -55,25 +55,66 @@ class AlarmaModeloController extends Controller
         return response()->json($dashboard);
     }
 
-    // Cuantas alarmas de modelo siguen sin atender.
+    // Alarmas de modelo para el desplegable de la barra.
     //
-    // Alimenta el acceso directo de la barra superior. Se filtra por modulo
-    // 'inteligencia', que es el de los modelos, para no mezclarse con las
-    // alarmas de rango fijo que tienen su propia campana.
+    // Se separan por vigencia, que no es lo mismo que por estado. Una alarma
+    // que predijo algo para las 14:00 deja de ser actualidad a las 14:01,
+    // aunque nadie la haya cerrado: su ventana ya paso y lo unico que queda
+    // por hacer con ella es comprobar si acerto. Por eso hay tres estados:
+    //
+    //   vigente   sigue abierta y su plazo no ha vencido
+    //   vencida   sigue abierta pero el momento que predijo ya paso
+    //   resuelta  alguien la cerro
+    //
+    // Se guardan las tres. Las dos ultimas son el material con el que despues
+    // se mide si el modelo acerto de verdad.
     public function pendientes(): JsonResponse
     {
         try {
-            $total = Alarma::query()
+            $filas = Alarma::query()
+                ->with('evidenciaModelo')
                 ->where('modulo', 'inteligencia')
-                ->where('estado', 'activa')
-                ->count();
+                ->whereHas('evidenciaModelo')
+                ->latest('created_at')
+                ->limit(40)
+                ->get()
+                ->map(function (Alarma $a) {
+                    $ev = $a->evidenciaModelo;
+                    $para = $ev?->prediction_for ? \Carbon\Carbon::parse($ev->prediction_for) : null;
+                    $vencida = $para !== null && $para->isPast();
+
+                    if ($a->estado !== 'activa') {
+                        $vigencia = 'resuelta';
+                    } elseif ($vencida) {
+                        $vigencia = 'vencida';
+                    } else {
+                        $vigencia = 'vigente';
+                    }
+
+                    return [
+                        'id' => $a->id,
+                        'titulo' => $a->titulo,
+                        'mensaje' => $a->mensaje,
+                        'nivel' => $a->nivel,
+                        'valor' => $a->valor_detectado,
+                        'ocurrio_en' => $a->created_at?->toIso8601String(),
+                        'resuelta_en' => $a->resuelta_en?->toIso8601String(),
+                        'vigencia' => $vigencia,
+                        'model_code' => $ev?->model_code,
+                        'predijo' => $ev?->predicted_value,
+                        'para' => $para?->toIso8601String(),
+                    ];
+                })
+                ->values();
         } catch (\Throwable) {
-            $total = 0;
+            $filas = collect();
         }
 
-        return response()->json(['pendientes' => $total]);
+        return response()->json([
+            'pendientes' => $filas->where('vigencia', 'vigente')->count(),
+            'alarmas' => $filas,
+        ]);
     }
-
     public function lightScenario(Request $request, ModelAlertDashboardService $service): JsonResponse
     {
         $validated = $request->validate([
