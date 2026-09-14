@@ -41,17 +41,17 @@ const catalog = [
     {
         code: MODEL_CODES.oxygen,
         name: "Estado de oxígeno disuelto",
-        description: "Compara el oxígeno medido con el que admite el agua a su temperatura, y muestra si la temperatura explica el oxígeno del estanque.",
-        horizon: "Horizonte: lectura actual",
-        modelType: "Ecuación física de solubilidad",
+        description: "Saturación del agua y ciclo diario del oxígeno: a qué hora sube, a qué hora baja y cuál será el mínimo de las próximas 24 horas.",
+        horizon: "Horizonte: próximas 24 horas",
+        modelType: "Regresión armónica del ciclo diario",
         icon: Odometer,
     },
     {
         code: MODEL_CODES.growth,
-        name: "Crecimiento de tilapia por temperatura",
-        description: "Predice cuántos milímetros de longitud gana el pez al día según la temperatura, y lo contrasta con las biometrías del lote.",
+        name: "Crecimiento de tilapia por temperatura y oxígeno",
+        description: "Predice cuántos milímetros de longitud gana el pez al día con la temperatura y el oxígeno del estanque, y lo contrasta con las biometrías del lote.",
         horizon: "Horizonte: diario, acumulado entre biometrías",
-        modelType: "Regresión lineal simple",
+        modelType: "Regresión lineal con factor de oxígeno",
         icon: TrendCharts,
     },
     {
@@ -231,29 +231,29 @@ const FICHA = {
     },
     [MODEL_CODES.oxygen]: {
         nombre: "Estado de oxígeno disuelto",
-        pregunta: "Qué parte del oxígeno que admite el agua tiene ahora el estanque",
-        tipo: "Ecuación física de solubilidad",
-        familia: "Modelo determinista: no aprende de datos",
-        calcula: "Porcentaje de saturación de oxígeno",
-        unidad: "%",
-        horizonte: "Lectura actual",
-        entradas: ["Temperatura del agua", "Oxígeno disuelto"],
-        formula: "Saturación (%) = 100 × OD medido ÷ OD de saturación a la temperatura del agua",
-        fuente: "OD de saturación según Benson y Krause (1984), la ecuación estándar de APHA para agua dulce. El Informe 15 usa esa concentración de saturación en el balance de aireación.",
-        evolucion: "Saturación de oxígeno medida",
+        pregunta: "Cuánto oxígeno tiene el estanque respecto a lo que admite el agua, y cuánto tendrá a cada hora del día",
+        tipo: "Regresión armónica del ciclo diario",
+        familia: "Modelo estadístico ajustado con los datos de este estanque; la saturación es física (Benson-Krause)",
+        calcula: "Oxígeno esperado a cada hora y saturación actual",
+        unidad: "mg/L y %",
+        horizonte: "Próximas 24 horas",
+        entradas: ["Oxígeno disuelto de las 24 horas previas", "Hora del día", "Temperatura del agua, para la saturación"],
+        formula: "OD(h) = nivel de las 24 h previas + a + b·sen(2πh/24) + c·cos(2πh/24);   Saturación (%) = 100 × OD ÷ OD de saturación(T)",
+        fuente: "Informe 16 (febrero de 2026): Royer et al. (2021) representan la oscilación diaria del consumo de oxígeno con una función sinusoidal y evalúan el modelo con la regresión entre lo observado y lo predicho, que es lo que se hace aquí con los datos del estanque. El OD de saturación sigue a Benson y Krause (1984), la concentración que usa el Informe 15 en el balance de aireación.",
+        evolucion: "Oxígeno medido, esperado y próximas 24 horas",
     },
     [MODEL_CODES.growth]: {
-        nombre: "Crecimiento de tilapia por temperatura",
-        pregunta: "Cuántos milímetros de longitud debería ganar un pez al día con esta temperatura",
-        tipo: "Regresión lineal simple",
-        familia: "Ecuación publicada; no se ajustó con datos de este estanque",
+        nombre: "Crecimiento de tilapia por temperatura y oxígeno",
+        pregunta: "Cuántos milímetros de longitud debería ganar el pez al día con la temperatura y el oxígeno que tiene el estanque",
+        tipo: "Regresión lineal con factor limitante de oxígeno",
+        familia: "Ecuación publicada (Söderberg) corregida con el factor de oxígeno de Yi; no se ajustó con datos del estanque",
         calcula: "Crecimiento diario en longitud",
         unidad: "mm/día",
         horizonte: "Diario, acumulado entre biometrías",
-        entradas: ["Temperatura media del día"],
-        formula: "Crecimiento diario en longitud (mm/día) = −1,6707 + 0,09682 × temperatura (°C)",
-        fuente: "Informe 17 (marzo de 2026), ecuación 1. Recta de Söderberg para tilapia del Nilo macho, con R² de 0,95 en su publicación y válida entre 21 y 30 °C.",
-        evolucion: "Longitud medida frente a la que predice la recta",
+        entradas: ["Temperatura media del día", "Oxígeno disuelto del día"],
+        formula: "ΔL (mm/día) = (−1,6707 + 0,09682 × T) × δ(OD);   δ = 1 si OD > 3,0 mg/L,  δ = (OD − 0,3) ÷ 2,7 entre 0,3 y 3,0,  δ = 0 si OD < 0,3",
+        fuente: "Informe 17 (marzo de 2026), ecuación 1: recta de Söderberg (2006) para tilapia del Nilo macho, con R² de 0,95, obtenida con oxígeno que nunca bajó de 3,5 mg/L y válida entre 21 y 30 °C. Informe 16 (febrero de 2026), ecuaciones 16 y 17: factor de oxígeno δ del modelo de crecimiento de Yi (1998), con OD crítico de 3,0 mg/L y OD mínimo de 0,3 mg/L para tilapia del Nilo.",
+        evolucion: "Longitud de cada pez medido y la que predice el modelo",
     },
     [MODEL_CODES.water]: {
         nombre: "Calidad de agua",
@@ -339,11 +339,12 @@ const lecturaActual = computed(() => {
     }
     case MODEL_CODES.oxygen: {
         if (!s) return [];
+        const hora = (iso) => new Date(iso).toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" });
         return [
             { etiqueta: "Oxígeno medido", valor: num(s.oxigeno_mg_l), unidad: "mg/L", pie: `lectura de ${fechaCorta(s.cuando)}` },
-            { etiqueta: "Temperatura del agua", valor: num(s.temperatura_c, 1), unidad: "°C" },
-            { etiqueta: "Oxígeno de saturación", valor: num(s.od_saturacion_mg_l), unidad: "mg/L", pie: "lo máximo que admite el agua a esa temperatura" },
-            { etiqueta: "Saturación", valor: num(s.saturacion_pct, 1), unidad: "%", destacado: true, pie: `faltan ${num(s.deficit_mg_l)} mg/L para saturar` },
+            { etiqueta: "Saturación", valor: num(s.saturacion_pct, 1), unidad: "%", pie: `de ${num(s.od_saturacion_mg_l)} mg/L que admite el agua a ${num(s.temperatura_c, 1)} °C` },
+            { etiqueta: "Mínimo esperado en 24 h", valor: num(v?.minimo_esperado?.od_mg_l), unidad: "mg/L", destacado: true, pie: v?.minimo_esperado ? `hacia las ${hora(v.minimo_esperado.cuando)}${v.minimo_esperado.od_mg_l < 3 ? ", por debajo de 3 mg/L" : ""}` : "" },
+            { etiqueta: "Máximo esperado en 24 h", valor: num(v?.maximo_esperado?.od_mg_l), unidad: "mg/L", pie: v?.maximo_esperado ? `hacia las ${hora(v.maximo_esperado.cuando)}` : "" },
         ];
     }
     case MODEL_CODES.growth: {
@@ -352,10 +353,10 @@ const lecturaActual = computed(() => {
         if (!hoy && !bio) return [];
         const diferencia = bio?.previsto_mm ? bio.medido_mm - bio.previsto_mm : null;
         return [
-            { etiqueta: "Temperatura media del día", valor: num(hoy?.temperatura_media, 1), unidad: "°C", pie: hoy ? diaCorto(hoy.fecha) : "" },
-            { etiqueta: "Crecimiento que predice la recta", valor: num(hoy?.soderberg_mm_dia), unidad: "mm/día", destacado: true, pie: hoy && !hoy.en_rango_validado ? "temperatura fuera del rango validado (21 a 30 °C)" : "dentro del rango validado" },
-            { etiqueta: "Última biometría", valor: num(bio?.medido_mm, 1), unidad: "mm", pie: bio ? `longitud media de ${bio.peces} peces, ${diaCorto(bio.fecha)}` : "" },
-            { etiqueta: "La recta predecía para esa fecha", valor: num(bio?.previsto_mm, 1), unidad: "mm", pie: diferencia === null ? "" : `el lote midió ${num(Math.abs(diferencia), 1)} mm ${diferencia >= 0 ? "más" : "menos"}` },
+            { etiqueta: "Temperatura media del día", valor: num(hoy?.temperatura_media, 1), unidad: "°C", pie: hoy ? `${diaCorto(hoy.fecha)}${hoy.en_rango_validado ? "" : ", fuera del rango validado de 21 a 30 °C"}` : "" },
+            { etiqueta: "Oxígeno medio del día", valor: num(hoy?.oxigeno_medio), unidad: "mg/L", pie: hoy?.delta === null || hoy?.delta === undefined ? "sin lecturas suficientes: δ = 1" : `factor de oxígeno δ = ${num(hoy.delta)}` },
+            { etiqueta: "Crecimiento que predice el modelo", valor: num(hoy?.corregido_mm_dia), unidad: "mm/día", destacado: true, pie: hoy ? `Söderberg sola: ${num(hoy.soderberg_mm_dia)} mm/día` : "" },
+            { etiqueta: "Última biometría", valor: num(bio?.medido_mm, 1), unidad: "mm", pie: bio ? `${bio.peces} peces, ${diaCorto(bio.fecha)}; el modelo predecía ${num(bio.previsto_mm, 1)} mm${diferencia === null ? "" : ` (${diferencia >= 0 ? "+" : "−"}${num(Math.abs(diferencia), 1)})`}` : "" },
         ];
     }
     case MODEL_CODES.water: {
@@ -396,29 +397,37 @@ const graficoEvolucion = computed(() => {
         };
     }
     case MODEL_CODES.oxygen: {
-        const sat = serieDe(m, /saturaci/i, /estimaci/i)?.data ?? [];
-        if (!sat.length) return null;
+        const serie = v?.serie ?? [];
+        if (!serie.length) return null;
+        const proyeccion = v?.proyeccion ?? [];
+        const ultimo = serie[serie.length - 1];
         return {
-            ...ejeTiempo("Saturación de oxígeno (%)"),
+            ...ejeTiempo("Oxígeno disuelto (mg/L)"),
             series: [
-                { name: "Saturación medida", type: "line", showSymbol: false, smooth: true, color: "#7c3aed", lineStyle: { width: 2 }, areaStyle: { color: "rgba(124,58,237,0.08)" }, data: sat },
-                { name: "Agua saturada (100 %)", type: "line", showSymbol: false, silent: true, color: "#94a3b8", lineStyle: { width: 1, type: "dashed" }, data: [[sat[0][0], 100], [sat[sat.length - 1][0], 100]] },
+                { name: "Oxígeno medido", type: "line", showSymbol: false, color: "#2563eb", lineStyle: { width: 2 }, data: serie.map((x) => [x[0], x[1]]) },
+                { name: "Esperado por el modelo", type: "line", showSymbol: false, color: "#ea580c", lineStyle: { width: 1.5, type: "dashed" }, data: serie.map((x) => [x[0], x[2]]) },
+                { name: "Próximas 24 horas", type: "line", showSymbol: false, color: "#ea580c", lineStyle: { width: 2.5 }, data: [[ultimo[0], ultimo[1]], ...proyeccion] },
+                { name: "Umbral de alarma (3 mg/L)", type: "line", showSymbol: false, silent: true, color: "#dc2626", lineStyle: { width: 1, type: "dotted" }, data: [[serie[0][0], 3], [(proyeccion.at(-1) ?? ultimo)[0], 3]] },
             ],
         };
     }
     case MODEL_CODES.growth: {
-        const prevista = v?.serie_longitud_prevista ?? [];
-        const medidas = (v?.longitudes ?? []).map((l) => [l.fecha, l.medido_mm]);
-        if (!prevista.length || !medidas.length) return null;
-        const opciones = ejeTiempo("Longitud media del pez (mm)");
+        const corregida = v?.serie_longitud_prevista ?? [];
+        const sola = v?.serie_longitud_soderberg ?? [];
+        const peces = v?.peces ?? [];
+        const medias = (v?.longitudes ?? []).map((l) => [l.fecha, l.medido_mm]);
+        if (!corregida.length || !medias.length) return null;
+        const opciones = ejeTiempo("Longitud del pez (mm)");
         return {
             ...opciones,
             xAxis: { ...opciones.xAxis, axisLabel: { color: "#6b7280", hideOverlap: true, formatter: (val) => new Date(val).toLocaleDateString("es-PE", { day: "numeric", month: "short" }) } },
             yAxis: { ...opciones.yAxis, min: 0, scale: false },
-            tooltip: { trigger: "axis", valueFormatter: (val) => `${num(val, 1)} mm` },
+            tooltip: { trigger: "item", formatter: (p) => `${p.seriesName}<br/>${new Date(p.value[0]).toLocaleDateString("es-PE", { day: "numeric", month: "short" })}: ${num(p.value[1], 1)} mm` },
             series: [
-                { name: "Longitud que predice la recta", type: "line", showSymbol: false, color: "#7c3aed", lineStyle: { width: 2.5 }, data: prevista },
-                { name: "Longitud medida en la biometría", type: "line", symbol: "circle", symbolSize: 11, color: "#ea580c", lineStyle: { width: 1.5, type: "dashed" }, itemStyle: { borderColor: "#fff", borderWidth: 2 }, data: medidas },
+                { name: "Cada pez medido", type: "scatter", symbolSize: 6, color: "#f59e0b", itemStyle: { opacity: 0.45 }, data: peces },
+                { name: "Longitud media medida", type: "scatter", symbolSize: 13, color: "#ea580c", itemStyle: { borderColor: "#fff", borderWidth: 2 }, data: medias },
+                { name: "Modelo con factor de oxígeno", type: "line", showSymbol: false, color: "#0d9488", lineStyle: { width: 2.5 }, data: corregida },
+                { name: "Söderberg sola", type: "line", showSymbol: false, color: "#7c3aed", lineStyle: { width: 1.5, type: "dashed" }, data: sola },
             ],
         };
     }
@@ -444,8 +453,8 @@ const graficoEvolucion = computed(() => {
 
 const notaEvolucion = computed(() => ({
     [MODEL_CODES.svm]: "En azul, el oxígeno medido. En naranja, lo que el modelo prevé para la próxima hora. La línea roja punteada marca los 3 mg/L del umbral de alarma.",
-    [MODEL_CODES.oxygen]: "Cada punto de la línea es la saturación de una lectura: el oxígeno medido como porcentaje del máximo que admite el agua a su temperatura. En 100 % el agua estaría saturada.",
-    [MODEL_CODES.growth]: "La línea morada parte de la longitud medida en la primera biometría y suma cada día lo que la recta predice con la temperatura media real de ese día. Los puntos naranjas son las biometrías: donde se separan, el lote creció distinto de lo que su temperatura permitía.",
+    [MODEL_CODES.oxygen]: "En azul, el oxígeno medido hora a hora en los últimos 7 días. La línea naranja punteada es lo que el modelo esperaba para cada hora y la naranja continua, lo que espera para las próximas 24 horas. La línea roja marca los 3 mg/L del umbral de alarma.",
+    [MODEL_CODES.growth]: "Cada punto amarillo es un pez medido en la biometría y los naranjas, la longitud media del lote. La línea verde parte de la primera biometría y suma cada día lo que predice el modelo con la temperatura y el oxígeno reales de ese día; la morada punteada es Söderberg sola, sin el oxígeno.",
     [MODEL_CODES.water]: "Clase que asigna el SVM a las lecturas limpias más recientes, con nitrato válido.",
 }[selectedCode.value] ?? ""));
 
@@ -460,11 +469,14 @@ const r2Catalogo = (codigo) => {
         return { texto: `Acierto ${num(v.acierto_svm * 100, 0)} %`, clase: tono(v.acierto_svm, 0.8, 0.6, 0.6), titulo: "Clase correcta en las lecturas de prueba" };
     }
     if (v.r2 === null || v.r2 === undefined) return null;
-    const titulo = codigo === MODEL_CODES.oxygen ? "R² entre el oxígeno medido y la temperatura" : "R² frente a lo medido";
+    const titulo = {
+        [MODEL_CODES.oxygen]: "R² del oxígeno esperado frente al medido, en horas de prueba",
+        [MODEL_CODES.growth]: "R² del crecimiento predicho frente al medido entre biometrías",
+    }[codigo] ?? "R² frente a lo medido";
     return { texto: `R² ${Number(v.r2).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, clase: tono(v.r2, 0.8, 0.5, 0.1), titulo };
 };
 
-const usaVentana = computed(() => [MODEL_CODES.svm, MODEL_CODES.oxygen].includes(selectedCode.value));
+const usaVentana = computed(() => selectedCode.value === MODEL_CODES.svm);
 
 const scheduleReload = () => {
     clearTimeout(reloadTimer.value);
