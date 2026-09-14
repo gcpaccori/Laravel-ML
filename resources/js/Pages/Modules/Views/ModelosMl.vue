@@ -31,32 +31,32 @@ const MODEL_CODES = {
 const catalog = [
     {
         code: MODEL_CODES.svm,
-        name: "Proyeccion de oxigeno disuelto",
+        name: "Proyeccion de oxigeno disuelto a una hora",
         description: "Anticipa el oxigeno disuelto de la proxima hora a partir de la serie real de sensores, ya limpia de rachas de sensor atascado.",
         importance: "Da margen para airear antes de que el oxigeno caiga por debajo de lo que toleran los peces.",
         inputs: ["Oxigeno disuelto", "Temperatura", "pH", "Hora del dia"],
         horizon: "1 hora",
-        modelType: "Gradient boosting sobre el cambio de oxigeno",
+        modelType: "Gradient boosting (regresion)",
         icon: DataAnalysis,
     },
     {
         code: MODEL_CODES.oxygen,
-        name: "Estado de oxigeno",
+        name: "Estado de oxigeno disuelto",
         description: "Compara el oxigeno medido con la saturacion que admite el agua a su temperatura.",
         importance: "Separa lo que depende de la fisica del agua de lo que depende de los peces, la aireacion y el biofloc.",
         inputs: ["Temperatura", "Oxigeno disuelto"],
         horizon: "Lectura actual",
-        modelType: "Ecuacion fisica de solubilidad (Benson-Krause)",
+        modelType: "Ecuacion fisica de solubilidad",
         icon: Odometer,
     },
     {
         code: MODEL_CODES.growth,
-        name: "Crecimiento de tilapia",
+        name: "Crecimiento de tilapia por temperatura",
         description: "Estima el crecimiento diario en longitud a partir de la temperatura del agua, y lo contrasta con las biometrias reales.",
         importance: "Permite ver si el lote crece lo que su temperatura permite o si algo mas lo esta frenando.",
         inputs: ["Temperatura", "Biometria real"],
         horizon: "1 a 365 dias",
-        modelType: "Regresion lineal simple (Soderberg)",
+        modelType: "Regresion lineal simple",
         icon: TrendCharts,
     },
     {
@@ -237,6 +237,235 @@ const formulaDe = (modelo) => {
     return modelo?.formula?.expression ?? "";
 };
 
+// ----------------------------------------------------------------------
+// Ficha de cada modelo.
+//
+// La pagina de un modelo sigue siempre el mismo orden -que es, que dice
+// ahora, como ha evolucionado y si acierta- y todo lo que se ensena sale de
+// aqui. Antes cada bloque venia tal cual del backend y varios describian
+// modelos que ya no se usan: la SVR vieja, dos formulas mezcladas en el
+// crecimiento o el indice ICA en calidad de agua.
+// ----------------------------------------------------------------------
+const FICHA = {
+    [MODEL_CODES.svm]: {
+        nombre: "Proyeccion de oxigeno disuelto a una hora",
+        pregunta: "Cuanto oxigeno disuelto tendra el agua dentro de una hora",
+        tipo: "Gradient boosting (regresion)",
+        familia: "Aprendizaje automatico supervisado, entrenado con datos de este estanque",
+        calcula: "Oxigeno disuelto dentro de una hora",
+        unidad: "mg/L",
+        horizonte: "1 hora",
+        entradas: ["Oxigeno disuelto de las ultimas 2 horas", "Variacion reciente del oxigeno", "Deficit de saturacion", "Hora del dia", "Temperatura del agua", "pH"],
+        formula: "OD(t + 1 h) = OD(t) + variacion estimada por el gradient boosting",
+        fuente: "Marco del balance de masas del oxigeno disuelto del Informe 16 (febrero 2026). El modelo y sus variables se desarrollaron en este proyecto; la saturacion se calcula con Benson y Krause (1984).",
+        evolucion: "Oxigeno disuelto medido y previsto",
+    },
+    [MODEL_CODES.oxygen]: {
+        nombre: "Estado de oxigeno disuelto",
+        pregunta: "Que parte del oxigeno que admite el agua tiene ahora el estanque",
+        tipo: "Ecuacion fisica de solubilidad",
+        familia: "Modelo determinista: no aprende de datos",
+        calcula: "Porcentaje de saturacion de oxigeno",
+        unidad: "%",
+        horizonte: "Lectura actual",
+        entradas: ["Temperatura del agua", "Oxigeno disuelto"],
+        formula: "Saturacion (%) = 100 x OD medido / OD de saturacion a la temperatura del agua",
+        fuente: "OD de saturacion segun Benson y Krause (1984), ecuacion estandar de APHA para agua dulce. El Informe 15 usa esa concentracion de saturacion en el balance de aireacion.",
+        evolucion: "Saturacion de oxigeno medida",
+    },
+    [MODEL_CODES.growth]: {
+        nombre: "Crecimiento de tilapia por temperatura",
+        pregunta: "Cuantos milimetros de longitud deberia ganar un pez al dia con esta temperatura",
+        tipo: "Regresion lineal simple",
+        familia: "Ecuacion publicada, no ajustada con datos de este estanque",
+        calcula: "Crecimiento diario en longitud",
+        unidad: "mm/dia",
+        horizonte: "Diario",
+        entradas: ["Temperatura del agua"],
+        formula: "Crecimiento diario en longitud (mm/dia) = -1,6707 + 0,09682 x Temperatura (C)",
+        fuente: "Informe 17 (marzo 2026), ecuacion 1. Recta de Soderberg para tilapia del Nilo macho, con R2 de 0,95 y valida entre 21 y 30 C.",
+        evolucion: "Crecimiento diario segun la temperatura medida",
+    },
+    [MODEL_CODES.water]: {
+        nombre: "Calidad de agua",
+        pregunta: "En que clase de calidad esta el agua ahora",
+        tipo: "Maquina de vectores de soporte (SVC, nucleo RBF)",
+        familia: "Aprendizaje automatico supervisado, clasificacion",
+        calcula: "Clase de calidad del agua",
+        unidad: "Excelente, Buena, Regular, Mala o Muy mala",
+        horizonte: "Lectura actual",
+        entradas: ["Temperatura del agua", "pH", "Oxigeno disuelto", "Ion nitrato"],
+        formula: "Clase = SVC con nucleo RBF (Temperatura, pH, Oxigeno disuelto, Ion nitrato)",
+        fuente: "Entrenado en este proyecto en julio de 2026 con las clases de la ponderacion del equipo. Ninguno de los cuatro informes trata un indice de calidad de agua.",
+        evolucion: "Clase de calidad que asigna el SVM",
+    },
+};
+const fichaActiva = computed(() => FICHA[selectedCode.value] ?? null);
+
+const serieDe = (modelo, patron, excluir = null) => (modelo?.chart?.series ?? []).find(
+    (s) => patron.test(s.name ?? "") && !(excluir && excluir.test(s.name ?? "")),
+);
+const ultimoDe = (datos) => {
+    const d = (datos ?? []).filter((p) => Array.isArray(p) && p[1] !== null && p[1] !== undefined);
+    return d.length ? d[d.length - 1] : null;
+};
+const num = (v, dec = 2) => (v === null || v === undefined || Number.isNaN(Number(v))
+    ? "-"
+    : Number(v).toLocaleString("es-PE", { maximumFractionDigits: dec }));
+const fechaCorta = (iso) => (iso ? new Date(iso).toLocaleString("es-PE", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "");
+
+const ejeTiempo = (nombreY) => ({
+    grid: { top: 28, left: 12, right: 24, bottom: 48, containLabel: true },
+    tooltip: { trigger: "axis" },
+    legend: { bottom: 0, textStyle: { fontSize: 11 } },
+    dataZoom: [{ type: "inside" }],
+    xAxis: { type: "time", splitLine: { show: false } },
+    yAxis: { type: "value", name: nombreY, nameLocation: "middle", nameGap: 44, scale: true, splitLine: { lineStyle: { color: "#f1f5f9" } } },
+});
+
+// ---------- lectura actual de cada modelo ----------
+const lecturaActual = computed(() => {
+    const m = activeModel.value;
+    const v = validacionDe(selectedCode.value);
+    if (!m && !v) return [];
+    switch (selectedCode.value) {
+    case MODEL_CODES.svm: {
+        const p = v?.prevision_actual;
+        return [
+            { etiqueta: "Oxigeno medido ahora", valor: num(p?.current_mg_l ?? m?.current_value), unidad: "mg/L", pie: p ? `dato de ${fechaCorta(p.from_at)}` : "" },
+            { etiqueta: "Previsto dentro de una hora", valor: num(p?.predicted_mg_l), unidad: "mg/L", pie: p ? `para ${fechaCorta(p.for_at)}` : "calculando", destacado: true },
+            { etiqueta: "Cambio esperado", valor: p ? (p.change_mg_l > 0 ? "+" : "") + num(p.change_mg_l) : "-", unidad: "mg/L", pie: p && p.predicted_mg_l < 3 ? "por debajo de 3 mg/L" : "" },
+        ];
+    }
+    case MODEL_CODES.oxygen: {
+        const fila = (re) => (m?.forecast ?? []).find((f) => re.test(f.label ?? ""));
+        const sat = fila(/saturaci/i);
+        const def = fila(/d.ficit/i);
+        return [
+            { etiqueta: "Saturacion", valor: num(sat?.value ?? m?.current_value, 1), unidad: "%", destacado: true },
+            { etiqueta: "Deficit de oxigeno", valor: num(def?.value), unidad: "mg/L", pie: "lo que falta para saturar" },
+        ];
+    }
+    case MODEL_CODES.growth: {
+        const serie = v?.serie_diaria ?? [];
+        const hoy = serie.length ? serie[serie.length - 1] : null;
+        const bio = selectedBiometrics.value;
+        return [
+            { etiqueta: "Temperatura media de hoy", valor: num(hoy?.[1]), unidad: "C" },
+            { etiqueta: "Crecimiento diario en longitud", valor: num(hoy?.[2] ?? m?.potential_daily_length_gain_mm_day, 3), unidad: "mm/dia", destacado: true, pie: hoy && (hoy[1] < 21 || hoy[1] > 30) ? "fuera del rango validado" : "" },
+            { etiqueta: "Ultima biometria", valor: num(bio?.longitud_promedio_cm, 2), unidad: "cm", pie: "longitud media medida" },
+        ];
+    }
+    case MODEL_CODES.water: {
+        const serie = v?.serie_svm ?? [];
+        const clase = serie.length ? serie[serie.length - 1][1] : m?.machine_learning?.classification;
+        const comp = (re) => (m?.components ?? []).find((c) => re.test(c.variable ?? ""));
+        return [
+            { etiqueta: "Clase segun el SVM", valor: clase ?? "-", unidad: "", destacado: true },
+            { etiqueta: "Oxigeno disuelto", valor: num(comp(/ox.geno/i)?.raw_value), unidad: "mg/L" },
+            { etiqueta: "Ion nitrato", valor: num(comp(/nitrato/i)?.raw_value), unidad: "mg/L" },
+            { etiqueta: "Temperatura y pH", valor: `${num(comp(/temperatura/i)?.raw_value, 1)} C, ${num(comp(/^ph$/i)?.raw_value, 2)}`, unidad: "" },
+        ];
+    }
+    default:
+        return [];
+    }
+});
+
+// ---------- evolucion en el tiempo, solo con la salida de cada modelo ----------
+const graficoEvolucion = computed(() => {
+    const m = activeModel.value;
+    const v = validacionDe(selectedCode.value);
+    switch (selectedCode.value) {
+    case MODEL_CODES.svm: {
+        const medido = serieDe(m, /observad|medid/i, /estimaci/i)?.data ?? [];
+        const p = v?.prevision_actual;
+        const ultimo = ultimoDe(medido);
+        const tramo = p && ultimo ? [ultimo, [p.for_at, p.predicted_mg_l]] : [];
+        if (!medido.length) return null;
+        return {
+            ...ejeTiempo("Oxigeno disuelto (mg/L)"),
+            series: [
+                { name: "Medido", type: "line", showSymbol: false, smooth: true, lineStyle: { color: "#2563eb", width: 2 }, data: medido },
+                { name: "Previsto a una hora", type: "line", symbolSize: 9, lineStyle: { color: "#ea580c", width: 2, type: "dashed" }, itemStyle: { color: "#ea580c" }, data: tramo },
+                { name: "Umbral de 3 mg/L", type: "line", showSymbol: false, silent: true, lineStyle: { color: "#dc2626", width: 1, type: "dotted" }, data: medido.length ? [[medido[0][0], 3], [p?.for_at ?? ultimo[0], 3]] : [] },
+            ],
+        };
+    }
+    case MODEL_CODES.oxygen: {
+        const sat = serieDe(m, /saturaci/i, /estimaci/i)?.data ?? [];
+        if (!sat.length) return null;
+        return {
+            ...ejeTiempo("Saturacion de oxigeno (%)"),
+            series: [
+                { name: "Saturacion medida", type: "line", showSymbol: false, smooth: true, lineStyle: { color: "#7c3aed", width: 2 }, areaStyle: { color: "rgba(124,58,237,0.08)" }, data: sat },
+                { name: "Agua saturada (100%)", type: "line", showSymbol: false, silent: true, lineStyle: { color: "#94a3b8", width: 1, type: "dashed" }, data: [[sat[0][0], 100], [sat[sat.length - 1][0], 100]] },
+            ],
+        };
+    }
+    case MODEL_CODES.growth: {
+        const serie = v?.serie_diaria ?? [];
+        if (!serie.length) return null;
+        return {
+            grid: { top: 28, left: 12, right: 12, bottom: 48, containLabel: true },
+            tooltip: { trigger: "axis" },
+            legend: { bottom: 0, textStyle: { fontSize: 11 } },
+            xAxis: { type: "category", data: serie.map((d) => d[0]), axisLabel: { fontSize: 10 } },
+            yAxis: [
+                { type: "value", name: "Crecimiento diario en longitud (mm/dia)", nameLocation: "middle", nameGap: 46, splitLine: { lineStyle: { color: "#f1f5f9" } } },
+                { type: "value", name: "Temperatura (C)", nameLocation: "middle", nameGap: 36, scale: true, splitLine: { show: false } },
+            ],
+            series: [
+                { name: "Crecimiento diario segun la recta", type: "line", showSymbol: false, smooth: true, lineStyle: { color: "#0d9488", width: 2.5 }, areaStyle: { color: "rgba(13,148,136,0.08)" }, data: serie.map((d) => d[2]) },
+                { name: "Temperatura media del dia", type: "line", yAxisIndex: 1, showSymbol: false, smooth: true, lineStyle: { color: "#94a3b8", width: 1.5, type: "dashed" }, data: serie.map((d) => d[1]) },
+            ],
+        };
+    }
+    case MODEL_CODES.water: {
+        const serie = v?.serie_svm ?? [];
+        const orden = v?.orden_clases ?? ["Excelente", "Buena", "Regular", "Mala", "Muy mala"];
+        if (!serie.length) return null;
+        const escala = [...orden].reverse();
+        return {
+            grid: { top: 20, left: 12, right: 24, bottom: 30, containLabel: true },
+            tooltip: { trigger: "axis" },
+            dataZoom: [{ type: "inside" }],
+            xAxis: { type: "time", splitLine: { show: false } },
+            yAxis: { type: "category", data: escala, splitLine: { show: true, lineStyle: { color: "#f1f5f9" } } },
+            series: [
+                { name: "Clase del SVM", type: "line", step: "end", showSymbol: false, lineStyle: { color: "#0d9488", width: 2 }, data: serie.map((d) => [d[0], d[1]]) },
+            ],
+        };
+    }
+    default:
+        return null;
+    }
+});
+
+const notaEvolucion = computed(() => ({
+    [MODEL_CODES.svm]: "Azul, el oxigeno medido. En naranja, lo que el modelo preve para la proxima hora. La linea roja punteada marca los 3 mg/L del umbral de alarma.",
+    [MODEL_CODES.oxygen]: "Porcentaje de la capacidad de oxigeno que tiene el agua en cada lectura. Por encima del 100% el agua esta sobresaturada.",
+    [MODEL_CODES.growth]: "Cada dia se lleva la temperatura media a la recta, sin factores limitantes. Por eso es un crecimiento posible segun la temperatura, no el crecimiento que se midio.",
+    [MODEL_CODES.water]: "Clase que asigna el SVM a cada lectura limpia reciente del estanque.",
+}[selectedCode.value] ?? ""));
+
+// La insignia de cada card resume si el modelo acierta frente a lo medido.
+// Sustituye al estado que venia del backend, que para la proyeccion de oxigeno
+// seguia diciendo "candidato bloqueado" por la SVR que ya no se usa.
+const r2Catalogo = (codigo) => {
+    const v = validacionDe(codigo);
+    if (!v?.disponible) return null;
+    const r2 = codigo === MODEL_CODES.water ? v.regresion_multiple?.r2_prueba : v.r2;
+    if (r2 === null || r2 === undefined) return null;
+    const texto = `R2 ${Number(r2).toLocaleString("es-PE", { maximumFractionDigits: 3 })}`;
+    if (r2 >= 0.8) return { texto, clase: "badge-light-success" };
+    if (r2 >= 0.5) return { texto, clase: "badge-light-primary" };
+    if (r2 >= 0.1) return { texto, clase: "badge-light-warning" };
+    return { texto, clase: "badge-light-danger" };
+};
+
+const usaVentana = computed(() => [MODEL_CODES.svm, MODEL_CODES.oxygen].includes(selectedCode.value));
+
 const scheduleReload = () => {
     clearTimeout(reloadTimer.value);
     reloadTimer.value = setTimeout(loadModelos, 250);
@@ -381,7 +610,7 @@ onBeforeUnmount(() => {
                             <span class="d-flex justify-content-between align-items-start gap-2">
                                 <span class="fw-bold text-dark fs-6">{{ item.name }}</span>
                                 
-                                <span v-if="models.find((model) => model.code === item.code)" :class="['badge', statusClass(models.find((model) => model.code === item.code)?.status)]">{{ statusLabel(models.find((model) => model.code === item.code)?.status) }}</span>
+                                <span v-if="r2Catalogo(item.code)" :class="['badge', r2Catalogo(item.code).clase]">{{ r2Catalogo(item.code).texto }}</span>
                             </span>
                             <span class="text-gray-600 fs-7 mt-3">{{ item.description }}</span>
                             <span v-if="item.modelType" class="model-choice__type">{{ item.modelType }}</span>
@@ -403,169 +632,86 @@ onBeforeUnmount(() => {
             <div class="detail-nav mb-5">
                 <el-button text :icon="RefreshRight" @click="showCatalog">Volver a modelos</el-button>
                 <span class="text-gray-400">/</span>
-                <span class="text-gray-600 fs-7">{{ activeMeta?.name }}</span>
+                <span class="text-gray-600 fs-7">{{ fichaActiva?.nombre ?? activeMeta?.name }}</span>
             </div>
 
-            <section v-if="activeMeta" class="model-overview mb-6">
-                <div class="model-overview__icon"><el-icon><component :is="activeMeta.icon" /></el-icon></div>
-                <div class="model-overview__copy">
-                    <div class="d-flex align-items-center flex-wrap gap-3">
-                        <h3 class="fs-2 fw-bold text-dark mb-0">{{ activeMeta.name }}</h3>
-                        <span v-if="activeModel" :class="['badge', statusClass(activeModel.status)]">{{ statusLabel(activeModel.status) }}</span>
+            <template v-if="fichaActiva">
+                <!-- CABECERA -->
+                <section class="mp-cab mb-6">
+                    <div class="mp-cab__icono"><el-icon><component :is="activeMeta?.icon" /></el-icon></div>
+                    <div class="mp-cab__texto">
+                        <h3 class="mp-cab__nombre">{{ fichaActiva.nombre }}</h3>
+                        <p class="mp-cab__pregunta">{{ fichaActiva.pregunta }}.</p>
                     </div>
-                    <p class="text-gray-700 fs-6 mt-2 mb-1">{{ activeMeta.description }}</p>
-                    <p class="text-gray-500 fs-7 mb-0">{{ activeMeta.importance }}</p>
-                </div>
-                <el-button class="model-overview__action" :icon="SetUp" @click="openDigitalTwin(activeMeta.code)">Ver en gemelo digital</el-button>
-            </section>
+                    <span class="mp-tipo">{{ fichaActiva.tipo }}</span>
+                    <el-button :icon="SetUp" @click="openDigitalTwin(selectedCode)">Ver en gemelo digital</el-button>
+                </section>
 
-            <section v-if="activeMeta" class="model-controls mb-6">
-                <div class="model-controls__group">
-                    <span class="text-gray-500 fs-8 fw-semibold text-uppercase">Tiempo</span>
-                    <el-select v-if="activeMeta.code === MODEL_CODES.growth" v-model="form.proyeccion_dias" class="model-controls__select" @change="scheduleReload">
-                        <el-option v-for="item in proyeccionesCrecimiento" :key="item.id" :label="item.name" :value="item.id" />
-                    </el-select>
-                    <el-select v-else v-model="form.ventana" class="model-controls__select" @change="scheduleReload">
-                        <el-option v-for="item in ventanas" :key="item.id" :label="item.name" :value="item.id" />
-                    </el-select>
-                </div>
-                <div class="model-controls__group model-controls__group--wide">
-                    <span class="text-gray-500 fs-8 fw-semibold text-uppercase">Variables utilizadas</span>
-                    <div class="input-tags"><span v-for="input in activeMeta.inputs" :key="input">{{ input }}</span></div>
-                </div>
-                <div class="model-controls__group">
-                    <span class="text-gray-500 fs-8 fw-semibold text-uppercase">Horizonte</span>
-                    <strong class="text-dark fs-7">{{ activeMeta.horizon }}</strong>
-                </div>
-            </section>
-
-            <section v-if="loading && !activeModel" class="card card-flush mb-6">
-                <div class="card-body py-12"><el-skeleton :rows="7" animated /></div>
-            </section>
-
-            <template v-else-if="activeModel">
-                <section class="row g-5 mb-6">
-                    <div class="col-lg-4">
-                        <div class="result-keyline h-100">
-                            <span>Valor actual</span>
-                            <strong>{{ formatValue(activeModel.current_value, activeModel.unit) }}</strong>
-                            <small>{{ activeModel.engine }}</small>
+                <!-- 1. FICHA DEL MODELO -->
+                <section class="card card-flush mb-6">
+                    <div class="card-header"><h4 class="card-title fw-bold text-dark fs-5"><span class="mp-num">1</span>Ficha del modelo</h4></div>
+                    <div class="card-body pt-0">
+                        <div class="mp-ficha">
+                            <div><small>Tipo de modelo</small><strong>{{ fichaActiva.tipo }}</strong><span>{{ fichaActiva.familia }}</span></div>
+                            <div><small>Que calcula</small><strong>{{ fichaActiva.calcula }}</strong><span>{{ fichaActiva.unidad }}</span></div>
+                            <div><small>Horizonte</small><strong>{{ fichaActiva.horizonte }}</strong></div>
                         </div>
-                    </div>
-                    <div class="col-lg-8">
-                        <div class="result-keyline h-100">
-                            <span>Uso en la piscina</span>
-                            <strong class="fs-5">{{ activeModel.usage?.label ?? statusLabel(activeModel.status) }}</strong>
-                            <small>{{ activeModel.usage?.detail ?? activeModel.message }}</small>
+                        <div class="mp-fila">
+                            <small>Variables de entrada</small>
+                            <div class="input-tags"><span v-for="e in fichaActiva.entradas" :key="e">{{ e }}</span></div>
+                        </div>
+                        <div class="mp-fila">
+                            <small>Formula</small>
+                            <code class="mp-formula">{{ fichaActiva.formula }}</code>
+                        </div>
+                        <div class="mp-fila">
+                            <small>De donde sale</small>
+                            <p class="mp-fuente">{{ fichaActiva.fuente }}</p>
                         </div>
                     </div>
                 </section>
 
-                <!-- El agua puede frenar al modelo por debajo de su potencial: la
-                     temperatura marca el techo, el oxigeno y el pH solo restan. -->
-                <section v-if="activeModel.limiting_factors" class="card card-flush mb-6">
+                <!-- 2. LECTURA ACTUAL -->
+                <section class="card card-flush mb-6">
+                    <div class="card-header"><h4 class="card-title fw-bold text-dark fs-5"><span class="mp-num">2</span>Lectura actual</h4></div>
+                    <div class="card-body pt-0">
+                        <el-skeleton v-if="loading && !lecturaActual.length" :rows="2" animated />
+                        <div v-else class="mp-lectura">
+                            <div v-for="l in lecturaActual" :key="l.etiqueta" :class="['mp-lectura__item', { 'mp-lectura__item--destacado': l.destacado }]">
+                                <small>{{ l.etiqueta }}</small>
+                                <strong>{{ l.valor }} <em v-if="l.unidad">{{ l.unidad }}</em></strong>
+                                <span v-if="l.pie">{{ l.pie }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 3. EVOLUCION EN EL TIEMPO -->
+                <section class="card card-flush mb-6">
                     <div class="card-header">
-                        <h4 class="card-title fw-bold text-dark fs-5">Que esta frenando este modelo</h4>
+                        <h4 class="card-title fw-bold text-dark fs-5"><span class="mp-num">3</span>{{ fichaActiva.evolucion }}</h4>
+                        <div v-if="usaVentana" class="card-toolbar">
+                            <el-select v-model="form.ventana" class="model-controls__select" @change="scheduleReload">
+                                <el-option v-for="item in ventanas" :key="item.id" :label="item.name" :value="item.id" />
+                            </el-select>
+                        </div>
                     </div>
                     <div class="card-body pt-0">
-                        <p class="text-gray-700 fs-6 mb-4">
-                            Con la temperatura actual podria alcanzar
-                            <strong>{{ formatValue(activeModel.potential_daily_length_gain_mm_day, activeModel.unit) }}</strong>,
-                            pero el agua solo se lo permite a
-                            <strong>{{ formatValue(activeModel.current_value, activeModel.unit) }}</strong>.
-                        </p>
-                        <ul class="ps-4 mb-3">
-                            <li class="fs-7 mb-2"
-                                :class="activeModel.limiting_factors.oxygen.factor < 1 ? 'text-warning fw-semibold' : 'text-gray-600'">
-                                {{ activeModel.limiting_factors.oxygen.detail }}
-                            </li>
-                            <li class="fs-7"
-                                :class="activeModel.limiting_factors.ph.factor < 1 ? 'text-warning fw-semibold' : 'text-gray-600'">
-                                {{ activeModel.limiting_factors.ph.detail }}
-                            </li>
-                        </ul>
-                        <p class="text-gray-500 fs-8 mb-0">
-                            Ley del minimo: manda el factor peor. Sin lecturas de oxigeno o pH no se aplica limitacion.
-                        </p>
+                        <el-skeleton v-if="!graficoEvolucion && (loading || !validacion)" :rows="6" animated />
+                        <p v-else-if="!graficoEvolucion" class="text-gray-500 fs-7">No hay datos suficientes para dibujar la evolucion.</p>
+                        <template v-else>
+                            <ChartFisheye :options="graficoEvolucion" height="360px" />
+                            <p class="mp-nota">{{ notaEvolucion }}</p>
+                        </template>
                     </div>
                 </section>
 
-
-                <section class="row g-5 mb-6">
-                    <div class="col-xl-8">
-                        <div class="card card-flush h-100">
-                            <div class="card-header"><h4 class="card-title fw-bold text-dark fs-5">{{ activeModel.chart?.title?.text ?? activeModel.name }}</h4></div>
-                            <div class="card-body pt-0">
-                                <p class="text-gray-600 fs-7">{{ activeModel.chart_description }}</p>
-                                <ChartFisheye :options="activeModel.chart" height="420px" />
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-xl-4">
-                        <div :class="['formula-panel h-100', modelFormulaTone(activeModel.code)]">
-                            <span class="text-gray-500 fs-8 fw-semibold text-uppercase">Formula y origen</span>
-                            <LatexFormula v-if="activeModel.formula?.latex && ![MODEL_CODES.growth, MODEL_CODES.svm, MODEL_CODES.water].includes(activeModel.code)" :latex="activeModel.formula.latex" />
-                            <code v-else class="d-block text-dark fs-7 text-break mt-3">{{ formulaDe(activeModel) }}</code>
-                            <p class="text-gray-700 fs-7 mt-4">{{ activeModel.formula?.detail }}</p>
-                            <ul v-if="activeModel.formula?.conditions?.length" class="text-gray-600 fs-8 ps-4 mb-4">
-                                <li v-for="condition in activeModel.formula.conditions" :key="condition">{{ condition }}</li>
-                            </ul>
-                            <div class="formula-panel__origin">{{ activeModel.origin?.document }}<br>{{ activeModel.origin?.data }}</div>
-                        </div>
-                    </div>
-                </section>
-
+                <!-- 4. VALIDACION CON DATOS REALES -->
                 <ValidacionModelo
-                    :codigo="activeModel.code"
-                    :datos="validacionDe(activeModel.code)"
+                    :codigo="selectedCode"
+                    :datos="validacionDe(selectedCode)"
                     :limpieza="validacion?.limpieza"
                 />
-
-                <section v-if="activeModel.code === MODEL_CODES.growth && selectedBiometrics?.available" class="pond-twin mb-6">
-                    <div class="pond-twin__header">
-                        <div><span class="text-gray-500 fs-8 fw-semibold text-uppercase">Gemelo digital de biometria</span><h4 class="fs-5 fw-bold text-dark mb-0">Evolucion del estanque</h4></div>
-                        <span class="badge badge-light-primary">Biometria real</span>
-                    </div>
-                    <div class="pond-twin__timeline">
-                        <div class="pond-twin__step"><span class="pond-twin__dot"></span><small>Ultima muestra</small><strong>{{ formatValue(selectedBiometrics.longitud_promedio_cm, "cm") }}</strong><span>{{ formatValue(selectedBiometrics.peso_promedio_g, "g") }}</span></div>
-                        <div class="pond-twin__line"></div>
-                        <div class="pond-twin__step"><span class="pond-twin__dot pond-twin__dot--current"></span><small>Temperatura actual</small><strong>{{ formatValue(activeModel.current_value, activeModel.unit) }}</strong><span>Ganancia diaria</span></div>
-                        <div class="pond-twin__line"></div>
-                        <div class="pond-twin__step"><span class="pond-twin__dot pond-twin__dot--future"></span><small>Proyeccion {{ growthProjection?.projection_days ?? form.proyeccion_dias }} dias</small><strong>{{ formatValue(growthProjection?.projected_length_mm, "mm") }}</strong><span>{{ formatValue(growthProjection?.projected_weight_g, "g") }}</span></div>
-                    </div>
-                    <p class="text-gray-600 fs-8 mt-5 mb-0">FCA {{ metricValue(selectedBiometrics.conversion_alimenticia) }}: {{ selectedBiometrics.conversion_label }}. La curva longitud-peso usada se muestra en la formula del modelo.</p>
-                </section>
-
-                <section class="row g-5 mb-6">
-                    <div class="col-xl-5">
-                        <div v-if="activeModel.asset_id || hasMetrics(activeModel)" class="info-block h-100">
-                            <span class="text-gray-500 fs-8 fw-semibold text-uppercase">Modelo y validacion</span>
-                            <div v-if="activeModel.asset_id" class="mt-3"><strong>{{ activeModel.version ?? "sin version" }}</strong><div class="text-gray-500 fs-8">{{ shortId(activeModel.asset_id) }}</div></div>
-                            <div v-if="activeModel.metrics?.mae !== undefined" class="mt-3 text-gray-700 fs-7">MAE: <strong>{{ metricValue(activeModel.metrics.mae) }}</strong></div>
-                            <div v-if="activeModel.metrics?.r2 !== undefined" class="text-gray-700 fs-7">R2: <strong>{{ metricValue(activeModel.metrics.r2) }}</strong></div>
-                            <div v-if="activeModel.metrics?.f1_weighted !== undefined" class="mt-3 text-gray-700 fs-7">F1 ponderado: <strong>{{ metricValue(activeModel.metrics.f1_weighted) }}</strong></div>
-                            <div v-if="activeModel.metrics?.accuracy !== undefined" class="text-gray-700 fs-7">Exactitud: <strong>{{ metricValue(activeModel.metrics.accuracy) }}</strong></div>
-                        </div>
-                    </div>
-                    <div class="col-xl-7">
-                        <div v-if="(activeModel.forecast ?? []).length" class="info-block h-100">
-                            <span class="text-gray-500 fs-8 fw-semibold text-uppercase">Resultado para el horizonte elegido</span>
-                            <div class="table-responsive mt-3">
-                                <table class="table table-sm table-row-dashed align-middle mb-0"><tbody><tr v-for="item in activeModel.forecast.slice(0, 6)" :key="`${activeModel.code}-${item.label}-${item.timestamp}`"><td class="text-gray-600 fs-7">{{ item.label }}</td><td class="text-end fw-bold text-dark fs-7">{{ formatValue(item.value, item.unit ?? activeModel.unit) }}</td></tr></tbody></table>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
-                <section v-if="activeModel.machine_learning || activeModel.components?.length || activeModel.interpretation?.length" class="row g-5 mb-6">
-                    <div v-if="activeModel.machine_learning" class="col-xl-4"><div class="info-block h-100"><span class="text-gray-500 fs-8 fw-semibold text-uppercase">Aprendizaje automatico</span><p class="text-gray-700 fs-7 mt-3 mb-2">{{ activeModel.machine_learning.detail }}</p><strong v-if="activeModel.machine_learning.classification">{{ activeModel.machine_learning.classification }}</strong><div class="text-gray-500 fs-8 mt-2">{{ activeModel.machine_learning.target_origin }}</div></div></div>
-                    <div v-if="activeModel.components?.length && activeModel.code !== MODEL_CODES.water" class="col-xl-4"><div class="info-block h-100"><span class="text-gray-500 fs-8 fw-semibold text-uppercase">Variables del indice</span><table class="table table-sm table-row-dashed align-middle mt-3 mb-0"><tbody><tr v-for="component in activeModel.components" :key="component.variable"><td class="fs-8">{{ component.variable }}</td><td class="text-end fs-8">{{ formatValue(component.raw_value, component.unit) }}</td><td class="text-end fw-bold fs-8">Q {{ formatValue(component.normalized_score) }}</td></tr></tbody></table></div></div>
-                    <div v-if="activeModel.interpretation?.length && activeModel.code !== MODEL_CODES.water" class="col-xl-4"><div class="info-block h-100"><span class="text-gray-500 fs-8 fw-semibold text-uppercase">Interpretacion</span><table class="table table-sm table-row-dashed align-middle mt-3 mb-0"><tbody><tr v-for="item in activeModel.interpretation" :key="`${item.range}-${item.label}`"><td class="fs-8">{{ interpretationRange(item) }}</td><td class="text-end fw-bold fs-8">{{ item.label }}</td></tr></tbody></table></div></div>
-                </section>
-
-                <section v-if="lifecycle.summary?.length" class="lifecycle-strip mb-6">
-                    <div v-for="item in lifecycle.summary" :key="item.step"><strong>{{ item.step }}</strong><span>{{ item.detail }}</span></div>
-                </section>
             </template>
         </template>
 
@@ -979,4 +1125,29 @@ onBeforeUnmount(() => {
     .pond-twin__step strong { font-size: 16px; }
     .model-catalog-grid { grid-template-columns: 1fr; }
 }
+
+.mp-cab { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; background: #fff; border: 1px solid #eef2f7; border-radius: 12px; padding: 18px 20px; }
+.mp-cab__icono { width: 48px; height: 48px; border-radius: 12px; background: #eef2ff; color: #4338ca; display: flex; align-items: center; justify-content: center; font-size: 24px; flex: none; }
+.mp-cab__texto { flex: 1 1 320px; min-width: 0; }
+.mp-cab__nombre { font-size: 20px; font-weight: 700; color: #111827; margin: 0; }
+.mp-cab__pregunta { font-size: 14px; color: #4b5563; margin: 4px 0 0; }
+.mp-tipo { font-size: 12px; font-weight: 600; color: #4338ca; background: #eef2ff; border-radius: 999px; padding: 5px 12px; }
+.mp-num { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: #111827; color: #fff; font-size: 12px; margin-right: 10px; }
+.mp-ficha { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+.mp-ficha > div { background: #f8fafc; border: 1px solid #eef2f7; border-radius: 8px; padding: 10px 12px; }
+.mp-ficha small, .mp-fila small, .mp-lectura__item small { display: block; font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #6b7280; margin-bottom: 4px; }
+.mp-ficha strong { display: block; font-size: 14px; color: #111827; line-height: 1.35; }
+.mp-ficha span { display: block; font-size: 12px; color: #6b7280; margin-top: 2px; }
+.mp-fila { margin-top: 14px; }
+.mp-formula { display: inline-block; font-size: 13px; color: #111827; background: #f1f5f9; border-radius: 6px; padding: 6px 10px; white-space: normal; }
+.mp-fuente { font-size: 13px; line-height: 1.6; color: #374151; margin: 0; }
+.mp-lectura { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.mp-lectura__item { border: 1px solid #eef2f7; border-radius: 10px; padding: 12px 14px; }
+.mp-lectura__item strong { display: block; font-size: 22px; font-weight: 700; color: #111827; }
+.mp-lectura__item strong em { font-style: normal; font-size: 13px; font-weight: 600; color: #6b7280; }
+.mp-lectura__item span { display: block; font-size: 12px; color: #6b7280; margin-top: 2px; }
+.mp-lectura__item--destacado { border-color: #c7d2fe; background: #f5f7ff; }
+.mp-lectura__item--destacado strong { color: #3730a3; }
+.mp-nota { font-size: 12px; line-height: 1.6; color: #6b7280; margin: 8px 0 0; }
+@media (max-width: 900px) { .mp-ficha { grid-template-columns: 1fr; } }
 </style>
