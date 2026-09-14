@@ -472,8 +472,8 @@ const contrastados = computed(() => {
                 <!-- crecimiento -->
                 <template v-else-if="codigo === 'TILAPIA_GROWTH_TEMPERATURE'">
                     <template v-if="datos.ventana_con_oxigeno?.puntos?.length">
-                        <p class="val__titulo">Con oxígeno medido: la predicción sin ajustar nada</p>
-                        <p class="val__nota mt-0 mb-3">El modelo parte del peso medido el {{ fechaCorta(datos.ventana_con_oxigeno.desde) }} ({{ fmt(datos.ventana_con_oxigeno.peso_inicial_g, 1) }} g) y avanza día a día con la temperatura, el oxígeno y las horas de luz reales, sin volver a mirar los pesos.</p>
+                        <p class="val__titulo">Con oxígeno medido, en biometrías que no se usaron para calibrar</p>
+                        <p class="val__nota mt-0 mb-3">El modelo parte del peso medido el {{ fechaCorta(datos.ventana_con_oxigeno.desde) }} ({{ fmt(datos.ventana_con_oxigeno.peso_inicial_g, 1) }} g) y avanza día a día con la temperatura, el oxígeno y las horas de luz reales, sin volver a mirar los pesos. La biomasa crítica ({{ fmt(datos.biomasa_critica_kg_m3, 2) }} kg/m³) se calibró solo con las biometrías hasta el {{ fechaCorta(datos.calibrado_con?.at(-1)) }}.</p>
                         <div class="table-responsive">
                             <table class="table table-sm table-row-dashed align-middle mb-0">
                                 <thead><tr class="text-gray-500 fs-8"><th>Biometría</th><th class="text-end">Peso medido</th><th class="text-end">Peso que predice el modelo</th><th class="text-end">Error</th></tr></thead>
@@ -631,7 +631,7 @@ const contrastados = computed(() => {
                             </tbody>
                         </table>
                     </div>
-                    <p class="val__nota">Crecimiento en peso en g/día y en talla en mm/día. La talla de la siembra (37 mm) se calcula del peso de 1 g con la relación peso–talla del estanque. Supervivencia y conversión alimenticia son las que registró cada biometría. Parámetros fijos del modelo: alimentación a saciedad (f = 1) y factor de amoníaco 1, porque no hay sensor de amoníaco.</p>
+                    <p class="val__nota">Crecimiento en peso en g/día y en talla en mm/día. La talla de la siembra (37 mm) se calcula del peso de 1 g con la relación peso–talla del estanque. Supervivencia y conversión alimenticia son las que registró cada biometría. La disponibilidad de alimento f baja cuando la biomasa supera {{ fmt(datos.biomasa_critica_kg_m3, 2) }} kg/m³, con el volumen de {{ fmt(datos.volumen_m3, 0) }} m³ y los peces que cuenta cada biometría. El factor de amoníaco se toma como 1 porque no hay sensor de amoníaco.</p>
                     <div v-for="i in tramosConObservacion" :key="'obs' + i.hasta" class="val__observacion">
                         <strong>Observación de la biometría del {{ fechaCorta(i.hasta) }}:</strong> {{ i.observacion }}
                     </div>

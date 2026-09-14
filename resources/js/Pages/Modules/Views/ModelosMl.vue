@@ -13,6 +13,7 @@ import {
 import ChartFisheye from "@/Components/ChartFisheye.vue";
 import LatexFormula from "@/Components/LatexFormula.vue";
 import ValidacionModelo from "@/Components/ValidacionModelo.vue";
+import ProyeccionModelo from "@/Components/ProyeccionModelo.vue";
 
 defineProps({
     title: String,
@@ -34,7 +35,7 @@ const catalog = [
         code: MODEL_CODES.svm,
         name: "Proyección de oxígeno disuelto a una hora",
         description: "Anticipa el oxígeno disuelto de la próxima hora con la serie real del sensor, sin las rachas en que el sensor se quedó atascado.",
-        horizon: "Horizonte: 1 hora",
+        horizon: "Proyecta a 1 h, 24 h, 72 h, 7 y 30 días",
         modelType: "Gradient boosting (regresión)",
         icon: DataAnalysis,
     },
@@ -42,7 +43,7 @@ const catalog = [
         code: MODEL_CODES.oxygen,
         name: "Estado de oxígeno disuelto",
         description: "Saturación del agua y ciclo diario del oxígeno: a qué hora sube, a qué hora baja y cuál será el mínimo de las próximas 24 horas.",
-        horizon: "Horizonte: próximas 24 horas",
+        horizon: "Proyecta a 1 h, 24 h, 72 h, 7 y 30 días",
         modelType: "Regresión armónica del ciclo diario",
         icon: Odometer,
     },
@@ -50,7 +51,7 @@ const catalog = [
         code: MODEL_CODES.growth,
         name: "Crecimiento de tilapia por temperatura y oxígeno",
         description: "Predice cuántos gramos gana el pez al día según su peso, la temperatura, el oxígeno y las horas de luz, y lo contrasta con las biometrías del lote.",
-        horizon: "Horizonte: diario, acumulado desde la siembra",
+        horizon: "Proyecta a 1, 7, 30, 90 y 180 días y el ciclo completo",
         modelType: "Modelo bioenergético (Yi, 1998)",
         icon: TrendCharts,
     },
@@ -58,7 +59,7 @@ const catalog = [
         code: MODEL_CODES.water,
         name: "Calidad de agua",
         description: "Clasifica la calidad del agua a partir de temperatura, pH, oxígeno y nitrato, y muestra de qué variable depende.",
-        horizon: "Horizonte: lectura actual",
+        horizon: "Proyecta a 1 h, 24 h, 72 h, 7 y 30 días",
         modelType: "Máquina de vectores de soporte (SVC, núcleo RBF)",
         icon: Connection,
     },
@@ -223,7 +224,7 @@ const FICHA = {
         familia: "Aprendizaje automático supervisado, entrenado con datos de este estanque",
         calcula: "Oxígeno disuelto dentro de una hora",
         unidad: "mg/L",
-        horizonte: "1 hora",
+        horizonte: "1 hora; con un modelo por plazo, 24 h, 72 h, 7 y 30 días",
         entradas: ["Oxígeno disuelto de las últimas 2 horas", "Variación reciente del oxígeno", "Déficit de saturación", "Hora del día", "Temperatura del agua", "pH"],
         formula: "OD(t + 1 h) = OD(t) + cambio estimado por el gradient boosting",
         fuente: "Marco del balance de masas del oxígeno disuelto del Informe 16 (febrero de 2026). El modelo y sus variables se desarrollaron en este proyecto; la saturación se calcula con Benson y Krause (1984).",
@@ -236,7 +237,7 @@ const FICHA = {
         familia: "Modelo estadístico ajustado con los datos de este estanque; la saturación es física (Benson-Krause)",
         calcula: "Oxígeno esperado a cada hora y saturación actual",
         unidad: "mg/L y %",
-        horizonte: "Próximas 24 horas",
+        horizonte: "1 h, 24 h, 72 h, 7 y 30 días",
         entradas: ["Oxígeno disuelto de las 24 horas previas", "Hora del día", "Temperatura del agua, para la saturación"],
         formula: "OD(h) = nivel de las 24 h previas + a + b·sen(2πh/24) + c·cos(2πh/24);   Saturación (%) = 100 × OD ÷ OD de saturación(T)",
         fuente: "Informe 16 (febrero de 2026): Royer et al. (2021) representan la oscilación diaria del consumo de oxígeno con una función sinusoidal y evalúan el modelo con la regresión entre lo observado y lo predicho, que es lo que se hace aquí con los datos del estanque. El OD de saturación sigue a Benson y Krause (1984), la concentración que usa el Informe 15 en el balance de aireación.",
@@ -246,13 +247,13 @@ const FICHA = {
         nombre: "Crecimiento de tilapia por temperatura y oxígeno",
         pregunta: "Cuántos gramos debería ganar el pez al día con su peso, la temperatura y el oxígeno que tiene el estanque",
         tipo: "Modelo bioenergético de crecimiento (Yi, 1998)",
-        familia: "Balance entre lo que el pez asimila y lo que gasta; parámetros publicados, sin ajuste con datos del estanque",
+        familia: "Balance entre lo que el pez asimila y lo que gasta; parámetros publicados y un solo parámetro del estanque, la biomasa crítica",
         calcula: "Crecimiento diario en peso; la talla se obtiene del peso",
         unidad: "g/día y mm",
-        horizonte: "Diario, acumulado desde la siembra",
-        entradas: ["Peso del pez", "Temperatura media del día", "Oxígeno disuelto del día", "Horas de luz"],
-        formula: "dW/dt = 0,233 · ρ · τ(T) · δ(OD) · W^0,67 − 0,00133 · e^(0,0132·(T − 24)) · W^0,81;   δ = 1 si OD > 5,  (OD − 3) ÷ 2 entre 3 y 5,  0 si OD < 3 mg/L;   τ = e^(−4,6·((33 − T) ÷ 9)^4) bajo 33 °C;   ρ = horas de luz ÷ 12",
-        fuente: "Informe 16 (febrero de 2026), ecuaciones 12 a 17: modelo de crecimiento de Yi (1998) para tilapia del Nilo, como diferencia entre anabolismo y catabolismo. Coeficientes de Yi tal como los tabulan Chahid et al. (2021): h = 0,8; b = 0,62; a = 0,53; m = 0,67; n = 0,81; kmin = 0,00133; j = 0,0132; temperaturas mínima 24, óptima 33 y máxima 40 °C. El producto h·b(1−a) = 0,233 coincide con el 0,2919 × 0,81 = 0,236 de la tabla 1 del Informe 16, de donde salen también los umbrales de oxígeno (crítico 5 y mínimo 3 mg/L, Khater et al., 2021). Horas de luz con el modelo de Forsythe et al. (1995) para la latitud de Lima.",
+        horizonte: "Diario desde la siembra; proyección a 1, 7, 30, 90 y 180 días y al fin del ciclo",
+        entradas: ["Peso del pez", "Temperatura media del día", "Oxígeno disuelto del día", "Horas de luz", "Biomasa del estanque"],
+        formula: "dW/dt = 0,233 · ρ · τ(T) · δ(OD) · f · W^0,67 − 0,00133 · e^(0,0132·(T − 24)) · W^0,81;   δ = 1 si OD > 5,  (OD − 3) ÷ 2 entre 3 y 5,  0 si OD < 3 mg/L;   τ = e^(−4,6·((33 − T) ÷ 9)^4) bajo 33 °C;   ρ = horas de luz ÷ 12;   f = 1 bajo la biomasa crítica y biomasa crítica ÷ biomasa encima",
+        fuente: "Informe 16 (febrero de 2026), ecuaciones 12 a 17: modelo de crecimiento de Yi (1998) para tilapia del Nilo, como diferencia entre anabolismo y catabolismo. Coeficientes de Yi tal como los tabulan Chahid et al. (2021): h = 0,8; b = 0,62; a = 0,53; m = 0,67; n = 0,81; kmin = 0,00133; j = 0,0132; temperaturas mínima 24, óptima 33 y máxima 40 °C. El producto h·b(1−a) = 0,233 coincide con el 0,2919 × 0,81 = 0,236 de la tabla 1 del Informe 16, de donde salen también los umbrales de oxígeno (crítico 5 y mínimo 3 mg/L, Khater et al., 2021). Horas de luz con el modelo de Forsythe et al. (1995) para la latitud de Lima. El factor f de disponibilidad de alimento por biomasa sigue a Yi (1998) y al anexo 3 de la FAO (Kapetsky y Nath, 1997); su biomasa crítica es el único valor calibrado, con la siembra y las biometrías previas a las lecturas válidas de oxígeno.",
         evolucion: "Peso y talla de cada pez medido, y lo que predice el modelo",
     },
     [MODEL_CODES.water]: {
@@ -262,7 +263,7 @@ const FICHA = {
         familia: "Aprendizaje automático supervisado, clasificación",
         calcula: "Clase de calidad del agua",
         unidad: "Excelente, Buena, Regular, Mala o Muy mala",
-        horizonte: "Lectura actual",
+        horizonte: "Lectura actual; proyección a 1 h, 24 h, 72 h, 7 y 30 días",
         entradas: ["Temperatura del agua", "pH", "Oxígeno disuelto", "Ion nitrato"],
         formula: "Clase = SVC con núcleo RBF (temperatura, pH, oxígeno disuelto, ion nitrato)",
         fuente: "Desarrollado en este proyecto: las clases de referencia salen de la ponderación del equipo sobre las cuatro variables y el SVM aprende a reconocerlas desde las lecturas. En esta página se entrena solo con lecturas de nitrato válido. Ninguno de los cuatro informes trata un índice de calidad de agua.",
@@ -702,10 +703,18 @@ onBeforeUnmount(() => {
                     </div>
                 </section>
 
-                <!-- 3. EVOLUCION EN EL TIEMPO -->
+                <!-- 3. PROYECCION -->
+                <ProyeccionModelo
+                    :numero="3"
+                    :codigo="selectedCode"
+                    :datos="validacionDe(selectedCode)"
+                    :historial="validacionDe(MODEL_CODES.oxygen)?.serie ?? []"
+                />
+
+                <!-- 4. EVOLUCION EN EL TIEMPO -->
                 <section class="card card-flush mb-6">
                     <div class="card-header">
-                        <h4 class="card-title fw-bold text-dark fs-5"><span class="mp-num">3</span>{{ fichaActiva.evolucion }}</h4>
+                        <h4 class="card-title fw-bold text-dark fs-5"><span class="mp-num">4</span>{{ fichaActiva.evolucion }}</h4>
                         <div v-if="usaVentana" class="card-toolbar">
                             <el-select v-model="form.ventana" class="model-controls__select" @change="scheduleReload">
                                 <el-option v-for="item in ventanas" :key="item.id" :label="item.name" :value="item.id" />
@@ -722,9 +731,9 @@ onBeforeUnmount(() => {
                     </div>
                 </section>
 
-                <!-- 4. VALIDACION CON DATOS REALES -->
+                <!-- 5. VALIDACION CON DATOS REALES -->
                 <ValidacionModelo
-                    :numero="4"
+                    :numero="5"
                     :codigo="selectedCode"
                     :datos="validacionDe(selectedCode)"
                     :limpieza="validacion?.limpieza"
