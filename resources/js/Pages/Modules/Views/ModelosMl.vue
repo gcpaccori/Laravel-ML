@@ -49,9 +49,9 @@ const catalog = [
     {
         code: MODEL_CODES.growth,
         name: "Crecimiento de tilapia por temperatura y oxígeno",
-        description: "Predice cuántos milímetros de longitud gana el pez al día con la temperatura y el oxígeno del estanque, y lo contrasta con las biometrías del lote.",
-        horizon: "Horizonte: diario, acumulado entre biometrías",
-        modelType: "Regresión lineal con factor de oxígeno",
+        description: "Predice cuántos gramos gana el pez al día según su peso, la temperatura, el oxígeno y las horas de luz, y lo contrasta con las biometrías del lote.",
+        horizon: "Horizonte: diario, acumulado desde la siembra",
+        modelType: "Modelo bioenergético (Yi, 1998)",
         icon: TrendCharts,
     },
     {
@@ -244,16 +244,16 @@ const FICHA = {
     },
     [MODEL_CODES.growth]: {
         nombre: "Crecimiento de tilapia por temperatura y oxígeno",
-        pregunta: "Cuántos milímetros de longitud debería ganar el pez al día con la temperatura y el oxígeno que tiene el estanque",
-        tipo: "Regresión lineal con factor limitante de oxígeno",
-        familia: "Ecuación publicada (Söderberg) corregida con el factor de oxígeno de Yi; no se ajustó con datos del estanque",
-        calcula: "Crecimiento diario en longitud",
-        unidad: "mm/día",
-        horizonte: "Diario, acumulado entre biometrías",
-        entradas: ["Temperatura media del día", "Oxígeno disuelto del día"],
-        formula: "ΔL (mm/día) = (−1,6707 + 0,09682 × T) × δ(OD);   δ = 1 si OD > 3,0 mg/L,  δ = (OD − 0,3) ÷ 2,7 entre 0,3 y 3,0,  δ = 0 si OD < 0,3",
-        fuente: "Informe 17 (marzo de 2026), ecuación 1: recta de Söderberg (2006) para tilapia del Nilo macho, con R² de 0,95, obtenida con oxígeno que nunca bajó de 3,5 mg/L y válida entre 21 y 30 °C. Informe 16 (febrero de 2026), ecuaciones 16 y 17: factor de oxígeno δ del modelo de crecimiento de Yi (1998), con OD crítico de 3,0 mg/L y OD mínimo de 0,3 mg/L para tilapia del Nilo.",
-        evolucion: "Longitud de cada pez medido y la que predice el modelo",
+        pregunta: "Cuántos gramos debería ganar el pez al día con su peso, la temperatura y el oxígeno que tiene el estanque",
+        tipo: "Modelo bioenergético de crecimiento (Yi, 1998)",
+        familia: "Balance entre lo que el pez asimila y lo que gasta; parámetros publicados, sin ajuste con datos del estanque",
+        calcula: "Crecimiento diario en peso",
+        unidad: "g/día",
+        horizonte: "Diario, acumulado desde la siembra",
+        entradas: ["Peso del pez", "Temperatura media del día", "Oxígeno disuelto del día", "Horas de luz"],
+        formula: "dW/dt = 0,233 · ρ · τ(T) · δ(OD) · W^0,67 − 0,00133 · e^(0,0132·(T − 24)) · W^0,81;   δ = 1 si OD > 5,  (OD − 3) ÷ 2 entre 3 y 5,  0 si OD < 3 mg/L;   τ = e^(−4,6·((33 − T) ÷ 9)^4) bajo 33 °C;   ρ = horas de luz ÷ 12",
+        fuente: "Informe 16 (febrero de 2026), ecuaciones 12 a 17: modelo de crecimiento de Yi (1998) para tilapia del Nilo, como diferencia entre anabolismo y catabolismo. Coeficientes de Yi tal como los tabulan Chahid et al. (2021): h = 0,8; b = 0,62; a = 0,53; m = 0,67; n = 0,81; kmin = 0,00133; j = 0,0132; temperaturas mínima 24, óptima 33 y máxima 40 °C. El producto h·b(1−a) = 0,233 coincide con el 0,2919 × 0,81 = 0,236 de la tabla 1 del Informe 16, de donde salen también los umbrales de oxígeno (crítico 5 y mínimo 3 mg/L, Khater et al., 2021). Horas de luz con el modelo de Forsythe et al. (1995) para la latitud de Lima.",
+        evolucion: "Peso de cada pez medido y el que predice el modelo",
     },
     [MODEL_CODES.water]: {
         nombre: "Calidad de agua",
@@ -348,15 +348,13 @@ const lecturaActual = computed(() => {
         ];
     }
     case MODEL_CODES.growth: {
-        const hoy = v?.ultimo_dia;
-        const bio = (v?.longitudes ?? []).at(-1);
-        if (!hoy && !bio) return [];
-        const diferencia = bio?.previsto_mm ? bio.medido_mm - bio.previsto_mm : null;
+        const hoy = v?.hoy;
+        if (!hoy) return [];
         return [
-            { etiqueta: "Temperatura media del día", valor: num(hoy?.temperatura_media, 1), unidad: "°C", pie: hoy ? `${diaCorto(hoy.fecha)}${hoy.en_rango_validado ? "" : ", fuera del rango validado de 21 a 30 °C"}` : "" },
-            { etiqueta: "Oxígeno medio del día", valor: num(hoy?.oxigeno_medio), unidad: "mg/L", pie: hoy?.delta === null || hoy?.delta === undefined ? "sin lecturas suficientes: δ = 1" : `factor de oxígeno δ = ${num(hoy.delta)}` },
-            { etiqueta: "Crecimiento que predice el modelo", valor: num(hoy?.corregido_mm_dia), unidad: "mm/día", destacado: true, pie: hoy ? `Söderberg sola: ${num(hoy.soderberg_mm_dia)} mm/día` : "" },
-            { etiqueta: "Última biometría", valor: num(bio?.medido_mm, 1), unidad: "mm", pie: bio ? `${bio.peces} peces, ${diaCorto(bio.fecha)}; el modelo predecía ${num(bio.previsto_mm, 1)} mm${diferencia === null ? "" : ` (${diferencia >= 0 ? "+" : "−"}${num(Math.abs(diferencia), 1)})`}` : "" },
+            { etiqueta: "Temperatura media del día", valor: num(hoy.temperatura_media, 1), unidad: "°C", pie: `${diaCorto(hoy.fecha)}; factor τ = ${num(hoy.tau)}` },
+            { etiqueta: "Oxígeno medio del día", valor: num(hoy.oxigeno_medio), unidad: "mg/L", pie: hoy.delta === null ? "sin lecturas suficientes: δ = 1" : `factor δ = ${num(hoy.delta)}${hoy.delta < 1 ? ", ya frena el crecimiento" : ""}` },
+            { etiqueta: "Horas de luz", valor: num(hoy.fotoperiodo_h, 1), unidad: "h", pie: `factor ρ = ${num(hoy.fotoperiodo_h / 12)}` },
+            { etiqueta: "Condición para crecer hoy", valor: num(hoy.tau * (hoy.delta ?? 1) * (hoy.fotoperiodo_h / 12)), unidad: "τ·δ·ρ", destacado: true, pie: "parte del crecimiento máximo que permiten hoy la temperatura, el oxígeno y la luz; 1 es sin límite" },
         ];
     }
     case MODEL_CODES.water: {
@@ -412,22 +410,22 @@ const graficoEvolucion = computed(() => {
         };
     }
     case MODEL_CODES.growth: {
-        const corregida = v?.serie_longitud_prevista ?? [];
-        const sola = v?.serie_longitud_soderberg ?? [];
-        const peces = v?.peces ?? [];
-        const medias = (v?.longitudes ?? []).map((l) => [l.fecha, l.medido_mm]);
-        if (!corregida.length || !medias.length) return null;
-        const opciones = ejeTiempo("Longitud del pez (mm)");
+        const modelo = v?.serie_peso_modelo ?? [];
+        const medias = (v?.medias ?? []).filter((x) => x.medido).map((x) => [x.fecha, x.peso_g]);
+        if (!modelo.length || !medias.length) return null;
+        const siembra = (v?.medias ?? []).find((x) => !x.medido);
+        const opciones = ejeTiempo("Peso del pez (g)");
+        const formatoDia = (val) => new Date(val).toLocaleDateString("es-PE", { day: "numeric", month: "short" });
         return {
             ...opciones,
-            xAxis: { ...opciones.xAxis, axisLabel: { color: "#6b7280", hideOverlap: true, formatter: (val) => new Date(val).toLocaleDateString("es-PE", { day: "numeric", month: "short" }) } },
+            xAxis: { ...opciones.xAxis, axisLabel: { color: "#6b7280", hideOverlap: true, formatter: formatoDia } },
             yAxis: { ...opciones.yAxis, min: 0, scale: false },
-            tooltip: { trigger: "item", formatter: (p) => `${p.seriesName}<br/>${new Date(p.value[0]).toLocaleDateString("es-PE", { day: "numeric", month: "short" })}: ${num(p.value[1], 1)} mm` },
+            tooltip: { trigger: "item", formatter: (p) => `${p.seriesName}<br/>${formatoDia(p.value[0])}: ${num(p.value[1], 1)} g` },
             series: [
-                { name: "Cada pez medido", type: "scatter", symbolSize: 6, color: "#f59e0b", itemStyle: { opacity: 0.45 }, data: peces },
-                { name: "Longitud media medida", type: "scatter", symbolSize: 13, color: "#ea580c", itemStyle: { borderColor: "#fff", borderWidth: 2 }, data: medias },
-                { name: "Modelo con factor de oxígeno", type: "line", showSymbol: false, color: "#0d9488", lineStyle: { width: 2.5 }, data: corregida },
-                { name: "Söderberg sola", type: "line", showSymbol: false, color: "#7c3aed", lineStyle: { width: 1.5, type: "dashed" }, data: sola },
+                { name: "Cada pez medido", type: "scatter", symbolSize: 6, color: "#f59e0b", itemStyle: { opacity: 0.45 }, data: v?.peces ?? [] },
+                { name: "Peso medio medido", type: "scatter", symbolSize: 13, color: "#ea580c", itemStyle: { borderColor: "#fff", borderWidth: 2 }, data: siembra ? [[siembra.fecha, siembra.peso_g], ...medias] : medias },
+                { name: "Modelo desde la siembra", type: "line", showSymbol: false, color: "#0d9488", lineStyle: { width: 2.5 }, data: modelo },
+                ...(v?.ventana_con_oxigeno?.serie?.length ? [{ name: "Modelo desde que hay oxígeno medido", type: "line", showSymbol: false, color: "#1d4ed8", lineStyle: { width: 2, type: "dashed" }, data: v.ventana_con_oxigeno.serie }] : []),
             ],
         };
     }
@@ -454,7 +452,7 @@ const graficoEvolucion = computed(() => {
 const notaEvolucion = computed(() => ({
     [MODEL_CODES.svm]: "En azul, el oxígeno medido. En naranja, lo que el modelo prevé para la próxima hora. La línea roja punteada marca los 3 mg/L del umbral de alarma.",
     [MODEL_CODES.oxygen]: "En azul, el oxígeno medido hora a hora en los últimos 7 días. La línea naranja punteada es lo que el modelo esperaba para cada hora y la naranja continua, lo que espera para las próximas 24 horas. La línea roja marca los 3 mg/L del umbral de alarma.",
-    [MODEL_CODES.growth]: "Cada punto amarillo es un pez medido en la biometría y los naranjas, la longitud media del lote. La línea verde parte de la primera biometría y suma cada día lo que predice el modelo con la temperatura y el oxígeno reales de ese día; la morada punteada es Söderberg sola, sin el oxígeno.",
+    [MODEL_CODES.growth]: "Cada punto amarillo es un pez medido y los naranjas, el peso medio del lote; el primero es la siembra registrada. La línea verde parte de la siembra y avanza día a día con la temperatura, el oxígeno y las horas de luz reales. La azul punteada parte del peso medido cuando empiezan las lecturas válidas de oxígeno.",
     [MODEL_CODES.water]: "Clase que asigna el SVM a las lecturas limpias más recientes, con nitrato válido.",
 }[selectedCode.value] ?? ""));
 
@@ -471,7 +469,7 @@ const r2Catalogo = (codigo) => {
     if (v.r2 === null || v.r2 === undefined) return null;
     const titulo = {
         [MODEL_CODES.oxygen]: "R² del oxígeno esperado frente al medido, en horas de prueba",
-        [MODEL_CODES.growth]: "R² del crecimiento predicho frente al medido entre biometrías",
+        [MODEL_CODES.growth]: "R² del peso de cada pez medido frente al que predice el modelo",
     }[codigo] ?? "R² frente a lo medido";
     return { texto: `R² ${Number(v.r2).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, clase: tono(v.r2, 0.8, 0.5, 0.1), titulo };
 };

@@ -161,82 +161,106 @@ const graficoTemperatura = computed(() => {
     };
 });
 
-// ---------- crecimiento: predicho frente a medido, por tramo ----------
+// ---------- crecimiento: peso de cada pez, medido frente a predicho ----------
 const etiquetaTramo = (desde, hasta) => `${fechaCorta(desde)} a ${fechaCorta(hasta)}`;
-const graficoCrecimientoValidacion = computed(() => {
+const graficoPesoPeces = computed(() => {
     const d = props.datos;
-    if (!d?.puntos_validacion?.length) return null;
-    const todos = [...d.puntos_validacion, ...(d.puntos_soderberg ?? [])];
-    const hi = Math.ceil(Math.max(...todos.map((p) => Math.max(p[0], p[1]))) * 5) / 5 + 0.2;
+    if (!d?.puntos?.length || props.codigo !== "TILAPIA_GROWTH_TEMPERATURE") return null;
+    const hi = Math.ceil(Math.max(...d.puntos.map((p) => Math.max(p[0], p[1]))) / 20) * 20;
     const opciones = base(d.eje_x, d.eje_y);
-    const aPunto = (p) => ({ value: [p[0], p[1]], name: etiquetaTramo(p[2], p[3]) });
+    const fechas = [...new Set(d.puntos.map((p) => p[2]))];
+    const colores = ["#f59e0b", "#0ea5e9", "#16a34a", "#dc2626", "#7c3aed"];
     return {
         ...opciones,
+        grid: { ...opciones.grid, bottom: 84 },
         xAxis: { ...opciones.xAxis, min: 0, max: hi, scale: false },
         yAxis: { ...opciones.yAxis, min: 0, max: hi, scale: false },
-        tooltip: { trigger: "item", formatter: (p) => (p.seriesType === "scatter" ? `${p.seriesName}<br/>${p.name}<br/>Creció ${fmt(p.value[0])} mm/día<br/>Predice ${fmt(p.value[1])} mm/día` : p.seriesName) },
+        tooltip: { trigger: "item", formatter: (p) => (p.seriesType === "scatter" ? `${p.seriesName}<br/>Medido ${fmt(p.value[0], 1)} g<br/>Predicho ${fmt(p.value[1], 1)} g` : p.seriesName) },
         series: [
-            { name: "Predicción perfecta (predice = creció)", type: "line", showSymbol: false, color: GRIS, lineStyle: { type: "dashed", width: 1.5 }, data: [[0, 0], [hi, hi]] },
-            { name: "Söderberg sola", type: "scatter", symbol: "circle", symbolSize: 12, color: MORADO, itemStyle: { color: "#fff", borderColor: MORADO, borderWidth: 2 }, data: (d.puntos_soderberg ?? []).map(aPunto) },
-            {
-                name: "Con factor de oxígeno (el modelo)",
+            ...fechas.map((f, i) => ({
+                name: `Biometría del ${fechaCorta(f)}`,
                 type: "scatter",
-                symbolSize: 14,
+                symbolSize: 8,
+                color: colores[i % colores.length],
+                itemStyle: { opacity: 0.75, borderColor: "#fff", borderWidth: 1 },
+                data: d.puntos.filter((p) => p[2] === f).map((p) => [p[0], p[1]]),
+            })),
+            { name: "Predicción perfecta (predicho = medido)", type: "line", showSymbol: false, color: GRIS, lineStyle: { type: "dashed", width: 1.5 }, data: [[0, 0], [hi, hi]] },
+            { name: "Recta de regresión", type: "line", showSymbol: false, color: NARANJA, lineStyle: { width: 2.5 }, data: rectaSobre(d.recta, 0, hi) },
+        ],
+    };
+});
+
+// ---------- crecimiento por tramo ----------
+const graficoTramos = computed(() => {
+    const t = props.datos?.intervalos ?? [];
+    if (!t.length || props.codigo !== "TILAPIA_GROWTH_TEMPERATURE") return null;
+    const valores = t.flatMap((x) => [x.observado_g_dia, x.predicho_g_dia]);
+    const lo = Math.min(0, Math.floor(Math.min(...valores) * 2) / 2);
+    const hi = Math.ceil(Math.max(...valores) * 2) / 2 + 0.25;
+    const opciones = base("Crecimiento medido (g/día)", "Crecimiento que predice el modelo (g/día)");
+    const punto = (x) => ({ value: [x.observado_g_dia, x.predicho_g_dia], name: etiquetaTramo(x.desde, x.hasta) });
+    return {
+        ...opciones,
+        xAxis: { ...opciones.xAxis, min: lo, max: hi, scale: false },
+        yAxis: { ...opciones.yAxis, min: lo, max: hi, scale: false },
+        tooltip: { trigger: "item", formatter: (p) => (p.seriesType === "scatter" ? `${p.name}<br/>Creció ${fmt(p.value[0])} g/día<br/>Predice ${fmt(p.value[1])} g/día` : p.seriesName) },
+        series: [
+            { name: "Predicción perfecta", type: "line", showSymbol: false, color: GRIS, lineStyle: { type: "dashed", width: 1.5 }, data: [[lo, lo], [hi, hi]] },
+            {
+                name: "Tramo con oxígeno medido",
+                type: "scatter",
+                symbolSize: 15,
                 color: VERDE,
                 itemStyle: { borderColor: "#fff", borderWidth: 2 },
                 label: { show: true, position: "right", fontSize: 10, color: "#4b5563", formatter: (p) => p.name },
-                data: d.puntos_validacion.map(aPunto),
+                data: t.filter((x) => x.delta_medio !== null).map(punto),
+            },
+            {
+                name: "Tramo sin oxígeno válido (δ = 1)",
+                type: "scatter",
+                symbolSize: 13,
+                color: MORADO,
+                itemStyle: { color: "#fff", borderColor: MORADO, borderWidth: 2 },
+                label: { show: true, position: "left", fontSize: 10, color: "#6b7280", formatter: (p) => p.name },
+                data: t.filter((x) => x.delta_medio === null).map(punto),
             },
         ],
     };
 });
 
-// ---------- crecimiento: relacion con la temperatura ----------
-const graficoCrecimiento = computed(() => {
-    const d = props.datos;
-    if (!d?.linea_modelo?.length) return null;
-    const [dv0, dv1] = d.dominio_validado ?? [21, 30];
-    const tMin = d.linea_modelo[0][0];
-    const tMax = d.linea_modelo[d.linea_modelo.length - 1][0];
-    const opciones = base("Temperatura media del agua en el tramo (°C)", "Crecimiento diario en longitud (mm/día)");
-    const puntos = d.puntos_temperatura ?? [];
+// ---------- relacion del crecimiento con la temperatura y el oxigeno ----------
+const factorGrafico = (curva, dias, ejeX, nombreCurva, colorCurva, colorDias, bandas) => {
+    const opciones = base(ejeX, "Factor (0 = no crece, 1 = sin límite)");
     return {
         ...opciones,
-        xAxis: { ...opciones.xAxis, min: tMin, max: tMax, interval: 5, scale: false },
-        yAxis: { ...opciones.yAxis, min: 0, scale: false },
-        tooltip: {
-            trigger: "item",
-            formatter: (p) => (p.seriesType === "scatter"
-                ? `${p.seriesName}<br/>${p.name}<br/>${fmt(p.value[0], 1)} °C: ${fmt(p.value[1], 2)} mm/día`
-                : `Recta de Söderberg<br/>${fmt(p.value[0], 0)} °C: ${fmt(p.value[1], 2)} mm/día`),
-        },
+        grid: { top: 24, left: 36, right: 16, bottom: 64, containLabel: true },
+        yAxis: { ...opciones.yAxis, min: 0, max: 1.05, interval: 0.25, scale: false, nameGap: 38 },
+        xAxis: { ...opciones.xAxis, min: curva[0][0], max: curva[curva.length - 1][0], scale: false },
+        tooltip: { trigger: "item", formatter: (p) => (p.seriesType === "scatter" ? `${fmt(p.value[0], 1)} → factor ${fmt(p.value[1])}` : nombreCurva) },
         series: [
             {
-                name: "Recta de Söderberg (solo temperatura)",
+                name: nombreCurva,
                 type: "line",
                 showSymbol: false,
-                color: MORADO,
+                color: colorCurva,
                 lineStyle: { width: 2.5 },
-                data: d.linea_modelo,
-                markArea: {
-                    silent: true,
-                    itemStyle: { color: "rgba(124,58,237,0.07)" },
-                    label: { show: true, position: "insideTop", fontSize: 10, color: MORADO, formatter: `rango validado ${dv0}-${dv1} °C` },
-                    data: [[{ xAxis: dv0 }, { xAxis: dv1 }]],
-                },
+                data: curva,
+                markArea: bandas ? { silent: true, itemStyle: { color: "rgba(234,88,12,0.07)" }, label: { show: true, position: "insideTop", fontSize: 10, color: "#9a3412" }, data: bandas } : undefined,
             },
-            { name: "Con factor de oxígeno", type: "scatter", symbol: "diamond", symbolSize: 13, color: VERDE, data: puntos.map((p) => ({ value: [p[0], p[2]], name: etiquetaTramo(p[3], p[4]) })) },
-            {
-                name: "Crecimiento medido",
-                type: "scatter",
-                symbolSize: 13,
-                color: NARANJA,
-                itemStyle: { borderColor: "#fff", borderWidth: 2 },
-                label: { show: true, position: "left", fontSize: 10, color: "#4b5563", formatter: (p) => p.name },
-                data: puntos.map((p) => ({ value: [p[0], p[1]], name: etiquetaTramo(p[3], p[4]) })),
-            },
+            { name: "Cada día de la campaña", type: "scatter", symbolSize: 6, color: colorDias, itemStyle: { opacity: 0.55 }, data: dias },
         ],
     };
+};
+const graficoTau = computed(() => {
+    const d = props.datos;
+    if (!d?.curva_tau?.length) return null;
+    return factorGrafico(d.curva_tau, d.dias_temperatura ?? [], "Temperatura media del día (°C)", "τ(T), Yi (1998)", MORADO, AZUL, null);
+});
+const graficoDelta = computed(() => {
+    const d = props.datos;
+    if (!d?.curva_delta?.length) return null;
+    return factorGrafico(d.curva_delta, d.dias_oxigeno ?? [], "Oxígeno disuelto medio del día (mg/L)", "δ(OD), Informe 16", VERDE, NARANJA, [[{ xAxis: 3, name: "se frena" }, { xAxis: 5 }]]);
 });
 
 // ---------- calidad de agua: dependencia de cada variable ----------
@@ -268,18 +292,18 @@ const metrica = computed(() => {
     }
     const etiqueta = {
         OXYGEN_STATUS_MODEL: "R² en horas de prueba",
-        TILAPIA_GROWTH_TEMPERATURE: "R² del crecimiento entre biometrías",
+        TILAPIA_GROWTH_TEMPERATURE: "R² del peso de cada pez",
     }[props.codigo] ?? "R² frente a lo medido";
     return { etiqueta, valor: fmtFijo(d?.r2), juicio: lecturaR2(d?.r2) };
 });
 
-const unidadError = computed(() => (props.codigo === "TILAPIA_GROWTH_TEMPERATURE" ? "mm/día" : "mg/L"));
+const unidadError = computed(() => (props.codigo === "TILAPIA_GROWTH_TEMPERATURE" ? "g/día por tramo" : "mg/L"));
 const tramosConObservacion = computed(() => (props.datos?.intervalos ?? []).filter((i) => i.observacion && ((i.supervivencia_pct ?? 100) < 100 || (i.conversion_alimenticia ?? 0) > 3)));
 
 const contrastados = computed(() => {
     const d = props.datos;
     if (ES_CALIDAD.value) return { etiqueta: "Lecturas con nitrato válido", valor: fmt(d?.lecturas, 0) };
-    if (props.codigo === "TILAPIA_GROWTH_TEMPERATURE") return { etiqueta: "Intervalos entre biometrías", valor: fmt(d?.intervalos?.length, 0) };
+    if (props.codigo === "TILAPIA_GROWTH_TEMPERATURE") return { etiqueta: "Peces medidos", valor: fmt(d?.puntos_totales, 0) };
     if (props.codigo === "OXYGEN_STATUS_MODEL") return { etiqueta: "Horas de prueba", valor: fmt(d?.puntos_totales, 0) };
     return { etiqueta: "Puntos contrastados", valor: fmt(d?.puntos_totales, 0) };
 });
@@ -417,66 +441,93 @@ const contrastados = computed(() => {
 
                 <!-- crecimiento -->
                 <template v-else-if="codigo === 'TILAPIA_GROWTH_TEMPERATURE'">
-                    <p class="val__titulo">Crecimiento que predice el modelo frente al medido</p>
-                    <ChartFisheye v-if="graficoCrecimientoValidacion" :options="graficoCrecimientoValidacion" height="400px" />
+                    <template v-if="datos.ventana_con_oxigeno?.puntos?.length">
+                        <p class="val__titulo">Con oxígeno medido: la predicción sin ajustar nada</p>
+                        <p class="val__nota mt-0 mb-3">El modelo parte del peso medido el {{ fechaCorta(datos.ventana_con_oxigeno.desde) }} ({{ fmt(datos.ventana_con_oxigeno.peso_inicial_g, 1) }} g) y avanza día a día con la temperatura, el oxígeno y las horas de luz reales, sin volver a mirar los pesos.</p>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-row-dashed align-middle mb-0">
+                                <thead><tr class="text-gray-500 fs-8"><th>Biometría</th><th class="text-end">Peso medido</th><th class="text-end">Peso que predice el modelo</th><th class="text-end">Error</th></tr></thead>
+                                <tbody>
+                                    <tr v-for="x in datos.ventana_con_oxigeno.puntos" :key="x.fecha" class="val__fila-modelo">
+                                        <td class="fs-7">{{ fechaCorta(x.fecha) }}</td>
+                                        <td class="text-end fs-7 fw-bold">{{ fmt(x.medido_g, 1) }} g</td>
+                                        <td class="text-end fs-7 fw-bold val__verde">{{ fmt(x.predicho_g, 1) }} g</td>
+                                        <td class="text-end fs-7">{{ x.error_pct > 0 ? "+" : "" }}{{ fmt(x.error_pct, 1) }} %</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </template>
+
+                    <p class="val__titulo mt-6">Peso de cada pez medido frente al que predice el modelo, desde la siembra</p>
+                    <ChartFisheye v-if="graficoPesoPeces" :options="graficoPesoPeces" height="420px" />
+                    <div class="val__pie">
+                        <span>Recta de regresión <strong>{{ ecuacionRecta(datos.recta, "predicho", "medido") }}</strong></span>
+                        <span>R² de la recta <strong>{{ fmtFijo(datos.recta?.r2) }}</strong></span>
+                        <span>Correlación <strong>{{ fmtFijo(datos.recta?.pearson) }}</strong></span>
+                    </div>
+
                     <div class="table-responsive mt-4">
                         <table class="table table-sm table-row-dashed align-middle mb-0">
-                            <thead><tr class="text-gray-500 fs-8"><th>Modelo, sobre los mismos tramos entre biometrías</th><th class="text-end">R²</th><th class="text-end">Error medio (mm/día)</th></tr></thead>
+                            <thead><tr class="text-gray-500 fs-8"><th>Modelo, sobre los mismos peces y tramos</th><th class="text-end">R² del peso de cada pez</th><th class="text-end">R² del crecimiento por tramo</th><th class="text-end">Error medio por tramo</th></tr></thead>
                             <tbody>
                                 <tr v-for="(fila, i) in datos.comparacion" :key="fila.metodo" :class="{ 'val__fila-modelo': i === 0 }">
                                     <td class="fs-7">{{ fila.metodo }}</td>
-                                    <td class="text-end fs-7 fw-bold">{{ fmtFijo(fila.r2) }}</td>
-                                    <td class="text-end fs-7">{{ fmtFijo(fila.mae, 3) }}</td>
+                                    <td class="text-end fs-7 fw-bold">{{ fila.r2_peces === null ? "-" : fmtFijo(fila.r2_peces) }}</td>
+                                    <td class="text-end fs-7">{{ fmtFijo(fila.r2) }}</td>
+                                    <td class="text-end fs-7">{{ fila.mae === null ? "-" : fmtFijo(fila.mae, 2) + " g/día" }}</td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
 
-                    <p class="val__titulo mt-6">Relación con la temperatura</p>
-                    <ChartFisheye v-if="graficoCrecimiento" :options="graficoCrecimiento" height="400px" />
-                    <p class="val__nota mt-2">
-                        La recta morada es Söderberg, que solo mira la temperatura. Los rombos verdes son lo que predice el modelo con el oxígeno real de cada tramo, y los puntos naranjas lo que creció el lote.
-                        Por debajo de {{ fmt(datos.cero_de_la_recta_c, 1) }} °C la recta da valores negativos y un pez no encoge, por eso se dibuja en cero.
-                    </p>
+                    <p class="val__titulo mt-6">Relación del crecimiento con la temperatura y el oxígeno</p>
+                    <p class="val__nota mt-0 mb-3">Cada factor multiplica lo que el pez puede comer y asimilar. Las curvas son las del modelo y los puntos, los días reales de la campaña. En la franja naranja, entre 3 y 5 mg/L, el oxígeno ya frena el crecimiento; bajo 3 lo detiene.</p>
+                    <div class="val__rejilla">
+                        <div class="val__mini"><div class="val__mini-cab"><span>Factor de temperatura τ</span></div><ChartFisheye v-if="graficoTau" :options="graficoTau" height="300px" /></div>
+                        <div class="val__mini"><div class="val__mini-cab"><span>Factor de oxígeno δ</span></div><ChartFisheye v-if="graficoDelta" :options="graficoDelta" height="300px" /></div>
+                    </div>
 
+                    <p class="val__titulo mt-6">Crecimiento por tramo, partiendo del peso medido al inicio de cada tramo</p>
+                    <ChartFisheye v-if="graficoTramos" :options="graficoTramos" height="380px" />
                     <div class="table-responsive mt-4">
                         <table class="table table-sm table-row-dashed align-middle mb-0">
                             <thead>
                                 <tr class="text-gray-500 fs-8">
-                                    <th>Tramo entre biometrías</th>
+                                    <th>Tramo</th>
                                     <th class="text-end">Días</th>
-                                    <th class="text-end">Temperatura</th>
+                                    <th class="text-end">Peso</th>
+                                    <th class="text-end">Temperatura (τ)</th>
                                     <th class="text-end">Oxígeno medio</th>
-                                    <th class="text-end">δ medio</th>
-                                    <th class="text-end">pH medio</th>
+                                    <th class="text-end">δ</th>
+                                    <th class="text-end">pH</th>
                                     <th class="text-end">Creció</th>
-                                    <th class="text-end">Söderberg sola</th>
-                                    <th class="text-end">Con δ</th>
+                                    <th class="text-end">Predice</th>
                                     <th class="text-end">Supervivencia</th>
                                     <th class="text-end">Conversión</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr v-for="i in datos.intervalos" :key="i.desde">
-                                    <td class="fs-7">{{ fechaCorta(i.desde) }} a {{ fechaCorta(i.hasta) }}</td>
+                                    <td class="fs-7">{{ fechaCorta(i.desde) }} a {{ fechaCorta(i.hasta) }}<span v-if="i.inicio_es_siembra" class="text-gray-500"> (siembra)</span></td>
                                     <td class="text-end fs-7">{{ i.dias }}</td>
-                                    <td class="text-end fs-7">{{ fmt(i.temperatura_media, 1) }} °C</td>
+                                    <td class="text-end fs-7">{{ fmt(i.peso_inicial_g, 1) }} → {{ fmt(i.peso_final_g, 1) }} g</td>
+                                    <td class="text-end fs-7">{{ fmt(i.temperatura_media, 1) }} °C ({{ fmtFijo(i.tau_medio) }})</td>
                                     <td class="text-end fs-7">
                                         <template v-if="i.oxigeno_medio !== null">{{ fmt(i.oxigeno_medio) }} mg/L <span class="text-gray-500">({{ fmt(i.pct_oxigeno_bajo_3, 0) }} % bajo 3)</span></template>
                                         <span v-else class="text-gray-500">sin lecturas válidas</span>
                                     </td>
                                     <td class="text-end fs-7">{{ i.delta_medio === null ? "1 (supuesto)" : fmtFijo(i.delta_medio) }}</td>
                                     <td class="text-end fs-7">{{ fmt(i.ph_medio, 1) }}</td>
-                                    <td class="text-end fs-7 fw-bold">{{ fmtFijo(i.observado_mm_dia) }}</td>
-                                    <td class="text-end fs-7">{{ fmtFijo(i.soderberg_mm_dia) }}</td>
-                                    <td class="text-end fs-7 fw-bold val__verde">{{ fmtFijo(i.corregido_mm_dia) }}</td>
+                                    <td class="text-end fs-7 fw-bold">{{ fmtFijo(i.observado_g_dia) }}</td>
+                                    <td class="text-end fs-7 fw-bold val__verde">{{ fmtFijo(i.predicho_g_dia) }}</td>
                                     <td class="text-end fs-7">{{ i.supervivencia_pct === null ? "-" : fmt(i.supervivencia_pct, 1) + " %" }}</td>
                                     <td class="text-end fs-7" :class="{ 'val__r2--mal': (i.conversion_alimenticia ?? 0) > 3 }">{{ fmt(i.conversion_alimenticia, 1) }}</td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
-                    <p class="val__nota">Crecimiento en mm/día. δ es el factor de oxígeno de cada día promediado en el tramo; sin lecturas válidas de oxígeno se toma 1. Supervivencia y conversión alimenticia son las que registró cada biometría.</p>
+                    <p class="val__nota">Crecimiento en g/día. Supervivencia y conversión alimenticia son las que registró cada biometría. Parámetros fijos del modelo: alimentación a saciedad (f = 1) y factor de amoníaco 1, porque no hay sensor de amoníaco.</p>
                     <div v-for="i in tramosConObservacion" :key="'obs' + i.hasta" class="val__observacion">
                         <strong>Observación de la biometría del {{ fechaCorta(i.hasta) }}:</strong> {{ i.observacion }}
                     </div>
