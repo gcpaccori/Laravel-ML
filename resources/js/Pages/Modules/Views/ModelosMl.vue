@@ -247,13 +247,13 @@ const FICHA = {
         pregunta: "Cuántos gramos debería ganar el pez al día con su peso, la temperatura y el oxígeno que tiene el estanque",
         tipo: "Modelo bioenergético de crecimiento (Yi, 1998)",
         familia: "Balance entre lo que el pez asimila y lo que gasta; parámetros publicados, sin ajuste con datos del estanque",
-        calcula: "Crecimiento diario en peso",
-        unidad: "g/día",
+        calcula: "Crecimiento diario en peso; la talla se obtiene del peso",
+        unidad: "g/día y mm",
         horizonte: "Diario, acumulado desde la siembra",
         entradas: ["Peso del pez", "Temperatura media del día", "Oxígeno disuelto del día", "Horas de luz"],
         formula: "dW/dt = 0,233 · ρ · τ(T) · δ(OD) · W^0,67 − 0,00133 · e^(0,0132·(T − 24)) · W^0,81;   δ = 1 si OD > 5,  (OD − 3) ÷ 2 entre 3 y 5,  0 si OD < 3 mg/L;   τ = e^(−4,6·((33 − T) ÷ 9)^4) bajo 33 °C;   ρ = horas de luz ÷ 12",
         fuente: "Informe 16 (febrero de 2026), ecuaciones 12 a 17: modelo de crecimiento de Yi (1998) para tilapia del Nilo, como diferencia entre anabolismo y catabolismo. Coeficientes de Yi tal como los tabulan Chahid et al. (2021): h = 0,8; b = 0,62; a = 0,53; m = 0,67; n = 0,81; kmin = 0,00133; j = 0,0132; temperaturas mínima 24, óptima 33 y máxima 40 °C. El producto h·b(1−a) = 0,233 coincide con el 0,2919 × 0,81 = 0,236 de la tabla 1 del Informe 16, de donde salen también los umbrales de oxígeno (crítico 5 y mínimo 3 mg/L, Khater et al., 2021). Horas de luz con el modelo de Forsythe et al. (1995) para la latitud de Lima.",
-        evolucion: "Peso de cada pez medido y el que predice el modelo",
+        evolucion: "Peso y talla de cada pez medido, y lo que predice el modelo",
     },
     [MODEL_CODES.water]: {
         nombre: "Calidad de agua",
@@ -410,22 +410,40 @@ const graficoEvolucion = computed(() => {
         };
     }
     case MODEL_CODES.growth: {
+        // Peso (eje izquierdo) y talla (eje derecho) en el mismo grafico: el
+        // modelo calcula peso; la talla sale de la relacion peso-talla medida.
         const modelo = v?.serie_peso_modelo ?? [];
-        const medias = (v?.medias ?? []).filter((x) => x.medido).map((x) => [x.fecha, x.peso_g]);
+        const medias = v?.medias ?? [];
         if (!modelo.length || !medias.length) return null;
-        const siembra = (v?.medias ?? []).find((x) => !x.medido);
         const opciones = ejeTiempo("Peso del pez (g)");
         const formatoDia = (val) => new Date(val).toLocaleDateString("es-PE", { day: "numeric", month: "short" });
+        const ejeY = (nombre, color, extra = {}) => ({
+            type: "value",
+            name: nombre,
+            nameLocation: "middle",
+            nameGap: 44,
+            nameTextStyle: { color, fontSize: 12, fontWeight: 600 },
+            axisLabel: { color, formatter: (x) => num(x, 0) },
+            min: 0,
+            splitLine: { lineStyle: { color: "#f1f5f9" } },
+            ...extra,
+        });
+        const PESO = "#ea580c";
+        const TALLA = "#2563eb";
         return {
             ...opciones,
+            grid: { top: 24, left: 40, right: 44, bottom: 84, containLabel: true },
             xAxis: { ...opciones.xAxis, axisLabel: { color: "#6b7280", hideOverlap: true, formatter: formatoDia } },
-            yAxis: { ...opciones.yAxis, min: 0, scale: false },
-            tooltip: { trigger: "item", formatter: (p) => `${p.seriesName}<br/>${formatoDia(p.value[0])}: ${num(p.value[1], 1)} g` },
+            yAxis: [ejeY("Peso (g)", PESO), ejeY("Talla (mm)", TALLA, { splitLine: { show: false } })],
+            tooltip: { trigger: "item", formatter: (p) => `${p.seriesName}<br/>${formatoDia(p.value[0])}: ${num(p.value[1], 1)} ${p.seriesName.toLowerCase().includes("talla") ? "mm" : "g"}` },
             series: [
-                { name: "Cada pez medido", type: "scatter", symbolSize: 6, color: "#f59e0b", itemStyle: { opacity: 0.45 }, data: v?.peces ?? [] },
-                { name: "Peso medio medido", type: "scatter", symbolSize: 13, color: "#ea580c", itemStyle: { borderColor: "#fff", borderWidth: 2 }, data: siembra ? [[siembra.fecha, siembra.peso_g], ...medias] : medias },
-                { name: "Modelo desde la siembra", type: "line", showSymbol: false, color: "#0d9488", lineStyle: { width: 2.5 }, data: modelo },
-                ...(v?.ventana_con_oxigeno?.serie?.length ? [{ name: "Modelo desde que hay oxígeno medido", type: "line", showSymbol: false, color: "#1d4ed8", lineStyle: { width: 2, type: "dashed" }, data: v.ventana_con_oxigeno.serie }] : []),
+                { name: "Peso de cada pez", type: "scatter", yAxisIndex: 0, symbolSize: 6, color: "#fdba74", itemStyle: { opacity: 0.6 }, data: v?.peces ?? [] },
+                { name: "Peso medio medido", type: "scatter", yAxisIndex: 0, symbolSize: 13, color: PESO, itemStyle: { borderColor: "#fff", borderWidth: 2 }, data: medias.map((m) => [m.fecha, m.peso_g]) },
+                { name: "Peso según el modelo (Yi)", type: "line", yAxisIndex: 0, showSymbol: false, color: PESO, lineStyle: { width: 2.5 }, data: modelo },
+                { name: "Talla de cada pez", type: "scatter", yAxisIndex: 1, symbol: "diamond", symbolSize: 6, color: "#93c5fd", itemStyle: { opacity: 0.6 }, data: v?.peces_talla ?? [] },
+                { name: "Talla media medida", type: "scatter", yAxisIndex: 1, symbol: "diamond", symbolSize: 14, color: TALLA, itemStyle: { borderColor: "#fff", borderWidth: 2 }, data: medias.map((m) => [m.fecha, m.talla_mm]) },
+                { name: "Talla según el modelo (Yi, vía peso–talla)", type: "line", yAxisIndex: 1, showSymbol: false, color: TALLA, lineStyle: { width: 2.5 }, data: v?.serie_talla_modelo ?? [] },
+                { name: "Talla según Söderberg (solo temperatura)", type: "line", yAxisIndex: 1, showSymbol: false, color: "#7c3aed", lineStyle: { width: 1.5, type: "dashed" }, data: v?.serie_talla_soderberg ?? [] },
             ],
         };
     }
@@ -452,7 +470,7 @@ const graficoEvolucion = computed(() => {
 const notaEvolucion = computed(() => ({
     [MODEL_CODES.svm]: "En azul, el oxígeno medido. En naranja, lo que el modelo prevé para la próxima hora. La línea roja punteada marca los 3 mg/L del umbral de alarma.",
     [MODEL_CODES.oxygen]: "En azul, el oxígeno medido hora a hora en los últimos 7 días. La línea naranja punteada es lo que el modelo esperaba para cada hora y la naranja continua, lo que espera para las próximas 24 horas. La línea roja marca los 3 mg/L del umbral de alarma.",
-    [MODEL_CODES.growth]: "Cada punto amarillo es un pez medido y los naranjas, el peso medio del lote; el primero es la siembra registrada. La línea verde parte de la siembra y avanza día a día con la temperatura, el oxígeno y las horas de luz reales. La azul punteada parte del peso medido cuando empiezan las lecturas válidas de oxígeno.",
+    [MODEL_CODES.growth]: "Peso en naranja (eje izquierdo, gramos) y talla en azul (eje derecho, milímetros). Los puntos pequeños son cada pez medido y los grandes, el promedio de cada biometría; el primero es la siembra registrada, 1 g, cuya talla de 37 mm se calcula con la relación peso–talla del estanque. El modelo calcula el peso día a día desde la siembra y la talla sale de ese peso. La línea morada punteada es la recta de Söderberg, que calcula talla solo con la temperatura.",
     [MODEL_CODES.water]: "Clase que asigna el SVM a las lecturas limpias más recientes, con nitrato válido.",
 }[selectedCode.value] ?? ""));
 

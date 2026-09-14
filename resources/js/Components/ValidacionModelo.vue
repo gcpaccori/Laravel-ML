@@ -191,6 +191,35 @@ const graficoPesoPeces = computed(() => {
     };
 });
 
+// ---------- relacion peso-talla de los peces medidos ----------
+const graficoAlometria = computed(() => {
+    const a = props.datos?.alometria;
+    if (!a?.puntos?.length) return null;
+    const fechas = [...new Set(a.puntos.map((p) => p[2]))];
+    const colores = ["#f59e0b", "#0ea5e9", "#16a34a", "#dc2626", "#7c3aed"];
+    const opciones = base("Talla (mm)", "Peso (g)");
+    return {
+        ...opciones,
+        grid: { ...opciones.grid, bottom: 84 },
+        xAxis: { ...opciones.xAxis, min: a.curva[0][0], max: a.curva[a.curva.length - 1][0], scale: false },
+        yAxis: { ...opciones.yAxis, min: 0, scale: false },
+        tooltip: { trigger: "item", formatter: (p) => (p.seriesType === "scatter" ? `${p.seriesName}<br/>${fmt(p.value[0], 1)} mm, ${fmt(p.value[1], 1)} g` : p.seriesName) },
+        series: [
+            ...fechas.map((f, i) => ({
+                name: `Biometría del ${fechaCorta(f)}`,
+                type: "scatter",
+                symbolSize: 8,
+                color: colores[i % colores.length],
+                itemStyle: { opacity: 0.8, borderColor: "#fff", borderWidth: 1 },
+                data: a.puntos.filter((p) => p[2] === f).map((p) => [p[0], p[1]]),
+            })),
+            { name: "Ajuste del estanque", type: "line", showSymbol: false, smooth: true, color: NARANJA, lineStyle: { width: 2.5 }, data: a.curva },
+            { name: "Söderberg, Informe 17 (1,861 × 10⁻⁵)", type: "line", showSymbol: false, smooth: true, color: GRIS, lineStyle: { width: 1.5, type: "dashed" }, data: a.curva_informe17 },
+        ],
+    };
+});
+const maximoPosible = computed(() => (props.datos?.comparacion ?? []).find((c) => c.mide === "referencia") ?? null);
+
 // ---------- crecimiento por tramo ----------
 const graficoTramos = computed(() => {
     const t = props.datos?.intervalos ?? [];
@@ -332,6 +361,7 @@ const contrastados = computed(() => {
                         <small>{{ metrica.etiqueta }}</small>
                         <strong :class="'val__r2--' + metrica.juicio.tono">{{ metrica.valor }}</strong>
                         <span :class="'val__r2--' + metrica.juicio.tono">{{ metrica.juicio.texto }}</span>
+                        <span v-if="codigo === 'TILAPIA_GROWTH_TEMPERATURE' && maximoPosible" class="val__dato-pie">de un máximo posible de {{ fmtFijo(maximoPosible.r2_peces) }}</span>
                     </div>
                     <div v-if="datos.mae !== undefined" class="val__dato">
                         <small>Error medio</small>
@@ -469,17 +499,85 @@ const contrastados = computed(() => {
 
                     <div class="table-responsive mt-4">
                         <table class="table table-sm table-row-dashed align-middle mb-0">
-                            <thead><tr class="text-gray-500 fs-8"><th>Modelo, sobre los mismos peces y tramos</th><th class="text-end">R² del peso de cada pez</th><th class="text-end">R² del crecimiento por tramo</th><th class="text-end">Error medio por tramo</th></tr></thead>
+                            <thead>
+                                <tr class="text-gray-500 fs-8">
+                                    <th>Modelo, desde la siembra y sobre los mismos 80 peces</th>
+                                    <th>Calcula</th>
+                                    <th class="text-end">R² del peso de cada pez</th>
+                                    <th class="text-end">R² de la talla de cada pez</th>
+                                    <th class="text-end">R² por tramo</th>
+                                    <th class="text-end">Error medio por tramo</th>
+                                </tr>
+                            </thead>
                             <tbody>
-                                <tr v-for="(fila, i) in datos.comparacion" :key="fila.metodo" :class="{ 'val__fila-modelo': i === 0 }">
+                                <tr v-for="(fila, i) in datos.comparacion" :key="fila.metodo" :class="{ 'val__fila-modelo': i === 0, 'val__fila-ref': fila.mide === 'referencia' }">
                                     <td class="fs-7">{{ fila.metodo }}</td>
-                                    <td class="text-end fs-7 fw-bold">{{ fila.r2_peces === null ? "-" : fmtFijo(fila.r2_peces) }}</td>
-                                    <td class="text-end fs-7">{{ fmtFijo(fila.r2) }}</td>
-                                    <td class="text-end fs-7">{{ fila.mae === null ? "-" : fmtFijo(fila.mae, 2) + " g/día" }}</td>
+                                    <td class="fs-7 text-gray-600">{{ fila.mide === "referencia" ? "-" : fila.mide }}</td>
+                                    <td class="text-end fs-7" :class="{ 'fw-bold': fila.mide !== 'talla' }">{{ fila.r2_peces === null ? "-" : fmtFijo(fila.r2_peces) }}</td>
+                                    <td class="text-end fs-7" :class="{ 'fw-bold': fila.mide !== 'peso' }">{{ fila.r2_talla === null ? "-" : fmtFijo(fila.r2_talla) }}</td>
+                                    <td class="text-end fs-7">{{ fila.r2 === null ? "-" : fmtFijo(fila.r2) }}</td>
+                                    <td class="text-end fs-7">{{ fila.mae === null ? "-" : fmtFijo(fila.mae, 2) + " " + fila.unidad_tramo }}</td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
+                    <p class="val__nota">Yi calcula peso y su talla se obtiene con la relación peso–talla del estanque; Söderberg calcula talla y su peso se obtiene con la misma relación. Así los dos se comparan en peso y en talla. La última fila es el techo: dentro de una misma biometría los peces miden y pesan distinto, y ningún modelo del lote puede predecir esa diferencia.</p>
+
+                    <template v-if="datos.biometrias?.length">
+                        <p class="val__titulo mt-6">Biometrías registradas en la base de datos</p>
+                        <p class="val__nota mt-0 mb-3">Tabla <code>biometrias</code> y su detalle pez por pez en <code>biometria_detalles</code> (peso en gramos, talla guardada en centímetros y mostrada aquí en milímetros).</p>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-row-dashed align-middle mb-0">
+                                <thead>
+                                    <tr class="text-gray-500 fs-8">
+                                        <th>Fecha</th>
+                                        <th class="text-end">Peces medidos</th>
+                                        <th class="text-end">Talla media</th>
+                                        <th class="text-end">Peso medio</th>
+                                        <th class="text-end">Factor de condición K</th>
+                                        <th class="text-end">Peces en estanque</th>
+                                        <th class="text-end">Biomasa</th>
+                                        <th class="text-end">Alimento</th>
+                                        <th class="text-end">Conversión</th>
+                                        <th class="text-end">Tasa guardada</th>
+                                        <th class="text-end">Tasa por pez</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="b in datos.biometrias" :key="b.fecha">
+                                        <td class="fs-7">{{ fechaCorta(b.fecha) }}</td>
+                                        <td class="text-end fs-7">{{ b.peces_medidos }}</td>
+                                        <td class="text-end fs-7">{{ fmt(b.talla_media_mm, 1) }} ± {{ fmt(b.talla_de_mm, 1) }} mm</td>
+                                        <td class="text-end fs-7">{{ fmt(b.peso_medio_g, 1) }} ± {{ fmt(b.peso_de_g, 1) }} g</td>
+                                        <td class="text-end fs-7">{{ fmtFijo(b.factor_condicion) }}</td>
+                                        <td class="text-end fs-7">{{ fmt(b.peces_en_estanque, 0) }}</td>
+                                        <td class="text-end fs-7">{{ fmt(b.biomasa_kg, 1) }} kg</td>
+                                        <td class="text-end fs-7">{{ fmt(b.alimento_kg, 1) }} kg</td>
+                                        <td class="text-end fs-7" :class="{ 'val__r2--mal': (b.conversion_alimenticia ?? 0) > 3 }">{{ fmt(b.conversion_alimenticia, 2) }}</td>
+                                        <td class="text-end fs-7">{{ fmt(b.tasa_guardada_g_dia, 3) }} g/día</td>
+                                        <td class="text-end fs-7 fw-bold" :class="{ 'val__r2--mal': b.tasa_guardada_g_dia !== null && b.tasa_por_pez_g_dia !== null && Math.abs(b.tasa_guardada_g_dia - b.tasa_por_pez_g_dia) > 0.02 }">{{ fmt(b.tasa_por_pez_g_dia, 3) }} g/día</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="val__nota">
+                            Los promedios guardados coinciden con el detalle de cada pez. K = 100 × peso ÷ talla³ (g y cm, Informe 18). La tasa guardada del {{ fechaCorta(datos.biometrias.at(-1).fecha) }} sale de la biomasa y descuenta los peces muertos;
+                            la tasa por pez es lo que ganó en promedio cada pez, y es la que usa el modelo.
+                        </p>
+
+                        <p class="val__titulo mt-6">Relación peso–talla de los peces medidos</p>
+                        <ChartFisheye v-if="graficoAlometria" :options="graficoAlometria" height="380px" />
+                        <div class="val__pie">
+                            <span>Ajuste del estanque <strong>W = {{ fmt(datos.alometria.a * 1e5, 3) }} × 10⁻⁵ × L^{{ fmt(datos.alometria.b, 3) }}</strong></span>
+                            <span>R² <strong>{{ fmtFijo(datos.alometria.r2) }}</strong></span>
+                            <span>Peces <strong>{{ datos.alometria.n }}</strong></span>
+                        </div>
+                        <p class="val__nota">
+                            W en gramos y L en milímetros. El exponente sale 3: los peces crecen proporcionados, como supone la ecuación 2 del Informe 17.
+                            En el informe el coeficiente aparece como 1,861 × 10⁻⁸; con L en milímetros ese valor da el peso en kilogramos (un pez de 200 mm, 0,149 kg), así que en gramos es 1,861 × 10⁻⁵, la línea gris.
+                            Los peces de este estanque pesan un {{ fmt((datos.alometria.a_con_b3 / 1.861e-5 - 1) * 100, 0) }} % más que los de Söderberg a igual talla.
+                        </p>
+                    </template>
 
                     <p class="val__titulo mt-6">Relación del crecimiento con la temperatura y el oxígeno</p>
                     <p class="val__nota mt-0 mb-3">Cada factor multiplica lo que el pez puede comer y asimilar. Las curvas son las del modelo y los puntos, los días reales de la campaña. En la franja naranja, entre 3 y 5 mg/L, el oxígeno ya frena el crecimiento; bajo 3 lo detiene.</p>
@@ -497,12 +595,15 @@ const contrastados = computed(() => {
                                     <th>Tramo</th>
                                     <th class="text-end">Días</th>
                                     <th class="text-end">Peso</th>
+                                    <th class="text-end">Talla</th>
                                     <th class="text-end">Temperatura (τ)</th>
                                     <th class="text-end">Oxígeno medio</th>
                                     <th class="text-end">δ</th>
                                     <th class="text-end">pH</th>
                                     <th class="text-end">Creció</th>
-                                    <th class="text-end">Predice</th>
+                                    <th class="text-end">Predice Yi</th>
+                                    <th class="text-end">Creció en talla</th>
+                                    <th class="text-end">Predice Söderberg</th>
                                     <th class="text-end">Supervivencia</th>
                                     <th class="text-end">Conversión</th>
                                 </tr>
@@ -512,6 +613,7 @@ const contrastados = computed(() => {
                                     <td class="fs-7">{{ fechaCorta(i.desde) }} a {{ fechaCorta(i.hasta) }}<span v-if="i.inicio_es_siembra" class="text-gray-500"> (siembra)</span></td>
                                     <td class="text-end fs-7">{{ i.dias }}</td>
                                     <td class="text-end fs-7">{{ fmt(i.peso_inicial_g, 1) }} → {{ fmt(i.peso_final_g, 1) }} g</td>
+                                    <td class="text-end fs-7">{{ fmt(i.talla_inicial_mm, 0) }} → {{ fmt(i.talla_final_mm, 0) }} mm</td>
                                     <td class="text-end fs-7">{{ fmt(i.temperatura_media, 1) }} °C ({{ fmtFijo(i.tau_medio) }})</td>
                                     <td class="text-end fs-7">
                                         <template v-if="i.oxigeno_medio !== null">{{ fmt(i.oxigeno_medio) }} mg/L <span class="text-gray-500">({{ fmt(i.pct_oxigeno_bajo_3, 0) }} % bajo 3)</span></template>
@@ -521,13 +623,15 @@ const contrastados = computed(() => {
                                     <td class="text-end fs-7">{{ fmt(i.ph_medio, 1) }}</td>
                                     <td class="text-end fs-7 fw-bold">{{ fmtFijo(i.observado_g_dia) }}</td>
                                     <td class="text-end fs-7 fw-bold val__verde">{{ fmtFijo(i.predicho_g_dia) }}</td>
+                                    <td class="text-end fs-7">{{ fmtFijo(i.observado_mm_dia) }}</td>
+                                    <td class="text-end fs-7">{{ fmtFijo(i.soderberg_mm_dia) }}</td>
                                     <td class="text-end fs-7">{{ i.supervivencia_pct === null ? "-" : fmt(i.supervivencia_pct, 1) + " %" }}</td>
                                     <td class="text-end fs-7" :class="{ 'val__r2--mal': (i.conversion_alimenticia ?? 0) > 3 }">{{ fmt(i.conversion_alimenticia, 1) }}</td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
-                    <p class="val__nota">Crecimiento en g/día. Supervivencia y conversión alimenticia son las que registró cada biometría. Parámetros fijos del modelo: alimentación a saciedad (f = 1) y factor de amoníaco 1, porque no hay sensor de amoníaco.</p>
+                    <p class="val__nota">Crecimiento en peso en g/día y en talla en mm/día. La talla de la siembra (37 mm) se calcula del peso de 1 g con la relación peso–talla del estanque. Supervivencia y conversión alimenticia son las que registró cada biometría. Parámetros fijos del modelo: alimentación a saciedad (f = 1) y factor de amoníaco 1, porque no hay sensor de amoníaco.</p>
                     <div v-for="i in tramosConObservacion" :key="'obs' + i.hasta" class="val__observacion">
                         <strong>Observación de la biometría del {{ fechaCorta(i.hasta) }}:</strong> {{ i.observacion }}
                     </div>
@@ -610,6 +714,7 @@ const contrastados = computed(() => {
 .val__pie strong { color: #1f2937; }
 .val__fila-modelo td { background: #f5f7ff; }
 .val__verde { color: #0f766e; }
+.val__fila-ref td { color: #6b7280; font-style: italic; }
 .val__observacion { font-size: 12px; line-height: 1.6; color: #7c2d12; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; padding: 10px 12px; margin-top: 10px; white-space: pre-line; }
 .val__punto { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; vertical-align: middle; }
 .val__matriz th, .val__matriz td { border-bottom: 1px solid #f1f5f9; }
