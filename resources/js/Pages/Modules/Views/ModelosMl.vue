@@ -7,11 +7,11 @@ import {
     Odometer,
     RefreshRight,
     SetUp,
-    Sunny,
     TrendCharts,
 } from "@element-plus/icons-vue";
 import ChartFisheye from "@/Components/ChartFisheye.vue";
 import LatexFormula from "@/Components/LatexFormula.vue";
+import ValidacionModelo from "@/Components/ValidacionModelo.vue";
 
 defineProps({
     title: String,
@@ -26,56 +26,48 @@ const MODEL_CODES = {
     oxygen: "OXYGEN_STATUS_MODEL",
     growth: "TILAPIA_GROWTH_TEMPERATURE",
     water: "WATER_QUALITY_INDEX_ICA",
-    light: "LIGHT_FEED_RESPONSE_CLASSIFIER_V1",
 };
 
 const catalog = [
     {
         code: MODEL_CODES.svm,
-        name: "SVM/SVR: proyeccion de OD",
-        description: "Modelo de regresion SVM que anticipa el oxigeno disuelto de la proxima hora con la serie real de sensores.",
-        importance: "Ayuda a observar cambios de oxigeno antes de que afecten a los peces.",
-        inputs: ["Temperatura", "pH", "OD", "Ion nitrato", "Historial temporal"],
+        name: "Proyeccion de oxigeno disuelto",
+        description: "Anticipa el oxigeno disuelto de la proxima hora a partir de la serie real de sensores, ya limpia de rachas de sensor atascado.",
+        importance: "Da margen para airear antes de que el oxigeno caiga por debajo de lo que toleran los peces.",
+        inputs: ["Oxigeno disuelto", "Temperatura", "pH", "Hora del dia"],
         horizon: "1 hora",
-        modelType: "IA entrenada - SVM de regresion",
+        modelType: "Gradient boosting sobre el cambio de oxigeno",
         icon: DataAnalysis,
     },
     {
         code: MODEL_CODES.oxygen,
         name: "Estado de oxigeno",
-        description: "Calcula la saturacion y el deficit de oxigeno del agua.",
-        importance: "Muestra cuan cerca esta el estanque de la capacidad de oxigeno que permite su temperatura.",
+        description: "Compara el oxigeno medido con la saturacion que admite el agua a su temperatura.",
+        importance: "Separa lo que depende de la fisica del agua de lo que depende de los peces, la aireacion y el biofloc.",
         inputs: ["Temperatura", "Oxigeno disuelto"],
         horizon: "Lectura actual",
+        modelType: "Ecuacion fisica de solubilidad (Benson-Krause)",
         icon: Odometer,
     },
     {
         code: MODEL_CODES.growth,
         name: "Crecimiento de tilapia",
-        description: "Proyecta la ganancia de longitud y peso desde la biometria real del estanque.",
-        importance: "Permite revisar la evolucion esperada del lote y su biometria de referencia.",
+        description: "Estima el crecimiento diario en longitud a partir de la temperatura del agua, y lo contrasta con las biometrias reales.",
+        importance: "Permite ver si el lote crece lo que su temperatura permite o si algo mas lo esta frenando.",
         inputs: ["Temperatura", "Biometria real"],
         horizon: "1 a 365 dias",
+        modelType: "Regresion lineal simple (Soderberg)",
         icon: TrendCharts,
     },
     {
         code: MODEL_CODES.water,
         name: "Calidad de agua",
-        description: "Resume temperatura, pH, oxigeno disuelto e ion nitrato en un indice ICA.",
-        importance: "Da una lectura unica y explicable de la condicion actual del agua.",
+        description: "Clasifica la calidad del agua con una maquina de vectores de soporte a partir de temperatura, pH, oxigeno y nitrato.",
+        importance: "Muestra de que variable depende realmente la calidad del agua en este estanque.",
         inputs: ["Temperatura", "pH", "OD", "Ion nitrato"],
         horizon: "Lectura actual",
+        modelType: "Maquina de vectores de soporte (SVC, nucleo RBF)",
         icon: Connection,
-    },
-    {
-        code: MODEL_CODES.light,
-        name: "Luz y respuesta alimentaria",
-        description: "Prepara la estimacion de respuesta al alimento a partir de luz subacuatica, fotoperiodo y contexto del agua.",
-        importance: "Permitira relacionar el ambiente luminoso con la actividad alimentaria sin confundir un escenario manual con una prediccion entrenada.",
-        inputs: ["Luz subacuatica", "Fotoperiodo", "Hora", "OD", "Temperatura", "Racion", "Respuesta observada"],
-        horizon: "Siguiente evento de alimentacion",
-        modelType: "Modelo planificado - requiere datos del sensor",
-        icon: Sunny,
     },
 ];
 
@@ -210,6 +202,41 @@ const loadModelos = async () => {
     }
 };
 
+// Validacion de los modelos contra lo medido. Se pide una vez: el calculo
+// recorre todo el historico y tarda, y no cambia de un minuto a otro.
+const validacion = ref(null);
+const cargarValidacion = async () => {
+    try {
+        const { data } = await axios.get(route("monitoreo.modelosmls.validacion"), {
+            params: { piscina_id: form.value.piscina_id },
+            timeout: 150000,
+        });
+        validacion.value = data;
+    } catch (error) {
+        validacion.value = {
+            disponible: false,
+            motivo: error?.response?.data?.motivo ?? "La validacion todavia se esta calculando.",
+        };
+    }
+};
+const validacionDe = (codigo) => validacion.value?.modelos?.[codigo] ?? null;
+
+// Cada modelo ensena una sola formula. El backend del crecimiento devolvia la
+// recta de Soderberg y la ley peso-longitud juntas, que son dos modelos
+// distintos; y el de oxigeno seguia describiendo la SVR que ya no se usa.
+const formulaDe = (modelo) => {
+    if (modelo?.code === MODEL_CODES.growth) {
+        return "Crecimiento diario en longitud (mm/dia) = -1,6707 + 0,09682 x temperatura (C)";
+    }
+    if (modelo?.code === MODEL_CODES.svm) {
+        return "OD(t + 1 h) = OD(t) + GB( OD reciente, dOD/dt, deficit de saturacion, hora del dia, T, pH )";
+    }
+    if (modelo?.code === MODEL_CODES.water) {
+        return "Clase = SVC-RBF( T, pH, OD, NO3 )";
+    }
+    return modelo?.formula?.expression ?? "";
+};
+
 const scheduleReload = () => {
     clearTimeout(reloadTimer.value);
     reloadTimer.value = setTimeout(loadModelos, 250);
@@ -230,10 +257,6 @@ const openModelAlerts = (modelCode = null) => {
 };
 
 const selectModel = (code) => {
-    if (code === MODEL_CODES.light) {
-        openModelAlerts(code);
-        return;
-    }
     selectedCode.value = code;
     currentView.value = "detail";
 };
@@ -273,6 +296,7 @@ onMounted(async () => {
         await piscinasOptions();
     } finally {
         loadModelos();
+        cargarValidacion();
     }
 });
 
@@ -356,8 +380,8 @@ onBeforeUnmount(() => {
                         <span class="model-choice__body">
                             <span class="d-flex justify-content-between align-items-start gap-2">
                                 <span class="fw-bold text-dark fs-6">{{ item.name }}</span>
-                                <span v-if="item.code === MODEL_CODES.light" class="badge badge-light-warning">Esperando sensor</span>
-                                <span v-else-if="models.find((model) => model.code === item.code)" :class="['badge', statusClass(models.find((model) => model.code === item.code)?.status)]">{{ statusLabel(models.find((model) => model.code === item.code)?.status) }}</span>
+                                
+                                <span v-if="models.find((model) => model.code === item.code)" :class="['badge', statusClass(models.find((model) => model.code === item.code)?.status)]">{{ statusLabel(models.find((model) => model.code === item.code)?.status) }}</span>
                             </span>
                             <span class="text-gray-600 fs-7 mt-3">{{ item.description }}</span>
                             <span v-if="item.modelType" class="model-choice__type">{{ item.modelType }}</span>
@@ -466,42 +490,6 @@ onBeforeUnmount(() => {
                     </div>
                 </section>
 
-                <!-- Modelo alometrico entrenado con biometria_detalles -->
-                <section v-if="activeModel.traceability?.weight_length_ml" class="card card-flush mb-6">
-                    <div class="card-header">
-                        <h4 class="card-title fw-bold text-dark fs-5">Modelo peso-longitud entrenado</h4>
-                    </div>
-                    <div class="card-body pt-0">
-                        <code class="d-block text-dark fs-7 mb-4">{{ activeModel.traceability.weight_length_ml.formula }}</code>
-                        <div class="row g-4">
-                            <div class="col-sm-3">
-                                <small class="text-gray-500 d-block">Peces medidos</small>
-                                <strong class="fs-5">{{ activeModel.traceability.weight_length_ml.sample_size }}</strong>
-                                <small class="text-gray-500 d-block">
-                                    {{ activeModel.traceability.weight_length_ml.train_size }} entrenamiento /
-                                    {{ activeModel.traceability.weight_length_ml.test_size }} prueba
-                                </small>
-                            </div>
-                            <div class="col-sm-3">
-                                <small class="text-gray-500 d-block">Acierto en prueba</small>
-                                <strong class="fs-5">R2 {{ activeModel.traceability.weight_length_ml.metrics.test_r2 }}</strong>
-                                <small class="text-gray-500 d-block">error {{ activeModel.traceability.weight_length_ml.metrics.test_mae_g }} g</small>
-                            </div>
-                            <div class="col-sm-3">
-                                <small class="text-gray-500 d-block">Peso medio</small>
-                                <strong class="fs-5">{{ activeModel.traceability.weight_length_ml.baselines.media.test_mae_g }} g</strong>
-                                <small class="text-gray-500 d-block">de error</small>
-                            </div>
-                            <div class="col-sm-3">
-                                <small class="text-gray-500 d-block">Ley cubica</small>
-                                <strong class="fs-5">{{ activeModel.traceability.weight_length_ml.baselines.isometrico_cubico.test_mae_g }} g</strong>
-                                <small class="text-gray-500 d-block">de error</small>
-                            </div>
-                        </div>
-                        <p class="text-gray-700 fs-7 mt-4 mb-0">{{ activeModel.traceability.weight_length_ml.verdict }}</p>
-                        <p class="text-gray-500 fs-8 mb-0">{{ activeModel.traceability.weight_length_ml.note }}</p>
-                    </div>
-                </section>
 
                 <section class="row g-5 mb-6">
                     <div class="col-xl-8">
@@ -516,8 +504,8 @@ onBeforeUnmount(() => {
                     <div class="col-xl-4">
                         <div :class="['formula-panel h-100', modelFormulaTone(activeModel.code)]">
                             <span class="text-gray-500 fs-8 fw-semibold text-uppercase">Formula y origen</span>
-                            <LatexFormula v-if="activeModel.formula?.latex" :latex="activeModel.formula.latex" />
-                            <code v-else class="d-block text-dark fs-7 text-break mt-3">{{ activeModel.formula?.expression }}</code>
+                            <LatexFormula v-if="activeModel.formula?.latex && ![MODEL_CODES.growth, MODEL_CODES.svm, MODEL_CODES.water].includes(activeModel.code)" :latex="activeModel.formula.latex" />
+                            <code v-else class="d-block text-dark fs-7 text-break mt-3">{{ formulaDe(activeModel) }}</code>
                             <p class="text-gray-700 fs-7 mt-4">{{ activeModel.formula?.detail }}</p>
                             <ul v-if="activeModel.formula?.conditions?.length" class="text-gray-600 fs-8 ps-4 mb-4">
                                 <li v-for="condition in activeModel.formula.conditions" :key="condition">{{ condition }}</li>
@@ -527,17 +515,11 @@ onBeforeUnmount(() => {
                     </div>
                 </section>
 
-                <section v-if="activeModel.relationship" class="card card-flush mb-6">
-                    <div class="card-header"><h4 class="card-title fw-bold text-dark fs-5">Relacion de variables</h4></div>
-                    <div class="card-body pt-0">
-                        <p class="text-gray-600 fs-7">{{ activeModel.relationship.description }}</p>
-                        <ChartFisheye :options="activeModel.relationship.chart" height="350px" />
-                        <div v-if="relationshipRows(activeModel).length" class="relationship-table mt-5">
-                            <div class="text-gray-500 fs-8 fw-semibold text-uppercase mb-2">Puntos trazados</div>
-                            <div class="table-responsive"><table class="table table-sm table-row-dashed align-middle mb-0"><thead><tr class="text-gray-500 fs-8"><th>Variable o punto</th><th class="text-end">Valor X</th><th class="text-end">Valor Y</th></tr></thead><tbody><tr v-for="row in relationshipRows(activeModel)" :key="`${row.name}-${row.primary}`"><td class="fs-8">{{ row.name }}</td><td class="text-end fs-8">{{ formatValue(row.primary) }}</td><td class="text-end fs-8">{{ formatValue(row.secondary) }}</td></tr></tbody></table></div>
-                        </div>
-                    </div>
-                </section>
+                <ValidacionModelo
+                    :codigo="activeModel.code"
+                    :datos="validacionDe(activeModel.code)"
+                    :limpieza="validacion?.limpieza"
+                />
 
                 <section v-if="activeModel.code === MODEL_CODES.growth && selectedBiometrics?.available" class="pond-twin mb-6">
                     <div class="pond-twin__header">
@@ -577,8 +559,8 @@ onBeforeUnmount(() => {
 
                 <section v-if="activeModel.machine_learning || activeModel.components?.length || activeModel.interpretation?.length" class="row g-5 mb-6">
                     <div v-if="activeModel.machine_learning" class="col-xl-4"><div class="info-block h-100"><span class="text-gray-500 fs-8 fw-semibold text-uppercase">Aprendizaje automatico</span><p class="text-gray-700 fs-7 mt-3 mb-2">{{ activeModel.machine_learning.detail }}</p><strong v-if="activeModel.machine_learning.classification">{{ activeModel.machine_learning.classification }}</strong><div class="text-gray-500 fs-8 mt-2">{{ activeModel.machine_learning.target_origin }}</div></div></div>
-                    <div v-if="activeModel.components?.length" class="col-xl-4"><div class="info-block h-100"><span class="text-gray-500 fs-8 fw-semibold text-uppercase">Variables del indice</span><table class="table table-sm table-row-dashed align-middle mt-3 mb-0"><tbody><tr v-for="component in activeModel.components" :key="component.variable"><td class="fs-8">{{ component.variable }}</td><td class="text-end fs-8">{{ formatValue(component.raw_value, component.unit) }}</td><td class="text-end fw-bold fs-8">Q {{ formatValue(component.normalized_score) }}</td></tr></tbody></table></div></div>
-                    <div v-if="activeModel.interpretation?.length" class="col-xl-4"><div class="info-block h-100"><span class="text-gray-500 fs-8 fw-semibold text-uppercase">Interpretacion</span><table class="table table-sm table-row-dashed align-middle mt-3 mb-0"><tbody><tr v-for="item in activeModel.interpretation" :key="`${item.range}-${item.label}`"><td class="fs-8">{{ interpretationRange(item) }}</td><td class="text-end fw-bold fs-8">{{ item.label }}</td></tr></tbody></table></div></div>
+                    <div v-if="activeModel.components?.length && activeModel.code !== MODEL_CODES.water" class="col-xl-4"><div class="info-block h-100"><span class="text-gray-500 fs-8 fw-semibold text-uppercase">Variables del indice</span><table class="table table-sm table-row-dashed align-middle mt-3 mb-0"><tbody><tr v-for="component in activeModel.components" :key="component.variable"><td class="fs-8">{{ component.variable }}</td><td class="text-end fs-8">{{ formatValue(component.raw_value, component.unit) }}</td><td class="text-end fw-bold fs-8">Q {{ formatValue(component.normalized_score) }}</td></tr></tbody></table></div></div>
+                    <div v-if="activeModel.interpretation?.length && activeModel.code !== MODEL_CODES.water" class="col-xl-4"><div class="info-block h-100"><span class="text-gray-500 fs-8 fw-semibold text-uppercase">Interpretacion</span><table class="table table-sm table-row-dashed align-middle mt-3 mb-0"><tbody><tr v-for="item in activeModel.interpretation" :key="`${item.range}-${item.label}`"><td class="fs-8">{{ interpretationRange(item) }}</td><td class="text-end fw-bold fs-8">{{ item.label }}</td></tr></tbody></table></div></div>
                 </section>
 
                 <section v-if="lifecycle.summary?.length" class="lifecycle-strip mb-6">

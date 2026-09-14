@@ -32,6 +32,52 @@ class ModeloMlController extends Controller
         ]);
     }
 
+    // Cada modelo contrastado con lo que midieron los sensores.
+    //
+    // El calculo recorre todo el historico limpio y entrena de nuevo para la
+    // prueba, asi que la primera vez tarda cerca de medio minuto. El backend
+    // lo guarda media hora y aqui se guarda otro tanto: la validacion no
+    // cambia de un minuto a otro, y no merece recalcularse en cada visita.
+    public function validacion(Request $request)
+    {
+        $baseUrl = $this->backendUrl();
+        $pondId = $this->pondId($request);
+        $cacheKey = "modelos-ml:validacion:{$pondId}";
+
+        if (! $request->boolean('refrescar')) {
+            $cached = Cache::get($cacheKey);
+            if ($cached !== null) {
+                return response()->json($cached);
+            }
+        }
+
+        try {
+            $response = Http::acceptJson()
+                ->connectTimeout(5)
+                ->timeout(120)
+                ->get("{$baseUrl}/ponds/{$pondId}/model-validation", [
+                    'refresh' => $request->boolean('refrescar') ? 'true' : 'false',
+                ]);
+        } catch (\Throwable $exception) {
+            return response()->json([
+                'disponible' => false,
+                'motivo' => 'La validacion se esta calculando. Vuelve a intentarlo en unos segundos.',
+            ], 202);
+        }
+
+        if (! $response->successful()) {
+            return response()->json([
+                'disponible' => false,
+                'motivo' => 'El servicio de modelos no pudo calcular la validacion.',
+            ], 502);
+        }
+
+        $datos = $response->json();
+        Cache::put($cacheKey, $datos, now()->addMinutes(30));
+
+        return response()->json($datos);
+    }
+
     public function proyecciones(Request $request)
     {
         $baseUrl = $this->backendUrl();
