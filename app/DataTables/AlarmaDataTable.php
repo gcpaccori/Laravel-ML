@@ -77,7 +77,6 @@ class AlarmaDataTable extends DataTable
                         'icon' => 'Check',
                         'id' => $alerta->id,
                         'name_funcion' => 'handleResolver',
-                        'disabled' => false,
                         'disabled' => ($alerta->estado === 'resuelta')
                     ]
                 ];
@@ -94,11 +93,69 @@ class AlarmaDataTable extends DataTable
      */
     public function query(Alarma $model): QueryBuilder
     {
+        $request = request();
+
         return $model->newQuery()
             ->with([
-                'piscigranja',
-                'piscina',
-            ]);
+                'piscigranja:id,nombre',
+                'piscina:id,nombre',
+            ])
+            ->when(
+                $request->filled('estado'),
+                fn (QueryBuilder $query) =>
+                    $query->where(
+                        'estado',
+                        $request->input('estado')
+                    )
+            )
+            ->when(
+                $request->filled('nivel'),
+                fn (QueryBuilder $query) =>
+                    $query->where(
+                        'nivel',
+                        $request->input('nivel')
+                    )
+            )
+            ->when(
+                $request->filled('modulo'),
+                fn (QueryBuilder $query) =>
+                    $query->where(
+                        'modulo',
+                        $request->input('modulo')
+                    )
+            )
+            ->when(
+                $request->filled('filtro'),
+                function (QueryBuilder $query) use ($request) {
+
+                    $filtro = $request->input('filtro');
+
+                    $query->where(function ($q) use ($filtro) {
+
+                        $q->where('titulo', 'like', "%{$filtro}%")
+                            ->orWhere('mensaje', 'like', "%{$filtro}%")
+                            ->orWhere('parametro', 'like', "%{$filtro}%")
+                            ->orWhereHas(
+                                'piscigranja',
+                                fn ($q) =>
+                                    $q->where(
+                                        'nombre',
+                                        'like',
+                                        "%{$filtro}%"
+                                    )
+                            )
+                            ->orWhereHas(
+                                'piscina',
+                                fn ($q) =>
+                                    $q->where(
+                                        'nombre',
+                                        'like',
+                                        "%{$filtro}%"
+                                    )
+                            );
+                    });
+                }
+            );
     }
 
     /**
@@ -107,19 +164,7 @@ class AlarmaDataTable extends DataTable
     public function html(): HtmlBuilder
     {
         return $this->builder()
-                    ->setTableId('alerta-table')
-                    ->columns($this->getColumns())
-                    ->minifiedAjax()
-                    ->orderBy(5, 'desc') // Ordenar por fecha o ID por defecto
-                    ->selectStyleSingle()
-                    ->buttons([
-                        Button::make('excel'),
-                        Button::make('csv'),
-                        Button::make('pdf'),
-                        Button::make('print'),
-                        Button::make('reset'),
-                        Button::make('reload')
-                    ]);
+            ->setTableId('alerta-table');
     }
 
     /**
@@ -128,6 +173,7 @@ class AlarmaDataTable extends DataTable
     public function getColumns(): array
     {
         return [
+            Column::make('id')->title('#')->addClass('text-center'),
             Column::make('created_at')
                 ->title('Fecha')
                 ->addClass('min-w-100px'),
