@@ -228,7 +228,7 @@ onBeforeUnmount(() => {
 // ==================== EXPORTACIÓN ====================
 function exportarExcel() {
     exportandoExcel.value = true;
-    window.location.href = route("biometrias.excel", biometria.value.id);
+    window.location.href = route("biometrias.excel.biometria", biometria.value.id);
     setTimeout(() => (exportandoExcel.value = false), 1500);
 }
 
@@ -257,7 +257,7 @@ function exportarPdf() {
                     </p>
                 </div>
                 <div class="acciones">
-                    <!-- <el-button
+                    <el-button
                         type="success"
                         :icon="DocumentIcon"
                         :loading="exportandoExcel"
@@ -265,7 +265,7 @@ function exportarPdf() {
                         size="small"
                     >
                         Exportar Excel
-                    </el-button> -->
+                    </el-button>
                     <el-button
                         type="danger"
                         :icon="DocumentIcon"

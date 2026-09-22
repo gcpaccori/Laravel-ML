@@ -179,7 +179,7 @@ class HistorialAguaController extends Controller
             ->get()
             ->map(function ($item) use ($config) {
                 $row = [
-                    'fecha'       => $item->fecha_medicion,
+                    'fecha'       => $item->created_at,
                     'piscina'     => $item->piscina->nombre ?? '',
                     'piscigranja' => $item->piscina->piscigranja->nombre ?? '',
                 ];

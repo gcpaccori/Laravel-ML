@@ -252,7 +252,7 @@
                                                 v-for="item in optionsEspecies"
                                                 :key="item.id"
                                                 :label="item.especie.nombre"
-                                                :value="item.id"
+                                                :value="item.especie.id"
                                             />
                                         </el-select>
                                     </el-form-item>

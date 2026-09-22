@@ -75,21 +75,23 @@ const ajaxConfig = computed(() => ({
 
 const tableOptions = computed(() => ({
   lengthMenu: props.lengthMenu,
-
-  order: [0, 'desc'],
-
+  order: [[0, 'desc']],
   searching: props.searchIng,
-
   processing: true,
-
   serverSide: !!props.ajaxUrl,
-
   language: {
     url: '/assets/js/es-Es.json',
     emptyTable: 'No hay datos disponibles',
     loadingRecords: 'Cargando datos...'
   },
-
+  initComplete(settings, json) {
+    const api = this.api();
+    if (!json || !json.data || json.data.length === 0) {
+        setTimeout(() => {
+            api.draw(false)
+        }, 0)
+    }
+  },
   headerCallback(thead) {
     thead.classList.add(
       'text-start',
@@ -101,7 +103,6 @@ const tableOptions = computed(() => ({
       'fs-7'
     )
   },
-
   createdRow(row) {
     row.classList.add(
       'text-gray-700',
@@ -139,7 +140,7 @@ const clearTable = () => {
   dt.clear().draw()
 
   emit('dataLoaded', {
-    hasData: false,
+    hasData: data.length > 0,
     totalRecords: 0,
     filteredRecords: 0
   })

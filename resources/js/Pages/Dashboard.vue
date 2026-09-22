@@ -180,7 +180,33 @@ const opcionPesoEvol = computed(() => {
 
     return {
         color: evolucion.value.map((_, i) => colorEtapa(i)),
-        tooltip: { trigger: "axis" },
+        tooltip: {
+            trigger: "axis",
+            formatter: (params) => {
+                if (!params || params.length === 0) return "";
+
+                const fecha = params[0].value[0];
+                let HTML = `<strong style="font-size:13px;">Fecha: ${fecha}</strong><br/>`;
+
+                params.forEach((item) => {
+                    const extra = item.data;
+                    const peso = item.value[1]; // prom_peso_g
+
+                    HTML += `
+                        <div style="margin-top: 4px; font-size:13px; color:#666;">
+                            ${item.marker} <b>Biometría:</b> #${extra.biometria_id}<br/>
+                            <span>
+                                • <b>Etapa:</b> ${extra.etapa}<br/>
+                                • <b>Especie:</b> ${extra.especie}<br/>
+                                • <b>Peso prom.:</b> ${peso} g
+                            </span>
+                        </div>
+                    `;
+                });
+
+                return HTML;
+            }
+        },
         legend: { type: "scroll", bottom: 0 },
         grid: { left: 48, right: 24, top: 24, bottom: 56 },
         xAxis: { type: "time" },
@@ -190,15 +216,19 @@ const opcionPesoEvol = computed(() => {
             axisLabel: { formatter: "{value} g" },
         },
         series: evolucion.value.map((etapa) => ({
-            name: etapa.etapa_nombre,
+            name: etapa.serie_nombre, // Muestra solo: "NombreCampaña · NombreEspecie"
             type: "line",
             smooth: true,
             showSymbol: true,
-            data: etapa.puntos.map((p) => [p.fecha, p.prom_peso_g]),
+            data: etapa.puntos.map((p) => ({
+                value: [p.fecha, p.prom_peso_g], // [Eje X, Eje Y]
+                biometria_id: p.id,
+                etapa: p.etapa,
+                especie: p.especie,
+            })),
         })),
     };
 });
-
 const { elRef: chartPesoEvolElRef } = useEchart(opcionPesoEvol);
 
 // --- Evolución de la supervivencia (una línea por etapa) ---
@@ -207,7 +237,32 @@ const opcionSupervivenciaEvol = computed(() => {
 
     return {
         color: evolucion.value.map((_, i) => colorEtapa(i)),
-        tooltip: { trigger: "axis", valueFormatter: (v) => `${v}%` },
+        tooltip: {
+            trigger: "axis",
+            formatter: (params) => {
+                if (!params || params.length === 0) return "";
+                const fecha = params[0].value[0];
+                let HTML = `<strong style="font-size:13px;">Fecha: ${fecha}</strong><br/>`;
+
+                params.forEach((item) => {
+                    const extra = item.data;
+                    const supervivencia = item.value[1]; // tasa_supervivencia_porcentaje
+
+                    HTML += `
+                        <div style="margin-top: 4px; font-size:13px; color:#666;">
+                            ${item.marker} <b>Biometría:</b> #${extra.biometria_id}<br/>
+                            <span style="font-size:12px; color:#666;">
+                                • <b>Etapa:</b> ${extra.etapa}<br/>
+                                • <b>Especie:</b> ${extra.especie}<br/>
+                                • <b>Supervivencia:</b> ${supervivencia != null ? supervivencia + '%' : 'N/A'}
+                            </span>
+                        </div>
+                    `;
+                });
+
+                return HTML;
+            }
+        },
         legend: { type: "scroll", bottom: 0 },
         grid: { left: 48, right: 24, top: 24, bottom: 56 },
         xAxis: { type: "time" },
@@ -219,20 +274,22 @@ const opcionSupervivenciaEvol = computed(() => {
             axisLabel: { formatter: "{value}%" },
         },
         series: evolucion.value.map((etapa) => ({
-            name: etapa.etapa_nombre,
+            name: etapa.serie_nombre, // Solo muestra: "Campaña · Especie"
             type: "line",
             smooth: true,
             showSymbol: true,
-            data: etapa.puntos.map((p) => [
-                p.fecha,
-                p.tasa_supervivencia_porcentaje,
-            ]),
+            data: etapa.puntos.map((p) => ({
+                value: [p.fecha, p.tasa_supervivencia], // [Eje X, Eje Y]
+                biometria_id: p.id,
+                etapa: p.etapa,
+                especie: p.especie,
+            })),
         })),
     };
 });
 const { elRef: chartSupervivenciaElRef } = useEchart(opcionSupervivenciaEvol);
 
-// --- Comparativa FCA por etapa (barras) ---
+// --- Comparativa FCA por etapa (barras verticales) ---
 const opcionFca = computed(() => {
     if (!hayComparativa.value) return null;
 
@@ -244,38 +301,62 @@ const opcionFca = computed(() => {
         tooltip: {
             trigger: "axis",
             axisPointer: { type: "shadow" },
+            formatter: (params) => {
+                if (!params || params.length === 0) return "";
+                const item = params[0];
+                const extra = item.data;
+
+                return `
+                    <strong>FCA: ${extra.value}</strong><br/>
+                    <hr style="margin:4px 0; border-color:#eee;"/>
+                    <span style="font-size:12px; color:#666;">
+                        • <b>Piscigranja:</b> ${extra.piscigranja}<br/>
+                        • <b>Etapa:</b> ${extra.etapa}<br/>
+                        • <b>Piscina:</b> ${extra.piscina}<br/>
+                        • <b>Última fecha:</b> ${extra.ultima_fecha}
+                    </span>
+                `;
+            }
         },
         grid: {
-            left: 120,
+            left: 48,
             right: 24,
-            top: 24,
-            bottom: 24,
+            top: 36,
+            bottom: 64,
         },
         xAxis: {
-            type: "value",
-            name: "FCA",
+            type: "category",
+            data: datos.map((d) => `${d.campania} · ${d.especie}`),
+            axisLabel: {
+                interval: 0,
+                rotate: 0,
+                fontSize: 11,
+            },
         },
         yAxis: {
-            type: "category",
-            data: datos.map((d) => d.etapa_nombre),
-            axisLabel: {
-                width: 100,
-                overflow: "break",
-                fontSize: 12,
-            },
+            type: "value",
+            name: "FCA",
         },
         series: [
             {
                 type: "bar",
-                data: datos.map((d) => d.fca),
+                data: datos.map((d) => ({
+                    value: d.fca,
+                    piscigranja: d.piscigranja,
+                    campania: d.campania,
+                    especie: d.especie,
+                    piscina: d.piscina,
+                    ultima_fecha: d.ultima_fecha_muestreo,
+                    etapa: d.etapa_nombre
+                })),
                 barMaxWidth: 30,
                 itemStyle: {
-                    borderRadius: [0, 4, 4, 0],
+                    borderRadius: [4, 4, 0, 0],
                     color: "#E6A23C",
                 },
                 label: {
                     show: true,
-                    position: "right",
+                    position: "top",
                     fontSize: 11,
                 },
             },
@@ -284,7 +365,7 @@ const opcionFca = computed(() => {
 });
 const { elRef: chartFcaElRef } = useEchart(opcionFca);
 
-// --- Comparativa Biomasa actual por etapa (barras) ---
+// --- Comparativa Biomasa actual por etapa (barras verticales) ---
 const opcionBiomasa = computed(() => {
     if (!hayComparativa.value) return null;
 
@@ -296,39 +377,62 @@ const opcionBiomasa = computed(() => {
         tooltip: {
             trigger: "axis",
             axisPointer: { type: "shadow" },
-            valueFormatter: (v) => `${v} kg`,
+            formatter: (params) => {
+                if (!params || params.length === 0) return "";
+                const item = params[0];
+                const extra = item.data;
+
+                return `
+                    <strong>Biomasa: ${extra.value} kg</strong><br/>
+                    <hr style="margin:4px 0; border-color:#eee;"/>
+                    <span style="font-size:12px; color:#666;">
+                        • <b>Piscigranja:</b> ${extra.piscigranja}<br/>
+                        • <b>Etapa:</b> ${extra.etapa}<br/>
+                        • <b>Piscina:</b> ${extra.piscina}<br/>
+                        • <b>Última fecha:</b> ${extra.ultima_fecha}
+                    </span>
+                `;
+            }
         },
         grid: {
-            left: 120,
+            left: 48,
             right: 24,
-            top: 24,
-            bottom: 24,
+            top: 36,
+            bottom: 64,
         },
         xAxis: {
-            type: "value",
-            name: "kg",
+            type: "category",
+            data: datos.map((d) => `${d.campania} · ${d.especie}`),
+            axisLabel: {
+                interval: 0,
+                rotate: 0,
+                fontSize: 11,
+            },
         },
         yAxis: {
-            type: "category",
-            data: datos.map((d) => d.etapa_nombre),
-            axisLabel: {
-                width: 100,
-                overflow: "break",
-                fontSize: 12,
-            },
+            type: "value",
+            name: "kg",
         },
         series: [
             {
                 type: "bar",
-                data: datos.map((d) => d.biomasa_actual_kg),
+                data: datos.map((d) => ({
+                    value: d.biomasa_actual_kg,
+                    piscigranja: d.piscigranja,
+                    campania: d.campania,
+                    especie: d.especie,
+                    piscina: d.piscina,
+                    ultima_fecha: d.ultima_fecha_muestreo,
+                    etapa: d.etapa_nombre
+                })),
                 barMaxWidth: 30,
                 itemStyle: {
-                    borderRadius: [0, 4, 4, 0],
+                    borderRadius: [4, 4, 0, 0],
                     color: "#409EFF",
                 },
                 label: {
                     show: true,
-                    position: "right",
+                    position: "top",
                     fontSize: 11,
                     formatter: ({ value }) => `${value} kg`,
                 },
@@ -336,7 +440,6 @@ const opcionBiomasa = computed(() => {
         ],
     };
 });
-
 const { elRef: chartBiomasaElRef } = useEchart(opcionBiomasa);
 
 watch(() => filtrosForm.value.piscigranja_id, campaniasOptions);
@@ -537,12 +640,12 @@ onMounted( async() => {
             </div>
         </div>
 
-        <el-row :gutter="16" class="seccion mb-4">
-            <el-col :span="12">
+        <el-row class="row g-3 seccion mb-4">
+            <el-col class="col-12 col-md-6">
                 <el-card shadow="never">
                     <template #header>
                         <span class="seccion-titulo"
-                            >Evolución del Peso Promedio (g)</span
+                            >Evolución del Peso Promedio (g) - Biometrías</span
                         >
                     </template>
                     <div
@@ -557,11 +660,11 @@ onMounted( async() => {
                 </el-card>
             </el-col>
 
-            <el-col :span="12">
+            <el-col class="col-12 col-md-6">
                 <el-card shadow="never">
                     <template #header>
                         <span class="seccion-titulo"
-                            >Evolución de la Supervivencia (%)</span
+                            >Evolución de la Supervivencia (%) - Biometrías</span
                         >
                     </template>
                     <div
@@ -577,13 +680,12 @@ onMounted( async() => {
             </el-col>
         </el-row>
 
-        <el-row :gutter="16" class="seccion mb-4">
-            <el-col :span="12">
+        <el-row class="row g-3 seccion mb-4">
+            <el-col class="col-12 col-md-6">
                 <el-card shadow="never">
                     <template #header>
                         <span class="seccion-titulo"
-                            >Comparativa: Conversión Alimenticia (FCA) por
-                            Etapa</span
+                            >Conversión Alimenticia (FCA) por Etapa - Biometrías</span
                         >
                     </template>
                     <div
@@ -598,12 +700,11 @@ onMounted( async() => {
                 </el-card>
             </el-col>
 
-            <el-col :span="12">
+            <el-col class="col-12 col-md-6">
                 <el-card shadow="never">
                     <template #header>
                         <span class="seccion-titulo"
-                            >Comparativa: Biomasa Actual por Etapa
-                            (kg)</span
+                            >Biomasa Actual por Etapa (kg) - Biometrías</span
                         >
                     </template>
                     <div
@@ -622,9 +723,7 @@ onMounted( async() => {
         <el-card shadow="never" class="seccion">
             <template #header>
                 <span class="seccion-titulo"
-                    >Resumen por Etapa ({{
-                        comparativaEtapas.length
-                    }})</span
+                    >Resumen por Etapa (Biometrías)</span
                 >
             </template>
 

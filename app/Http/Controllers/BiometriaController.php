@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\DataTables\BiometriaDataTable;
 use App\Exports\BiometriaExport;
+use App\Exports\BiometriasExport;
 use App\Helpers\DataTableHelper;
 use App\Http\Requests\BiometriaRequest;
 use App\Models\Biometria;
@@ -13,6 +14,7 @@ use App\Models\CampaniaEtapa;
 use App\Models\ParametrosProduccion;
 use App\Services\BiometriaCalculoService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
@@ -241,7 +243,7 @@ class BiometriaController extends Controller
         return $etapa;
     }
 
-    public function exportarExcel(Biometria $biometria)
+    public function exportarExcelBiometria(Biometria $biometria)
     {
         $biometria->load([
             'detalles',
@@ -255,7 +257,6 @@ class BiometriaController extends Controller
 
         return Excel::download(new BiometriaExport($biometria), $nombreArchivo);
     }
-
 
     public function exportarPdf(Biometria $biometria)
     {
@@ -287,6 +288,18 @@ class BiometriaController extends Controller
         $nombreArchivo = "biometria-{$biometria->id}-" . now()->format('Ymd_His') . '.pdf';
 
         return $pdf->download($nombreArchivo);
+    }
+
+    public function exportarExcel(Request $request)
+    {
+        $filters = $request->only(['piscigranja_id', 'campania_id', 'especie_id', 'rango_fecha']);
+        return Excel::download(new BiometriasExport($filters), 'biometrias_' . now()->format('Ymd_His') . '.xlsx', \Maatwebsite\Excel\Excel::XLSX);
+    }
+
+    public function exportarCsv(Request $request)
+    {
+        $filters = $request->only(['piscigranja_id', 'campania_id', 'especie_id', 'rango_fecha']);
+        return Excel::download(new BiometriasExport($filters), 'biometrias_' . now()->format('Ymd_His') . '.csv', \Maatwebsite\Excel\Excel::CSV);
     }
 
     public static function calcularDistribucion(array $valores, float $ancho): array

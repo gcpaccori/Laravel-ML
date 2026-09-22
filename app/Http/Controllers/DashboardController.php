@@ -67,17 +67,23 @@ class DashboardController extends Controller
         $evolucion = $porEtapa->map(function (Collection $items) {
             $primero = $items->first();
             $etapa = $primero->campaniaEtapa;
+            $campania = $etapa?->campaniaEspecie?->campania?->nombre ?? '';
+            $especie  = $etapa?->campaniaEspecie?->especie?->nombre ?? '';
+            $serieNombre = trim("{$campania} · {$especie}", ' ·');
 
             return [
                 'etapa_id'     => $primero->campania_etapa_id,
-                'etapa_nombre' => $this->nombreEtapaCorto($etapa),
+                'serie_nombre' => $serieNombre,
                 'puntos'       => $items->map(fn ($b) => [
-                    'fecha'                        => $b->fecha_muestreo->format('Y-m-d'),
-                    'prom_peso_g'                  => $b->prom_peso_g,
-                    'prom_longitud_cm'             => $b->prom_longitud_cm,
-                    'tasa_supervivencia_porcentaje' => $b->tasa_supervivencia_porcentaje,
-                    'conversion_alimenticia'       => $b->conversion_alimenticia,
-                    'bf_kg'                         => $b->bf_kg,
+                    'id'                 => $b->id,
+                    'fecha'              => $b->fecha_muestreo->format('Y-m-d'),
+                    'etapa'              => $b->campaniaEtapa?->etapa?->nombre ?? '-',
+                    'especie'            => $b->campaniaEtapa?->campaniaEspecie?->especie?->nombre ?? '-',
+                    'prom_peso_g'        => $b->prom_peso_g,
+                    'prom_longitud_cm'   => $b->prom_longitud_cm,
+                    'tasa_supervivencia' => $b->tasa_supervivencia_porcentaje,
+                    'fca'                => $b->conversion_alimenticia,
+                    'bf_kg'              => $b->bf_kg,
                 ])->values(),
             ];
         })->values();

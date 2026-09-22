@@ -49,7 +49,6 @@ const limpiarFiltros = () => {
     Object.keys(formInline.value).forEach(key => {
         formInline.value[key] = '';
     });
-    reloadTable();
 };
 
 const handleResolver = async (id) => {
