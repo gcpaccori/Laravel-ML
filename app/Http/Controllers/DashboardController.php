@@ -3,9 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Biometria;
-use App\Models\Campania;
 use App\Models\CampaniaEtapa;
-use App\Models\Piscigranja;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Inertia\Inertia;
@@ -47,34 +45,35 @@ class DashboardController extends Controller
             ->orderBy('id')
             ->get();
 
-        // Agrupadas por etapa para poder calcular "último registro" y "serie histórica" de cada una
+        // Agrupadas por campaña-especie (cadena de biometrías sin importar la etapa)
+        $porCampaniaEspecie = $biometrias->groupBy(fn (Biometria $b) => $b->campaniaEtapa?->campania_especie_id);
+        // Agrupadas por etapa (solo para la tabla comparativa)
         $porEtapa = $biometrias->groupBy('campania_etapa_id');
 
         // ==================== KPIs ====================
-        $ultimasPorEtapa = $porEtapa->map(fn (Collection $items) => $items->last());
+        $ultimasPorCampaniaEspecie = $porCampaniaEspecie->map(fn (Collection $items) => $items->last());
 
         $kpis = [
-            'total_etapas_activas'        => $ultimasPorEtapa->count(),
-            'total_peces_actuales'        => (int) $ultimasPorEtapa->sum('cantidad_peces_actuales'),
-            'biomasa_actual_kg'           => round($ultimasPorEtapa->sum('bf_kg'), 2),
+            'total_etapas_activas'        => $ultimasPorCampaniaEspecie->count(),
+            'total_peces_actuales'        => (int) $ultimasPorCampaniaEspecie->sum('cantidad_peces_actuales'),
+            'biomasa_actual_kg'           => round($ultimasPorCampaniaEspecie->sum('bf_kg'), 2),
             'alimento_consumido_total_kg' => round($biometrias->sum('total_alimento_consumido_kg'), 2),
-            'fca_promedio'                => $this->promedio($ultimasPorEtapa->pluck('conversion_alimenticia')),
-            'supervivencia_promedio'      => $this->promedio($ultimasPorEtapa->pluck('tasa_supervivencia_porcentaje')),
-            'tasa_crecimiento_promedio'   => $this->promedio($ultimasPorEtapa->pluck('tasa_crecimiento_g_dia')),
+            'fca_promedio'                => $this->promedio($ultimasPorCampaniaEspecie->pluck('conversion_alimenticia')),
+            'supervivencia_promedio'      => $this->promedio($ultimasPorCampaniaEspecie->pluck('tasa_supervivencia_porcentaje')),
+            'tasa_crecimiento_promedio'   => $this->promedio($ultimasPorCampaniaEspecie->pluck('tasa_crecimiento_g_dia')),
         ];
 
-        // ==================== EVOLUCIÓN EN EL TIEMPO (una serie por etapa) ====================
-        $evolucion = $porEtapa->map(function (Collection $items) {
-            $primero = $items->first();
-            $etapa = $primero->campaniaEtapa;
-            $campania = $etapa?->campaniaEspecie?->campania?->nombre ?? '';
-            $especie  = $etapa?->campaniaEspecie?->especie?->nombre ?? '';
+        // ==================== EVOLUCIÓN EN EL TIEMPO (una serie por campaña-especie) ====================
+        $evolucion = $porCampaniaEspecie->map(function (Collection $items, $campaniaEspecieId) {
+            $campaniaEspecie = $items->first()->campaniaEtapa?->campaniaEspecie;
+            $campania = $campaniaEspecie?->campania?->nombre ?? '';
+            $especie  = $campaniaEspecie?->especie?->nombre ?? '';
             $serieNombre = trim("{$campania} · {$especie}", ' ·');
 
             return [
-                'etapa_id'     => $primero->campania_etapa_id,
-                'serie_nombre' => $serieNombre,
-                'puntos'       => $items->map(fn ($b) => [
+                'campania_especie_id' => $campaniaEspecieId,
+                'serie_nombre'        => $serieNombre,
+                'puntos'              => $items->map(fn ($b) => [
                     'id'                 => $b->id,
                     'fecha'              => $b->fecha_muestreo->format('Y-m-d'),
                     'etapa'              => $b->campaniaEtapa?->etapa?->nombre ?? '-',
@@ -89,6 +88,7 @@ class DashboardController extends Controller
         })->values();
 
         // ==================== TABLA COMPARATIVA POR ETAPA ====================
+        $ultimasPorEtapa = $porEtapa->map(fn (Collection $items) => $items->last());
         $comparativaEtapas = $ultimasPorEtapa->map(function (Biometria $b) {
             $etapa = $b->campaniaEtapa;
 

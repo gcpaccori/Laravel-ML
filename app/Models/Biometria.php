@@ -51,11 +51,37 @@ class Biometria extends Model
     // ==================== CADENA ====================
 
     /**
-     * Biometría anterior en la cadena (misma etapa, fecha_muestreo/id menor).
+     * Filtra biometrías que pertenecen a la misma campaña-especie
+     * (sin importar la etapa).
+     */
+    public function scopeDeCampaniaEspecie($query, int $campaniaEspecieId)
+    {
+        return $query->whereHas('campaniaEtapa', function ($q) use ($campaniaEspecieId) {
+            $q->where('campania_especie_id', $campaniaEspecieId);
+        });
+    }
+
+    /**
+     * campania_especie_id de este registro (vía su campaña-etapa).
+     */
+    protected function obtenerCampaniaEspecieId(): ?int
+    {
+        return $this->campaniaEtapa?->campania_especie_id;
+    }
+
+    /**
+     * Biometría anterior en la cadena (misma campaña-especie,
+     * fecha_muestreo/id menor), sin importar la etapa.
      */
     public function anterior(): ?self
     {
-        return static::where('campania_etapa_id', $this->campania_etapa_id)
+        $campaniaEspecieId = $this->obtenerCampaniaEspecieId();
+
+        if (!$campaniaEspecieId) {
+            return null;
+        }
+
+        return static::deCampaniaEspecie($campaniaEspecieId)
             ->where(function ($q) {
                 $q->where('fecha_muestreo', '<', $this->fecha_muestreo)
                   ->orWhere(function ($q2) {
@@ -69,11 +95,18 @@ class Biometria extends Model
     }
 
     /**
-     * Biometría siguiente en la cadena.
+     * Biometría siguiente en la cadena (misma campaña-especie),
+     * sin importar la etapa.
      */
     public function siguiente(): ?self
     {
-        return static::where('campania_etapa_id', $this->campania_etapa_id)
+        $campaniaEspecieId = $this->obtenerCampaniaEspecieId();
+
+        if (!$campaniaEspecieId) {
+            return null;
+        }
+
+        return static::deCampaniaEspecie($campaniaEspecieId)
             ->where(function ($q) {
                 $q->where('fecha_muestreo', '>', $this->fecha_muestreo)
                   ->orWhere(function ($q2) {

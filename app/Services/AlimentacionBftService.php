@@ -311,6 +311,7 @@ class AlimentacionBftService
     /**
      * Fecha inicial del periodo (igual que en el Excel, donde la
      * "FECHA INICIAL" de un muestreo es la "FECHA" del muestreo anterior).
+     * La cadena se arma por campaña-especie, sin importar la etapa.
      * Reutiliza este método en el store/update para que ambos coincidan.
      *
      * @return array{0: ?CarbonImmutable, 1: ?string}
@@ -318,7 +319,7 @@ class AlimentacionBftService
     public function resolverFechaInicial(CampaniaEtapa $etapa, CarbonImmutable $fechaMuestreo, ?int $excluirId = null): array
     {
         $anterior = Biometria::query()
-            ->where('campania_etapa_id', $etapa->id)
+            ->deCampaniaEspecie($etapa->campania_especie_id)
             ->when($excluirId, fn ($q) => $q->where('id', '!=', $excluirId))
             ->whereDate('fecha_muestreo', '<', $fechaMuestreo->toDateString())
             ->orderByDesc('fecha_muestreo')
@@ -328,7 +329,6 @@ class AlimentacionBftService
             return [CarbonImmutable::parse($anterior)->startOfDay(), 'biometria_anterior'];
         }
 
-        // Ajusta el nombre de la columna si tu campania_etapas usa otro (fecha_inicio, fecha_ingreso...)
         if ($etapa->fecha_inicio) {
             return [CarbonImmutable::parse($etapa->fecha_inicio)->startOfDay(), 'inicio_etapa'];
         }

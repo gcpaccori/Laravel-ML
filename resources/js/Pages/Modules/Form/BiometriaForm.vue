@@ -498,25 +498,6 @@
                                     </template>
                                 </el-table-column>
 
-                                <el-table-column label="Tamaño (cm)" align="center">
-                                    <template #default="{ $index }">
-                                        <el-input
-                                            v-model="form.detalles[$index].longitud_cm"
-                                            type="text"
-                                            step="any"
-                                            :min="0"
-                                            class="w-100"
-                                        />
-
-                                        <small
-                                            v-if="errors[`detalles.${$index}.longitud_cm`]"
-                                            class="text-danger"
-                                        >
-                                            {{ errors[`detalles.${$index}.longitud_cm`] }}
-                                        </small>
-                                    </template>
-                                </el-table-column>
-
                                 <el-table-column label="Peso (g)" align="center">
                                     <template #default="{ $index }">
                                         <el-input
@@ -532,6 +513,25 @@
                                             class="text-danger"
                                         >
                                             {{ errors[`detalles.${$index}.peso_g`] }}
+                                        </small>
+                                    </template>
+                                </el-table-column>
+
+                                <el-table-column label="Tamaño (cm)" align="center">
+                                    <template #default="{ $index }">
+                                        <el-input
+                                            v-model="form.detalles[$index].longitud_cm"
+                                            type="text"
+                                            step="any"
+                                            :min="0"
+                                            class="w-100"
+                                        />
+
+                                        <small
+                                            v-if="errors[`detalles.${$index}.longitud_cm`]"
+                                            class="text-danger"
+                                        >
+                                            {{ errors[`detalles.${$index}.longitud_cm`] }}
                                         </small>
                                     </template>
                                 </el-table-column>

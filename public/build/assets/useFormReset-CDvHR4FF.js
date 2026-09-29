@@ -1,1 +1,0 @@
-import{f as n,u}from"./app-OV53vyUQ.js";function i(o){const s=()=>typeof o=="function"?o():JSON.parse(JSON.stringify(o)),e=n(s());return{form:e,resetForm:()=>{const t=s();Object.keys(t).forEach(r=>{e.value[r]=t[r]})},setFormValues:t=>{Object.keys(t).forEach(r=>{r in e.value&&(e.value[r]=t[r])})},getFormValues:()=>u(e)}}export{i as u};

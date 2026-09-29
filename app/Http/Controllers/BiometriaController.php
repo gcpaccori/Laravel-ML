@@ -170,6 +170,7 @@ class BiometriaController extends Controller
             $calculados = $this->calculoService->calcular($validated, $anterior, $campaniaEtapa);
 
             $id->update([
+                'campania_etapa_id'           => $validated['campania_etapa_id'],
                 'fecha_muestreo'              => $validated['fecha_muestreo'],
                 'total_alimento_consumido_kg' => $validated['total_alimento_consumido_kg'],
                 'cantidad_peces_actuales'     => $validated['cantidad_peces_actuales'],

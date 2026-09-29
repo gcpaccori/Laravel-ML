@@ -326,7 +326,7 @@ const opcionFca = computed(() => {
         },
         xAxis: {
             type: "category",
-            data: datos.map((d) => `${d.campania} · ${d.especie}`),
+            data: datos.map((d) => d.etapa_nombre),
             axisLabel: {
                 interval: 0,
                 rotate: 0,
@@ -402,7 +402,7 @@ const opcionBiomasa = computed(() => {
         },
         xAxis: {
             type: "category",
-            data: datos.map((d) => `${d.campania} · ${d.especie}`),
+            data: datos.map((d) => d.etapa_nombre),
             axisLabel: {
                 interval: 0,
                 rotate: 0,
@@ -731,7 +731,7 @@ onMounted( async() => {
                 :data="comparativaEtapas"
                 border
                 stripe
-                size="default"
+                size="small"
                 show-summary
                 :summary-method="resumenTabla"
             >
