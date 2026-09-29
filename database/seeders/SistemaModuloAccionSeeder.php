@@ -10,217 +10,25 @@ use App\Helpers\PermissionHelper;
 use Spatie\Permission\Models\Role;
 use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\Models\Permission;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 
 class SistemaModuloAccionSeeder extends Seeder
 {
-
     /**
      * Run the database seeds.
      */
     public function run(): void
     {
-        // 1. Acciones maestras (se crean una vez)
-        $accionesBase = [
-            [
-                'accion'       => 'Nuevo',
-                'name'         => 'new',
-                'icon'         => 'Plus',
-                'type'         => 'primary',
-                'name_funcion' => 'handleNew',
-                'location'     => 'M',
-            ],
-            [
-                'accion'       => 'Editar',
-                'name'         => 'edit',
-                'icon'         => 'EditPen',
-                'type'         => 'warning',
-                'name_funcion' => 'handleEdit',
-            ],
-            [
-                'accion'       => 'Eliminar',
-                'name'         => 'delete',
-                'icon'         => 'Delete',
-                'type'         => 'danger',
-                'name_funcion' => 'handleDelete',
-            ],
-            [
-                'accion'       => 'Visualizar',
-                'name'         => 'show',
-                'icon'         => 'View',
-                'type'         => 'primary',
-                'name_funcion' => 'handleShow',
-            ],
-        ];
+        // 1. Cargar e insertar Acciones maestras desde el archivo externo
+        $accionesBase = require database_path('seeders/data/acciones.php');
 
         $acciones = collect($accionesBase)->map(fn($a) =>
             Accion::updateOrCreate(['name' => $a['name']], $a)
         );
 
-        // 2️. Definir todos los sistemas con módulos y acciones
-        $sistemas = [
-            [
-                'name'    => 'Sistema De Seguridad',
-                'icon'    => 'Lock',
-                'url'     => 'seguridad',
-                'order'   => 10,
-                'modulos' => [
-                    [
-                        'name'     => 'Gestionar Usuarios',
-                        'url'      => 'usuario',
-                        'icon'     => 'UserFilled',
-                        'order'    => 1,
-                        'acciones' => ['new','edit','delete'],
-                    ],
-                    [
-                        'name'     => 'Gestionar Roles',
-                        'url'      => 'role',
-                        'icon'     => 'Switch',
-                        'order'    => 2,
-                        'acciones' => ['new','edit','delete'],
-                    ],
-                    [
-                        'name'     => 'Gestionar Módulos',
-                        'url'      => 'modulo',
-                        'icon'     => 'List',
-                        'order'    => 3,
-                        'acciones' => ['new','edit','delete'],
-                    ],
-                    [
-                        'name'     => 'Gestionar Sistemas',
-                        'url'      => 'sistema',
-                        'icon'     => 'Platform',
-                        'order'    => 4,
-                        'acciones' => ['new','edit','delete'],
-                    ],
-                    [
-                        'name'     => 'Gestionar Acciones',
-                        'url'      => 'accion',
-                        'icon'     => 'TurnOff',
-                        'order'    => 5,
-                        'acciones' => ['new','edit','delete'],
-                    ],
-                    [
-                        'name'     => 'Logs',
-                        'url'      => 'log',
-                        'icon'     => 'Cpu',
-                        'order'    => 6,
-                        'acciones' => [],
-                    ]
-                ],
-            ],
-            // [
-            //     'name'    => 'Configuraciones',
-            //     'icon'    => 'Setting',
-            //     'url'     => 'configuracion',
-            //     'order'   => 20,
-            //     'modulos' => [
-            //         [
-            //             'name'     => 'Logs',
-            //             'url'      => 'log',
-            //             'icon'     => 'Cpu',
-            //             'order'    => 1,
-            //             'acciones' => ['new','edit','delete'],
-            //         ]
-            //     ],
-            // ],
-            [
-                'name'    => 'Panel de Monitoreo',
-                'icon'    => 'Monitor',
-                'url'     => 'monitoreo',
-                'order'   => 1,
-                'modulos' => [
-                    [
-                        'name'     => 'Historial Calidad Agua',
-                        'url'      => 'historialagua',
-                        'icon'     => 'Stopwatch',
-                        'order'    => 3,
-                        'acciones' => ['new','edit','delete'],
-                    ],
-                    [
-                        'name'     => 'Calidad de Agua',
-                        'url'      => 'calidadagua',
-                        'icon'     => 'Stopwatch',
-                        'order'    => 1,
-                        'acciones' => ['new','edit','delete'],
-                    ],
-                    [
-                        'name'     => 'Fotoperíodo',
-                        'url'      => 'fotoperiodo',
-                        'icon'     => 'Stopwatch',
-                        'order'    => 2,
-                        'acciones' => [],
-                    ],
-                    [
-                        'name'     => 'Alertas',
-                        'url'      => 'alarma',
-                        'icon'     => 'Stopwatch',
-                        'order'    => 4,
-                        'acciones' => [],
-                    ],
-                ]
-                ],
-            [
-                'name'    => 'Gestionar Piscigranjas',
-                'icon'    => 'Refrigerator',
-                'url'     => 'sispiscis',
-                'order'   => 2,
-                'modulos' => [
-                    [
-                        'name'     => 'Especies',
-                        'url'      => 'especie',
-                        'icon'     => 'Flag',
-                        'order'    => 4,
-                        'acciones' => ['new','edit','delete'],
-                    ],
-                    [
-                        'name'     => 'Campañas',
-                        'url'      => 'campania',
-                        'icon'     => 'Calendar',
-                        'order'    => 3,
-                        'acciones' => ['new','edit','delete'],
-                    ],
-                    [
-                        'name'     => 'Piscinas',
-                        'url'      => 'piscina',
-                        'icon'     => 'Aim',
-                        'order'    => 2,
-                        'acciones' => ['new','edit','delete'],
-                    ],
-                    [
-                        'name'     => 'Piscigranjas',
-                        'url'      => 'piscigranja',
-                        'icon'     => 'Aim',
-                        'order'    => 1,
-                        'acciones' => ['new','edit','delete'],
-                    ],
-                ]
-            ],
-            [
-                'name'    => 'Gestionar Producción',
-                'icon'    => 'DataLine',
-                'url'     => 'produccion',
-                'order'   => 3,
-                'modulos' => [
-                    [
-                        'name'     => 'Tabla Alimentación',
-                        'url'      => 'alimentacionbft',
-                        'icon'     => 'DataLine',
-                        'order'    => 1,
-                        'acciones' => ['new','edit','delete', 'show'],
-                    ],
-                    [
-                        'name'     => 'Biometrias',
-                        'url'      => 'biometria',
-                        'icon'     => 'DataLine',
-                        'order'    => 2,
-                        'acciones' => ['new','edit','delete', 'show'],
-                    ],
-                ]
-            ]
-        ];
+        // 2. Cargar Sistemas, Módulos y Acciones desde el archivo externo
+        $sistemas = require database_path('seeders/data/sistemas_modulos.php');
 
-        // 3️. Recorrer cada sistema
+        // 3. Recorrer cada sistema
         foreach ($sistemas as $sistemaData) {
             $modulosData = $sistemaData['modulos'];
             unset($sistemaData['modulos']);
@@ -231,26 +39,58 @@ class SistemaModuloAccionSeeder extends Seeder
             );
 
             foreach ($modulosData as $mod) {
+                $accionesMod = $mod['acciones'] ?? [];
+                $hijos = $mod['modulos_hijos'] ?? [];
+
                 $accionesIds = $acciones
-                    ->whereIn('name', $mod['acciones'])
+                    ->whereIn('name', $accionesMod)
                     ->pluck('id')
                     ->toArray();
 
-                $modulo = $sistema->modulos()->updateOrCreate(
+                // Crear o actualizar el Módulo Padre
+                $moduloPadre = $sistema->modulos()->updateOrCreate(
                     ['url' => $mod['url']],
-                    collect($mod)->except('acciones')->toArray()
+                    collect($mod)->except(['acciones', 'modulos_hijos'])->toArray()
                 );
 
-                $modulo->acciones()->sync($accionesIds);
+                $moduloPadre->acciones()->sync($accionesIds);
+
+                // Procesar submódulos (hijos) si existen
+                foreach ($hijos as $hijoData) {
+                    $accionesHijoIds = $acciones
+                        ->whereIn('name', $hijoData['acciones'] ?? [])
+                        ->pluck('id')
+                        ->toArray();
+
+                    $moduloHijo = $sistema->modulos()->updateOrCreate(
+                        ['url' => $hijoData['url']],
+                        array_merge(
+                            collect($hijoData)->except('acciones')->toArray(),
+                            ['cod_father' => $moduloPadre->id]
+                        )
+                    );
+
+                    $moduloHijo->acciones()->sync($accionesHijoIds);
+                }
             }
         }
 
         // 4. Crear Permisos
         PermissionHelper::syncPermisosDesdeAccionModulo();
 
-        // 5. Asignar Permisos
-        $permissions = Permission::all()->pluck('name')->toArray();
-        // $permissionsIds = collect($permissions)->pluck('name')->toArray();
+        // 5. Asignar Permisos (con exclusión configurable de módulos)
+        $modulosExcluidos = [
+            'piscina',
+        ];
+
+        $permissions = Permission::where(function ($query) use ($modulosExcluidos) {
+            foreach ($modulosExcluidos as $modulo) {
+                $query->where('name', 'not like', $modulo)
+                      ->where('name', 'not like', $modulo . '.%');
+            }
+        })
+        ->pluck('name')
+        ->toArray();
 
         $role = Role::firstOrCreate(['name' => 'Administrador']);
         $role->syncPermissions($permissions);

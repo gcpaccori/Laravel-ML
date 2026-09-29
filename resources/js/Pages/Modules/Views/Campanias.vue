@@ -143,7 +143,7 @@
                     round
                     @click="showForm( props.rowData.id )"
                 >
-                    Etapas
+                    Ver
                 </el-button>
             </template>
         </BaseDataTable>

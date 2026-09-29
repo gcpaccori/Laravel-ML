@@ -30,10 +30,9 @@ class DataTableHelper
 
     public static function getAccionesPermitidasDelModulo(
         $resourceId = null,
-        string $controllerName = null,
+        ?string $controllerName = null,
         array $disabledActions = []
-    )
-    {
+    ) {
         // Inferir el nombre del controlador si no se proporciona
         if (!$controllerName) {
             $controllerAction = class_basename(request()->route()->getActionName());
@@ -48,31 +47,34 @@ class DataTableHelper
             return [];
         }
 
+        // Normalizar las acciones deshabilitadas a minúsculas una sola vez
+        $disabledActionsLower = array_map('strtolower', $disabledActions);
+
         $acciones = $modulo->acciones()
             ->where('location', 'T')
             ->where('active', true)
             ->get()
-            ->filter(function ($accion) use ($modulo) {
-                $permiso = strtolower($modulo->url) . '.' . strtolower($accion->name);
+            ->filter(function ($accion) use ($modulo, $disabledActionsLower) {
+                $accionNombre = strtolower($accion->name);
+
+                // 1. Excluir si la acción está en $disabledActions
+                if (in_array($accionNombre, $disabledActionsLower, true)) {
+                    return false;
+                }
+
+                // 2. Filtrar por permisos del usuario
+                $permiso = strtolower($modulo->url) . '.' . $accionNombre;
                 return Auth::user()?->can($permiso);
             });
 
-        return $acciones->map(function ($accion) use ($resourceId, $disabledActions) {
-
-            $disabled = in_array(
-                strtolower($accion->name),
-                array_map('strtolower', $disabledActions)
-            );
-
+        return $acciones->map(function ($accion) use ($resourceId) {
             return [
-                'type'          => $accion->type,
-                'icon'          => $accion->icon,
-                'action'        => $accion->accion,
-                'name_funcion'  => $accion->name_funcion,
-                'id'            => $resourceId,
-                'disabled'      => $disabled,
+                'type'         => $accion->type,
+                'icon'         => $accion->icon,
+                'action'       => $accion->accion,
+                'name_funcion' => $accion->name_funcion,
+                'id'           => $resourceId,
             ];
-
         })->values()->toArray();
     }
 

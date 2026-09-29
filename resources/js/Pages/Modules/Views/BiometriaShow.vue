@@ -7,7 +7,6 @@ import {
     ref,
     watch,
 } from "vue";
-import { Document as DocumentIcon } from "@element-plus/icons-vue";
 import * as echarts from "echarts";
 
 const props = defineProps({
@@ -226,6 +225,14 @@ onBeforeUnmount(() => {
 });
 
 // ==================== EXPORTACIÓN ====================
+function handleCommand(command) {
+    if (command === "excel") {
+        exportarExcel();
+    } else if (command === "pdf") {
+        exportarPdf();
+    }
+}
+
 function exportarExcel() {
     exportandoExcel.value = true;
     window.location.href = route("biometrias.excel.biometria", biometria.value.id);
@@ -241,49 +248,50 @@ function exportarPdf() {
 
 <template>
     <App :title="title" :toolbar="toolbar">
-        <div class="biometria-show">
+        <div class="p-3">
             <!-- ==================== ENCABEZADO / ACCIONES ==================== -->
-            <div class="header-actions">
+            <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
                 <div>
-                    <h2 class="titulo">
-                        Biometría —
+                    <h2 class="h4 fw-bold mb-1">
+                        Biometría #{{biometria?.id}} —
                         {{ formatearFecha(biometria?.fecha_muestreo) }}
                     </h2>
-                    <p class="subtitulo">
+                    <p class="text-muted mb-0">
                         {{ biometria?.nombre_piscigranja }} /
                         {{ biometria?.nombre_campania }} /
                         {{ biometria?.nombre_especie }} /
                         {{ biometria?.nombre_etapa }}
                     </p>
                 </div>
-                <div class="acciones">
-                    <el-button
-                        type="success"
-                        :icon="DocumentIcon"
-                        :loading="exportandoExcel"
-                        @click="exportarExcel"
-                        size="small"
-                    >
-                        Exportar Excel
-                    </el-button>
-                    <el-button
-                        type="danger"
-                        :icon="DocumentIcon"
-                        :loading="exportandoPdf"
-                        @click="exportarPdf"
-                        size="small"
-                    >
-                        Exportar PDF
-                    </el-button>
+                <div class="d-flex gap-2">
+                    <el-dropdown trigger="click" @command="handleCommand">
+                        <el-button
+                            type="primary"
+                            size="small"
+                            :loading="exportandoExcel || exportandoPdf"
+                        >
+                            <el-icon class="me-1"><Download /></el-icon>
+                            Exportar
+                            <el-icon class="ms-1"><ArrowDown /></el-icon>
+                        </el-button>
+                        <template #dropdown>
+                            <el-dropdown-menu>
+                                <el-dropdown-item command="excel" icon="Document">
+                                    Exportar Excel
+                                </el-dropdown-item>
+                                <el-dropdown-item command="pdf" icon="Document">
+                                    Exportar PDF
+                                </el-dropdown-item>
+                            </el-dropdown-menu>
+                        </template>
+                    </el-dropdown>
                 </div>
             </div>
 
             <!-- ==================== DATOS GENERALES (Campania / Especie / Etapa) ==================== -->
-            <el-card shadow="never" class="seccion-card">
+            <el-card shadow="never" class="mb-3">
                 <template #header>
-                    <span class="seccion-titulo"
-                        >Información de la Campaña</span
-                    >
+                    <span class="fw-bold fs-4">Información de la Campaña</span>
                 </template>
                 <el-descriptions :column="3" border size="default">
                     <el-descriptions-item label="Piscigranja">{{
@@ -317,9 +325,9 @@ function exportarPdf() {
             </el-card>
 
             <!-- ==================== DATOS DE LA BIOMETRÍA ==================== -->
-            <el-card shadow="never" class="seccion-card">
+            <el-card shadow="never" class="mb-3">
                 <template #header>
-                    <span class="seccion-titulo">Datos de la Biometría</span>
+                    <span class="fw-bold fs-4">Datos de la Biometría</span>
                 </template>
 
                 <el-row :gutter="16">
@@ -385,7 +393,7 @@ function exportarPdf() {
                     </el-col>
                 </el-row>
 
-                <el-row :gutter="16" style="margin-top: 16px">
+                <el-row :gutter="16" class="mt-3">
                     <el-col :span="12">
                         <el-descriptions
                             title="Biomasa y alimentación"
@@ -453,7 +461,7 @@ function exportarPdf() {
                     v-if="biometria?.observaciones"
                     :column="1"
                     border
-                    style="margin-top: 16px"
+                    class="mt-3"
                 >
                     <el-descriptions-item label="Observaciones">{{
                         biometria.observaciones
@@ -462,11 +470,11 @@ function exportarPdf() {
             </el-card>
 
             <!-- ==================== GRÁFICOS DE DISTRIBUCIÓN ==================== -->
-            <el-row :gutter="16" class="seccion-card">
+            <el-row :gutter="16" class="mb-3">
                 <el-col :span="12">
                     <el-card shadow="never">
                         <template #header>
-                            <span class="seccion-titulo"
+                            <span class="fw-bold fs-6"
                                 >Distribución % del Crecimiento en Longitud
                                 (cm)</span
                             >
@@ -475,7 +483,7 @@ function exportarPdf() {
                         <div
                             v-if="distribucionLongitud.length"
                             ref="chartLongitudEl"
-                            class="chart"
+                            style="height: 320px;"
                         ></div>
                         <el-empty v-else description="Sin datos suficientes" />
                     </el-card>
@@ -484,7 +492,7 @@ function exportarPdf() {
                 <el-col :span="12">
                     <el-card shadow="never">
                         <template #header>
-                            <span class="seccion-titulo"
+                            <span class="fw-bold fs-6"
                                 >Distribución % del Crecimiento en Peso
                                 (g)</span
                             >
@@ -493,7 +501,7 @@ function exportarPdf() {
                         <div
                             v-if="distribucionPeso.length"
                             ref="chartPesoEl"
-                            class="chart"
+                            style="height: 320px;"
                         ></div>
                         <el-empty v-else description="Sin datos suficientes" />
                     </el-card>
@@ -501,11 +509,11 @@ function exportarPdf() {
             </el-row>
 
             <!-- ==================== TABLA DE DETALLES ==================== -->
-             <el-row :gutter="16">
+            <el-row :gutter="16">
                 <el-col :span="8" class="d-flex">
-                    <el-card shadow="never" class="seccion-card h-100 w-100">
+                    <el-card shadow="never" class="mb-3 h-100 w-100">
                         <template #header>
-                            <span class="seccion-titulo"
+                            <span class="fw-bold fs-6"
                                 >Detalle de Muestras ({{
                                     biometria?.detalles?.length || 0
                                 }})</span
@@ -536,9 +544,9 @@ function exportarPdf() {
                 </el-col>
 
                 <el-col :span="8" class="d-flex">
-                    <el-card shadow="never" class="seccion-card h-100 w-100">
+                    <el-card shadow="never" class="mb-3 h-100 w-100">
                         <template #header>
-                            <span class="seccion-titulo"
+                            <span class="fw-bold fs-6"
                                 >Crecimiento en  Longitud (cm)</span
                             >
                         </template>
@@ -548,7 +556,7 @@ function exportarPdf() {
                             border
                             stripe
                             size="default"
-                            style="margin-top: 12px"
+                            class="mt-2"
                         >
                             <el-table-column prop="rango" label="Rango" />
                             <el-table-column
@@ -568,9 +576,9 @@ function exportarPdf() {
                 </el-col>
 
                 <el-col :span="8" class="d-flex">
-                    <el-card shadow="never" class="seccion-card h-100 w-100">
+                    <el-card shadow="never" class="mb-3 h-100 w-100">
                         <template #header>
-                            <span class="seccion-titulo"
+                            <span class="fw-bold fs-6"
                                 >Crecimiento en  Peso (g)</span
                             >
                         </template>
@@ -580,7 +588,7 @@ function exportarPdf() {
                             border
                             stripe
                             size="default"
-                            style="margin-top: 12px"
+                            class="mt-2"
                         >
                             <el-table-column prop="rango" label="Rango" />
                             <el-table-column
@@ -598,52 +606,7 @@ function exportarPdf() {
                         </el-table>
                     </el-card>
                 </el-col>
-
-             </el-row>
+            </el-row>
         </div>
     </App>
 </template>
-<style scoped>
-.biometria-show {
-    padding: 16px;
-}
-
-.header-actions {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 16px;
-    flex-wrap: wrap;
-    gap: 12px;
-}
-
-.titulo {
-    margin: 0 0 4px 0;
-    font-size: 20px;
-    font-weight: 600;
-}
-
-.subtitulo {
-    margin: 0;
-    color: var(--el-text-color-secondary);
-    font-size: 13px;
-}
-
-.acciones {
-    display: flex;
-    gap: 8px;
-}
-
-.seccion-card {
-    margin-bottom: 16px;
-}
-
-.seccion-titulo {
-    font-weight: 600;
-    font-size: 15px;
-}
-
-.chart {
-    height: 320px;
-}
-</style>

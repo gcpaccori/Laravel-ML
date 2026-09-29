@@ -12,6 +12,7 @@ use App\Models\Campania;
 use App\Models\CampaniaEspecie;
 use App\Models\CampaniaEtapa;
 use App\Models\ParametrosProduccion;
+use App\Services\AlimentacionBftService;
 use App\Services\BiometriaCalculoService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -72,9 +73,6 @@ class BiometriaController extends Controller
         ]);
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(BiometriaRequest $request)
     {
 
@@ -130,9 +128,6 @@ class BiometriaController extends Controller
         ]);
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
     public function edit( string $id )
     {
         $biometria = Biometria::with(['detalles','campaniaEtapa'])->findOrFail($id);
@@ -147,9 +142,6 @@ class BiometriaController extends Controller
         ]);
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
     public function update(BiometriaRequest $request, Biometria $id)
     {
         // Regla clave: solo se edita si es el último registro de la cadena
@@ -197,9 +189,6 @@ class BiometriaController extends Controller
         ]);
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
     public function destroy(Biometria $id)
     {
 
@@ -300,6 +289,23 @@ class BiometriaController extends Controller
     {
         $filters = $request->only(['piscigranja_id', 'campania_id', 'especie_id', 'rango_fecha']);
         return Excel::download(new BiometriasExport($filters), 'biometrias_' . now()->format('Ymd_His') . '.csv', \Maatwebsite\Excel\Excel::CSV);
+    }
+
+    public function alimentoReferencial(Request $request, AlimentacionBftService $service)
+    {
+        $data = $request->validate([
+            'campania_etapa_id' => ['required', 'integer', 'exists:campania_etapas,id'],
+            'fecha_muestreo'    => ['required', 'date'],
+            'biometria_id'      => ['nullable', 'integer'],
+        ]);
+
+        return response()->json(
+            $service->calcularAlimento(
+                (int) $data['campania_etapa_id'],
+                $data['fecha_muestreo'],
+                isset($data['biometria_id']) ? (int) $data['biometria_id'] : null,
+            )
+        );
     }
 
     public static function calcularDistribucion(array $valores, float $ancho): array

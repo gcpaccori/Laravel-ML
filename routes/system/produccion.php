@@ -11,6 +11,7 @@ Route::post('/biometrias/store', [BiometriaController::class, 'store'])->name('b
 Route::get('/biometrias/exportar-excel', [BiometriaController::class, 'exportarExcel'])->name('biometrias.excel');
 Route::get('/biometrias/exportar-csv', [BiometriaController::class, 'exportarCsv'])->name('biometrias.csv');
 
+Route::get('biometrias/alimento-referencial', [BiometriaController::class, 'alimentoReferencial'])->name('biometrias.alimento-referencial');
 Route::get('/biometrias/{id}', [BiometriaController::class, 'show'])->name('biometrias.show');
 Route::get('/biometrias/edit/{id}', [BiometriaController::class, 'edit'])->name('biometrias.edit');
 Route::put('/biometrias/update/{id}', [BiometriaController::class, 'update'])->name('biometrias.update');
@@ -25,12 +26,10 @@ Route::get('/especie/etapa/{campania_especie_id}', [BiometriaController::class, 
 Route::get('/etapa/parametro/{campania_etapa_id}', [BiometriaController::class, 'showParametrosEtapa'])->name('parametro.active.show');
 
 Route::get('alimentacion-bft', [AlimentacionBftController::class, 'index'])->name('produccion.alimentacionbfts.index')->middleware('modulo:alimentacionbft');
-
-Route::prefix('campana-especie/{campaniaEspecie}/alimentacion-bft')
-    ->name('campana-especie.alimentacion-bft.')
-    ->controller(AlimentacionBftController::class)
-    ->group(function () {
-        Route::get('/', 'show')->name('show');
-        Route::post('/', 'store')->name('store');
-        Route::get('/pdf', 'pdf')->name('pdf');
-    });
+Route::get('alimentacion-bft/datatable', [AlimentacionBftController::class, 'datatable'])->name('alimentacionbfts.datatable');
+Route::get('alimentacion-bft/{campaniaEspecie}/create', [AlimentacionBftController::class, 'create'])->name('alimentacionbfts.create');
+Route::post('alimentacion-bft/{campaniaEspecie}/store', [AlimentacionBftController::class, 'store'])->name('alimentacionbfts.store');
+Route::get('alimentacion-bft/{campaniaEspecie}/show', [AlimentacionBftController::class, 'show'])->name('alimentacionbfts.show');
+Route::get('alimentacion-bft/{campaniaEspecie}/pdf', [AlimentacionBftController::class, 'pdf'])->name('alimentacionbfts.pdf');
+Route::get('alimentacion-bft/{campaniaEspecie}/edit', [AlimentacionBftController::class, 'edit'])->name('alimentacionbfts.edit');
+Route::get('alimentacion-bft/{campaniaEspecie}/excel', [AlimentacionBftController::class, 'excel'])->name('alimentacionbfts.excel');

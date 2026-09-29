@@ -11,7 +11,6 @@
 </script>
 
 <template>
-    <!--begin::Header-->
     <div id="kt_app_header"
         class="app-header"
         data-kt-sticky="true"
@@ -21,7 +20,6 @@
         data-kt-sticky-animation="false"
         data-kt-sticky-enabled="true"
     >
-        <!--begin::Header container-->
         <div class="app-container container-fluid d-flex align-items-stretch justify-content-between" id="kt_app_header_container">
             <!--begin::Sidebar mobile toggle-->
             <div class="d-flex align-items-center d-lg-none ms-n3 me-1 me-md-2" title="Show sidebar menu">
