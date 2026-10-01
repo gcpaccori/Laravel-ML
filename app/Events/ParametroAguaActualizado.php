@@ -6,9 +6,10 @@ use Illuminate\Broadcasting\Channel;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Broadcasting\InteractsWithSockets;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow; // ← Cambiar esto
+use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 
-class ParametroAguaActualizado implements ShouldBroadcastNow // ← Cambiar esto
+class ParametroAguaActualizado implements ShouldBroadcastNow
+    // ShouldBroadcast usa worker y cola.
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
