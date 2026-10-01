@@ -23,24 +23,22 @@ class BiometriaCalculoService
         $promPesoG       = count($pesos) ? round(array_sum($pesos) / count($pesos), 4) : 0.0;
         $promLongitudCm  = count($longitudes) ? round(array_sum($longitudes) / count($longitudes), 4) : 0.0;
         $poblacionActual = $datos['cantidad_peces_actuales'];
+        $campaniaEspecie = $campaniaEtapa->campaniaEspecie;
+
+        if (!$campaniaEspecie) throw new \RuntimeException('La etapa no tiene una campaña-especie asociada.');
+
+        $cantidadPecesSiembra = $campaniaEspecie->cantidad_siembra;
 
         // 2. Iniciales: heredados del anterior, o de campaniaEspecie si es el primero
         if ($anterior) {
             $fechaInicial           = $anterior->fecha_muestreo;
             $cantidadPecesIniciales = $anterior->cantidad_peces_actuales;
-            // $cantidadPecesIniciales = $anterior->cantidad_peces_iniciales;
             $biKg                   = $anterior->bf_kg;
         } else {
-            $campaniaEspecie = $campaniaEtapa->campaniaEspecie;
-
-            if (!$campaniaEspecie) {
-                throw new \RuntimeException('La etapa no tiene una campaña-especie asociada.');
-            }
-
             $fechaInicial           = $campaniaEspecie->fecha_siembra;
-            $cantidadPecesIniciales = $campaniaEspecie->cantidad_siembra;
-            $biKg = ($campaniaEspecie->cantidad_siembra && $campaniaEspecie->peso_inicial_gr)
-                ? round(($campaniaEspecie->cantidad_siembra * $campaniaEspecie->peso_inicial_gr) / 1000, 4)
+            $cantidadPecesIniciales = $cantidadPecesSiembra;
+            $biKg = ($cantidadPecesSiembra && $campaniaEspecie->peso_inicial_gr)
+                ? round(($cantidadPecesSiembra * $campaniaEspecie->peso_inicial_gr) / 1000, 4)
                 : 0.0;
         }
 
@@ -66,8 +64,8 @@ class BiometriaCalculoService
             : 0.0;
 
         // 7. Supervivencia
-        $tasaSupervivencia = $cantidadPecesIniciales > 0
-            ? round(($poblacionActual / $cantidadPecesIniciales) * 100, 4)
+        $tasaSupervivencia = $cantidadPecesSiembra > 0
+            ? round(($poblacionActual / $cantidadPecesSiembra) * 100, 4)
             : null;
 
         // 8. % de muestreo
