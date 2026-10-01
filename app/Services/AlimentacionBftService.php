@@ -196,7 +196,16 @@ class AlimentacionBftService
             'fecha_inicial'        => $inicio?->toDateString(),
             'origen_fecha_inicial' => $origen,
             'fecha_muestreo'       => $fin->toDateString(),
-            'dias'                 => $inicio ? max(0, (int) $inicio->diffInDays($fin, false)) : 0,
+            'dias' => $inicio
+                ? max(
+                    0,
+                    CarbonImmutable::parse($inicio->toDateString())
+                        ->diffInDays(
+                            CarbonImmutable::parse($fin->toDateString()),
+                            false
+                        )
+                )
+                : 0,
             'dias_cubiertos'       => 0,
             'semana_desde'         => null,
             'semana_hasta'         => null,
@@ -321,7 +330,7 @@ class AlimentacionBftService
         $anterior = Biometria::query()
             ->deCampaniaEspecie($etapa->campania_especie_id)
             ->when($excluirId, fn ($q) => $q->where('id', '!=', $excluirId))
-            ->whereDate('fecha_muestreo', '<', $fechaMuestreo->toDateString())
+            ->whereDate('fecha_muestreo', '<=', $fechaMuestreo->toDateString())
             ->orderByDesc('fecha_muestreo')
             ->value('fecha_muestreo');
 
