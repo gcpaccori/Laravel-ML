@@ -14,6 +14,8 @@ import ChartFisheye from "@/Components/ChartFisheye.vue";
 import LatexFormula from "@/Components/LatexFormula.vue";
 import ValidacionModelo from "@/Components/ValidacionModelo.vue";
 import ProyeccionModelo from "@/Components/ProyeccionModelo.vue";
+import ArticuloMlCorregido from "@/Components/ArticuloMlCorregido.vue";
+import CrecimientoSismapiscis from "@/Components/CrecimientoSismapiscis.vue";
 
 defineProps({
     title: String,
@@ -190,6 +192,23 @@ const loadModelos = async () => {
 
 // Validacion de los modelos contra lo medido. Se pide una vez: el calculo
 // recorre todo el historico y tarda, y no cambia de un minuto a otro.
+const articulo = ref(null);
+const articuloLoading = ref(false);
+const cargarArticulo = async (forzar = false) => {
+    articuloLoading.value = true;
+    try {
+        const { data } = await axios.get(route("monitoreo.modelosmls.articulo"), {
+            params: { piscina_id: form.value.piscina_id, refrescar: forzar ? 1 : 0 },
+            timeout: 190000,
+        });
+        articulo.value = data;
+    } catch (error) {
+        articulo.value = { disponible: false, motivo: error?.response?.data?.motivo ?? "No se pudo calcular la corrida corregida." };
+    } finally {
+        articuloLoading.value = false;
+    }
+};
+
 const validacion = ref(null);
 const cargarValidacion = async () => {
     try {
@@ -294,7 +313,7 @@ const etiquetaTiempo = (valor) => {
 };
 
 const ejeTiempo = (nombreY) => ({
-    grid: { top: 24, left: 40, right: 24, bottom: 48, containLabel: true },
+    grid: { top: 24, left: 58, right: 24, bottom: 48, containLabel: true },
     tooltip: { trigger: "axis" },
     legend: { bottom: 0, textStyle: { fontSize: 11 } },
     xAxis: { type: "time", splitLine: { show: false }, axisLabel: { color: "#6b7280", hideOverlap: true, formatter: etiquetaTiempo } },
@@ -433,7 +452,7 @@ const graficoEvolucion = computed(() => {
         const TALLA = "#2563eb";
         return {
             ...opciones,
-            grid: { top: 24, left: 40, right: 44, bottom: 84, containLabel: true },
+            grid: { top: 24, left: 58, right: 58, bottom: 84, containLabel: true },
             xAxis: { ...opciones.xAxis, axisLabel: { color: "#6b7280", hideOverlap: true, formatter: formatoDia } },
             yAxis: [ejeY("Peso (g)", PESO), ejeY("Talla (mm)", TALLA, { splitLine: { show: false } })],
             tooltip: { trigger: "item", formatter: (p) => `${p.seriesName}<br/>${formatoDia(p.value[0])}: ${num(p.value[1], 1)} ${p.seriesName.toLowerCase().includes("talla") ? "mm" : "g"}` },
@@ -502,8 +521,10 @@ const scheduleReload = () => {
 
 const cambiarPiscina = () => {
     validacion.value = null;
+    articulo.value = null;
     scheduleReload();
     cargarValidacion();
+    cargarArticulo();
 };
 
 const changePiscigranja = async () => {
@@ -561,6 +582,7 @@ onMounted(async () => {
     } finally {
         loadModelos();
         cargarValidacion();
+        cargarArticulo();
     }
 });
 
@@ -606,6 +628,12 @@ onBeforeUnmount(() => {
                     </div>
                 </el-form>
             </section>
+
+            <CrecimientoSismapiscis />
+
+            <ArticuloMlCorregido :datos="articulo" :loading="articuloLoading" @refresh="cargarArticulo(true)" />
+
+            <h3 class="fs-6 fw-bold text-gray-700 mb-4">Modelos operacionales de la plataforma</h3>
         </template>
 
         <el-alert v-if="errorMessage" class="mb-6" type="warning" :title="errorMessage" show-icon :closable="false">

@@ -33,6 +33,8 @@
             key,
             value: parametros_agua.value[key],
             ...config,
+            fueraRango: key === "ion_nitrato" && parametros_agua.value?.ion_nitrato_fuera_rango,
+            valorRaw: key === "ion_nitrato" ? parametros_agua.value?.ion_nitrato_raw : null,
         }))
     );
 
@@ -205,6 +207,9 @@
                                     :bandsData="gauge.bands"
                                     :unit="gauge.unit"
                                 />
+                                <el-alert v-if="gauge.fueraRango" type="warning" :closable="false" show-icon class="mt-2">
+                                    Lectura descartada: {{ gauge.valorRaw }}. El sensor está fuera del dominio válido de nitrato (&gt; 100 mg/L).
+                                </el-alert>
                             </el-card>
                         </div>
                     </div>

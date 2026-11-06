@@ -23,6 +23,9 @@ Route::get('/modelos-ml', [ModeloMlController::class, 'index'])->name('monitoreo
 Route::get('/gemelo-digital', [ModeloMlController::class, 'gemeloDigital'])->name('monitoreo.gemelodigitals.index')->middleware('modulo:modelosml');
 Route::get('/modelos-ml/proyecciones', [ModeloMlController::class, 'proyecciones'])->name('monitoreo.modelosmls.proyecciones')->middleware('modulo:modelosml');
 Route::get('/modelos-ml/validacion', [ModeloMlController::class, 'validacion'])->name('monitoreo.modelosmls.validacion')->middleware('modulo:modelosml');
+Route::get('/modelos-ml/articulo-corregido', [ModeloMlController::class, 'articuloCorregido'])->name('monitoreo.modelosmls.articulo')->middleware('modulo:modelosml');
+Route::get('/modelos-ml/crecimiento', [\App\Http\Controllers\CrecimientoMlController::class, 'resumen'])->name('monitoreo.modelosmls.crecimiento')->middleware('modulo:modelosml');
+Route::post('/modelos-ml/crecimiento/inferir', [\App\Http\Controllers\CrecimientoMlController::class, 'inferir'])->name('monitoreo.modelosmls.crecimiento.inferir')->middleware('modulo:modelosml');
 Route::post('/modelos-ml/simulacion', [ModeloMlController::class, 'simulacion'])->name('monitoreo.modelosmls.simulacion')->middleware('modulo:modelosml');
 Route::get('/modelos-ml-suite', [ModeloMlController::class, 'suite'])->name('monitoreo.modelosmlsuites.index')->middleware('modulo:modelosmlsuite');
 

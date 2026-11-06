@@ -72,7 +72,7 @@ const ejeValor = (nombre, extra = {}) => ({
 });
 
 const base = (ejeX, ejeY) => ({
-    grid: { top: 24, left: 40, right: 24, bottom: 64, containLabel: true },
+    grid: { top: 24, left: 58, right: 24, bottom: 64, containLabel: true },
     tooltip: { trigger: "item" },
     legend: { bottom: 0, textStyle: { fontSize: 11 } },
     xAxis: ejeValor(ejeX, { nameGap: 30, scale: true }),
@@ -263,7 +263,7 @@ const factorGrafico = (curva, dias, ejeX, nombreCurva, colorCurva, colorDias, ba
     const opciones = base(ejeX, "Factor (0 = no crece, 1 = sin límite)");
     return {
         ...opciones,
-        grid: { top: 24, left: 36, right: 16, bottom: 64, containLabel: true },
+        grid: { top: 24, left: 54, right: 16, bottom: 64, containLabel: true },
         yAxis: { ...opciones.yAxis, min: 0, max: 1.05, interval: 0.25, scale: false, nameGap: 38 },
         xAxis: { ...opciones.xAxis, min: curva[0][0], max: curva[curva.length - 1][0], scale: false },
         tooltip: { trigger: "item", formatter: (p) => (p.seriesType === "scatter" ? `${fmt(p.value[0], 1)} → factor ${fmt(p.value[1])}` : nombreCurva) },
@@ -299,7 +299,7 @@ const graficosDependencia = computed(() => (props.datos?.dependencias ?? []).map
         variable: dep.variable,
         recta: dep.recta,
         opciones: {
-            grid: { top: 12, left: 30, right: 14, bottom: 40, containLabel: true },
+            grid: { top: 12, left: 48, right: 14, bottom: 40, containLabel: true },
             tooltip: { trigger: "item", formatter: (p) => (p.seriesType === "scatter" ? `${dep.variable}: ${fmt(p.value[0])}<br/>Puntaje: ${fmt(p.value[1], 1)}` : "Recta de regresión") },
             xAxis: ejeValor(dep.variable, { nameGap: 26, scale: true, splitLine: { show: false } }),
             yAxis: ejeValor("Puntaje de calidad", { nameGap: 34, scale: true }),

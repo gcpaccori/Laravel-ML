@@ -78,6 +78,37 @@ class ModeloMlController extends Controller
         return response()->json($datos);
     }
 
+    public function articuloCorregido(Request $request)
+    {
+        $baseUrl = $this->backendUrl();
+        $pondId = $this->pondId($request);
+        $cacheKey = "modelos-ml:articulo-corregido:{$pondId}";
+
+        if (! $request->boolean('refrescar')) {
+            $cached = Cache::get($cacheKey);
+            if ($cached !== null) {
+                return response()->json($cached);
+            }
+        }
+
+        try {
+            $response = Http::acceptJson()->connectTimeout(5)->timeout(180)
+                ->get("{$baseUrl}/ponds/{$pondId}/article-ml-correction", [
+                    'refresh' => $request->boolean('refrescar') ? 'true' : 'false',
+                ]);
+        } catch (\Throwable $exception) {
+            return response()->json(['disponible' => false, 'motivo' => 'La corrida corregida se está calculando.'], 202);
+        }
+
+        if (! $response->successful()) {
+            return response()->json(['disponible' => false, 'motivo' => 'No se pudo ejecutar la corrida corregida.'], 502);
+        }
+
+        $datos = $response->json();
+        Cache::put($cacheKey, $datos, now()->addMinutes(10));
+        return response()->json($datos);
+    }
+
     public function proyecciones(Request $request)
     {
         $baseUrl = $this->backendUrl();

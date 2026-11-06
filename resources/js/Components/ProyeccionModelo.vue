@@ -5,7 +5,8 @@
 // inicio, y al lado de cada proyeccion se muestra cuanto acerto ese mismo
 // calculo en el pasado. Un plazo sin confiabilidad se dibuja igual, pero en
 // gris y dicho, para que nadie tome una curva por una promesa.
-import { computed, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
+import axios from "axios";
 import ChartFisheye from "@/Components/ChartFisheye.vue";
 
 const props = defineProps({
@@ -60,7 +61,7 @@ const juicio = (c) => {
 };
 
 const ejeTiempo = (nombreY, extra = {}) => ({
-    grid: { top: 30, left: 40, right: 28, bottom: 64, containLabel: true },
+    grid: { top: 30, left: 58, right: 28, bottom: 64, containLabel: true },
     tooltip: { trigger: "axis" },
     legend: { bottom: 0, textStyle: { fontSize: 11 } },
     xAxis: { type: "time", splitLine: { show: false }, axisLabel: { color: "#6b7280", hideOverlap: true, formatter: etiquetaTiempo } },
@@ -159,8 +160,8 @@ const graficoCalidad = computed(() => {
     const orden = [...(p.orden_clases ?? [])].reverse();
     return {
         grid: [
-            { top: 24, left: 40, right: 28, height: "34%", containLabel: true },
-            { top: "52%", left: 40, right: 28, bottom: 64, containLabel: true },
+            { top: 24, left: 58, right: 28, height: "34%", containLabel: true },
+            { top: "52%", left: 58, right: 28, bottom: 64, containLabel: true },
         ],
         tooltip: { trigger: "axis" },
         legend: { bottom: 0, textStyle: { fontSize: 11 } },
@@ -188,6 +189,55 @@ const repartoClases = computed(() => {
     return (p.orden_clases ?? []).filter((c) => cuenta[c]).map((c) => ({ clase: c, horas: cuenta[c], pct: (100 * cuenta[c]) / tramo.length }));
 });
 
+
+// ---------- crecimiento: modelos ML del nucleo SISMAPISCIS ----------
+// Ridge y proceso gaussiano estiman el peso medio al cierre de cada intervalo
+// entre biometrias. Se agregan a la grafica del ciclo sin cambiar lo demas.
+const ml = ref(null);
+onMounted(async () => {
+    if (!ES_CRECIMIENTO.value) return;
+    try {
+        const { data } = await axios.get("/modelos-ml/crecimiento", { timeout: 30000 });
+        if (data?.disponible) ml.value = data;
+    } catch (e) {
+        ml.value = null;
+    }
+});
+const ML_RIDGE = "#2563eb";
+const ML_GP = "#db2777";
+const ML_NOMBRE = { ridge: "Ridge", gp: "GP" };
+const mlActual = computed(() => {
+    const m = ml.value;
+    if (!m) return [];
+    const ia = m.intervalo_actual;
+    return ["ridge", "gp"].map((k) => {
+        const mod = m.modelos.find((x) => x.clave === k);
+        return {
+            clave: k,
+            nombre: mod?.nombre ?? k,
+            color: k === "ridge" ? ML_RIDGE : ML_GP,
+            mae: mod?.mae_g,
+            desde: ia?.desde?.slice(0, 10),
+            hasta: ia?.hasta?.slice(0, 10),
+            admisible: !!ia?.admisible,
+            peso: ia?.laravel?.[k]?.predicted_weight_g ?? null,
+            sd: ia?.laravel?.[k]?.conditional_latent_gain_sd_g ?? null,
+        };
+    });
+});
+const seriesMl = () => {
+    const m = ml.value;
+    if (!m || variable.value !== "peso") return [];
+    const pts = (k) => [
+        ...m.evaluacion.filter((r) => r[k]).map((r) => ({ value: [r.fecha, r[k].peso_g], name: `${ML_NOMBRE[k]}, estimado al cierre del intervalo (medido ${fmt(r.peso_observado_g, 1)} g)` })),
+        ...mlActual.value.filter((a) => a.clave === k && a.admisible && a.peso !== null).map((a) => ({ value: [a.hasta, a.peso], name: `${ML_NOMBRE[k]}, intervalo en curso`, symbolSize: 17 })),
+    ];
+    return [
+        { name: "ML Ridge: Modelo SISMAPISCIS de incremento de peso", type: "scatter", symbol: "diamond", symbolSize: 13, color: ML_RIDGE, itemStyle: { borderColor: "#fff", borderWidth: 1 }, data: pts("ridge"), z: 5 },
+        { name: "ML GP: Modelo probabilístico SISMAPISCIS", type: "scatter", symbol: "triangle", symbolSize: 13, color: ML_GP, itemStyle: { borderColor: "#fff", borderWidth: 1 }, data: pts("gp"), z: 5 },
+    ];
+};
+
 // ---------- crecimiento: el ciclo completo ----------
 const indicePorFecha = (serie) => Object.fromEntries((serie ?? []).map((x) => [x[0], x]));
 const valorEn = (serie, iso, columna) => indicePorFecha(serie)[iso]?.[columna] ?? null;
@@ -214,7 +264,7 @@ const graficoCiclo = computed(() => {
     const horizontales = variable.value === "peso" && ciclo.peso_final_objetivo_g ? [{ yAxis: ciclo.peso_final_objetivo_g, name: `Objetivo de la campaña: ${fmt(ciclo.peso_final_objetivo_g, 0)} g`, lineStyle: { color: "#16a34a" } }] : [];
     return {
         ...ejeTiempo(variable.value === "peso" ? "Peso del pez (g)" : "Talla del pez (mm)"),
-        grid: { top: 36, left: 40, right: 36, bottom: 84, containLabel: true },
+        grid: { top: 36, left: 58, right: 36, bottom: ml.value && variable.value === "peso" ? 104 : 84, containLabel: true },
         xAxis: { type: "time", min: ciclo.siembra ?? undefined, max: limite, splitLine: { show: false }, axisLabel: { color: "#6b7280", hideOverlap: true, formatter: (v) => new Date(v).toLocaleDateString("es-PE", { day: "numeric", month: "short" }) } },
         tooltip: { trigger: "item", formatter: (q) => (q.name && q.seriesType === "scatter" ? `${q.name}<br/>${fecha(q.value[0])}: ${fmt(q.value[1], 1)} ${unidad}` : `${q.seriesName}<br/>${fecha(q.value?.[0])}: ${fmt(q.value?.[1], 1)} ${unidad}`) },
         series: [
@@ -229,6 +279,7 @@ const graficoCiclo = computed(() => {
                 data: recorte(e.serie).map((x) => [x[0], x[col]]),
                 markLine: e.id === "reciente" ? { silent: true, symbol: "none", label: { fontSize: 10, formatter: "{b}", position: "insideEndTop" }, data: [...marcas, ...horizontales] } : undefined,
             })),
+            ...seriesMl(),
             { name: "Biometría medida", type: "scatter", symbolSize: 12, color: "#111827", itemStyle: { borderColor: "#fff", borderWidth: 2 }, data: medidas.filter((m) => m[2]).map((m) => ({ value: [m[0], m[1]], name: "Biometría" })) },
             { name: "Siembra registrada", type: "scatter", symbol: "diamond", symbolSize: 13, color: "#16a34a", data: medidas.filter((m) => !m[2]).map((m) => ({ value: [m[0], m[1]], name: `Siembra: ${ciclo.alevines ? fmt(ciclo.alevines, 0) + " alevines de " : ""}${fmt(ciclo.peso_siembra_g, 1)} g` })) },
         ],
@@ -405,6 +456,24 @@ const resumenCiclo = computed(() => {
                                 <td class="fs-7"><span class="pro__punto" :style="{ background: COLOR_ESCENARIO[e.id] }"></span>{{ e.nombre }}</td>
                                 <td class="text-end fs-7">{{ fmtFijo(e.delta) }}</td>
                                 <td class="text-end fs-7 fw-bold">{{ fmt(e.valor, 1) }} {{ variable === "peso" ? "g" : "mm" }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+
+                <div v-if="mlActual.length && variable === 'peso'" class="table-responsive mt-4">
+                    <table class="table table-sm table-row-dashed align-middle mb-0">
+                        <thead><tr class="text-gray-500 fs-8"><th>Modelos ML de incremento de peso</th><th>Intervalo en curso</th><th class="text-end">Peso estimado al cierre</th><th class="text-end">Error medio (4 fechas)</th></tr></thead>
+                        <tbody>
+                            <tr v-for="a in mlActual" :key="a.clave">
+                                <td class="fs-7"><span class="pro__punto" :style="{ background: a.color }"></span>{{ a.nombre }}</td>
+                                <td class="fs-7">{{ fecha(a.desde) }} – {{ fecha(a.hasta) }}</td>
+                                <td class="text-end fs-7 fw-bold">
+                                    <template v-if="a.admisible && a.peso !== null">{{ fmt(a.peso, 1) }} g<span v-if="a.sd" class="text-gray-500 fw-normal"> ± {{ fmt(a.sd, 1) }}</span></template>
+                                    <span v-else class="pro__tono--gris fw-normal">sin estimación: cobertura de sensores insuficiente</span>
+                                </td>
+                                <td class="text-end fs-7">{{ fmt(a.mae, 2) }} g</td>
                             </tr>
                         </tbody>
                     </table>
