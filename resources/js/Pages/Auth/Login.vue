@@ -42,28 +42,26 @@
                         <span class="w-125px text-gray-500 fw-semibold fs-7">*</span>
                     </div>
                     <div class="fv-row mb-8">
-                        <el-input type="email" v-model="form.email" size="large" placeholder="Correo Electrónico" />
+                        <el-input type="email" v-model="form.email" placeholder="Correo Electrónico" />
                         <InputError class="mt-2" :message="form.errors.email" />
                     </div>
                     <div class="fv-row mb-3">
                         <el-input
                             type="password"
                             v-model="form.password"
-                            size="large"
                             placeholder="Contraseña"
                             show-password
                         />
                         <InputError class="mt-2" :message="form.errors.password" />
                     </div>
                     <div class="d-flex flex-stack flex-wrap gap-3 fs-base fw-semibold mb-8">
-                        <el-checkbox v-model="form.remember" label="Recordar" size="large" />
+                        <el-checkbox v-model="form.remember" label="Recordar" />
                         <Link v-if="canResetPassword" :href="route('password.request')" class="link-primary">¿Has olvidado tu contraseña?</Link>
                     </div>
                     <div class="d-grid mb-10">
                         <el-button
                             native-type="submit"
                             type="primary"
-                            size="large"
                             :loading="form.processing"
                         >
                             Ingresar

@@ -64,7 +64,7 @@ use App\Http\Controllers\SessionLogController;
     Route::get('datatable/sessionlogs', [SessionLogController::class, 'datatable'])->name('datatable.sessionlogs');
 
     Route::prefix('logs')->name('seguridad.logs.')->group(function () {
-        Route::get('/', [LogController::class, 'index'])->name('index');
+        Route::get('/', [LogController::class, 'index'])->name('index')->middleware('modulo:log');
         Route::get('/datatable', [LogController::class, 'datatable'])->name('datatable');
         // Route::get('/data', [LogController::class, 'getData'])->name('data');
         // Route::get('/show/{id}', [LogController::class, 'show'])->name('show');

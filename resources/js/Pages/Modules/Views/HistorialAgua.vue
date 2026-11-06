@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, onBeforeUnmount, ref, computed } from "vue";
+import { onMounted, ref, computed } from "vue";
 import ChartFisheye from "@/Components/ChartFisheye.vue";
 import { useDate } from "@/Composables/useDate";
 
@@ -17,6 +17,7 @@ const props = defineProps({
     },
 });
 
+const loading = ref(false);
 const tableInstance = ref(null);
 const ajaxUrl = route("datatable.historialaguas");
 const piscigranjas = ref(null);
@@ -29,10 +30,6 @@ const form = ref({
     mes: getMonth(), // YYYY-MM
     anio: getYear(), // YYYY
 });
-
-const labels = ref([]);
-const tooltips = ref([]);
-const series = ref([]);
 
 const tipoTiempo = [
     { id: "D", name: "Fecha" },
@@ -57,30 +54,26 @@ const formatMY = (yyyyMm) => {
 const subTituloFiltros = computed(() => {
     const parts = [];
 
-    // Piscigranja
     if (form.value.piscigranja_id !== "T") {
         const pg = piscigranjas.value?.find(
-            (p) => String(p.id) == String(form.value.piscigranja_id)
+            (p) => String(p.id) == String(form.value.piscigranja_id),
         );
         if (pg) parts.push(pg.nombre);
     }
 
-    // Piscina
     if (form.value.piscina_id !== "T") {
         const pc = piscinasList.value?.find(
-            (p) => String(p.id) == String(form.value.piscina_id)
+            (p) => String(p.id) == String(form.value.piscina_id),
         );
         if (pc) parts.push(pc.nombre);
     }
 
-    // Fecha / Mes / Año (sin usar new Date('YYYY-MM-DD'))
     if (form.value.tipo_tiempo === "D" && form.value.fecha) {
-        parts.push(formatDMY(form.value.fecha)); // ej: 30/08/2025
+        parts.push(formatDMY(form.value.fecha));
     } else if (form.value.tipo_tiempo === "M" && form.value.mes) {
-        parts.push(formatMY(form.value.mes)); // ej: 08/2025
-        // parts.push(formatMYText(form.value.mes))       // ej: agosto de 2025 (si prefieres)
+        parts.push(formatMY(form.value.mes));
     } else if (form.value.tipo_tiempo === "Y" && form.value.anio) {
-        parts.push(String(form.value.anio)); // ej: 2025
+        parts.push(String(form.value.anio));
     }
 
     return parts.length ? parts.join(" - ") : "Todos";
@@ -88,22 +81,25 @@ const subTituloFiltros = computed(() => {
 
 const tituloCard = computed(() => {
     let title = "-";
-    if ( form.value.piscigranja_id === "T" || form.value.piscina_id === "T" || form.value.tipo_tiempo !== "D" ) {
-        title = ' - Promedios';
-    }else{
-        title = ' - Registros';
+    if (
+        form.value.piscigranja_id === "T" ||
+        form.value.piscina_id === "T" ||
+        form.value.tipo_tiempo !== "D"
+    ) {
+        title = " - Promedios";
+    } else {
+        title = " - Registros";
     }
 
     return title;
-})
+});
 
-// Inicializar Tabla
 const handleTableReady = (dt) => {
     tableInstance.value = dt;
 };
 
 const reloadTable = () => {
-    tableInstance.value.ajax.reload(null, true); // Recargar y regresa a la primera pagina;
+    tableInstance.value.ajax.reload(null, true);
 };
 
 const piscigranjasOptions = async () => {
@@ -147,23 +143,37 @@ const loadParametros = async () => {
 
 const piscinasOptions = async () => {
     const { data } = await axios.get(
-        route("piscigranjas.piscinas", form.value.piscigranja_id)
+        route("piscigranjas.piscinas", form.value.piscigranja_id),
     );
     piscinasList.value = data;
+};
+
+const exportarArchivo = async (routeName, fileName) => {
+    loading.value = true;
+    try {
+        if (fileName === 'excel') {
+            window.location.href = route(routeName, form.value);
+        }else{
+            window.location.href = route(routeName, form.value);
+        }
+    } catch (error) {
+        console.error("Error al exportar:", error);
+    } finally {
+        setTimeout(() => (loading.value = false), 1500);
+    }
 };
 
 onMounted(async () => {
     await loadParametros();
     await piscigranjasOptions();
 
-    // Para canal público
     window.Echo.channel("parametros-agua").listen(
         ".parametro.actualizado",
         (data) => {
             console.log(data.message);
             reloadTable();
             loadParametros();
-        }
+        },
     );
 });
 </script>
@@ -301,7 +311,10 @@ onMounted(async () => {
                 <div class="card card-flush overflow-hidden h-xl-100">
                     <div class="card-header py-5">
                         <h3 class="card-title align-items-start flex-column">
-                            <span class="card-label fw-bold text-dark">Historial de Registros de Parámetros del Agua {{ tituloCard }}</span>
+                            <span class="card-label fw-bold text-dark"
+                                >Historial de Registros de Parámetros del Agua
+                                {{ tituloCard }}</span
+                            >
                             <span class="text-gray-400 mt-1 fw-semibold fs-6">{{
                                 subTituloFiltros
                             }}</span>
@@ -312,23 +325,46 @@ onMounted(async () => {
                     </div>
                 </div>
             </div>
-
             <div class="d-flex justify-content-end mb-3">
-                <a
-                    :href="route('parametrosagua.csv', form)"
-                    class="btn btn-success btn-sm me-2"
-                    target="_blank"
-                >
-                    <i class="fa fa-file-excel"></i> Exportar a CSV
-                </a>
-                <a
-                    :href="route('parametrosagua.excel', form)"
-                    class="btn btn-success btn-sm"
-                    target="_blank"
-                >
-                    <i class="fa fa-file-excel"></i> Exportar a EXCEL
-                </a>
+                <el-dropdown type="success" size="small" :disabled="loading">
+                    <el-button type="success" size="small" :loading="loading">
+                        <el-icon v-if="!loading" class="me-1"
+                            ><Download
+                        /></el-icon>
+                        {{ loading ? "Exportando..." : "Exportar" }}
+                        <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+                    </el-button>
+                    <template #dropdown>
+                        <el-dropdown-menu>
+                            <el-dropdown-item
+                                @click="
+                                    exportarArchivo(
+                                        'parametrosagua.excel',
+                                        'excel',
+                                    )
+                                "
+                            >
+                                <el-icon class="me-1"
+                                    ><DocumentChecked
+                                /></el-icon>
+                                Exportar a EXCEL
+                            </el-dropdown-item>
+                            <el-dropdown-item
+                                @click="
+                                    exportarArchivo(
+                                        'parametrosagua.csv',
+                                        'csv',
+                                    )
+                                "
+                            >
+                                <el-icon class="me-1"><Document /></el-icon>
+                                Exportar a CSV
+                            </el-dropdown-item>
+                        </el-dropdown-menu>
+                    </template>
+                </el-dropdown>
             </div>
+
             <div class="col-lg-12">
                 <BaseDataTable
                     :ajax-url="ajaxUrl"

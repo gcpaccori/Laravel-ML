@@ -22,103 +22,36 @@
     });
 
     const tableInstance = ref(null);
-    const ajaxUrl = route('datatable.biometrias');
+    const ajaxUrl = route('alimentacionbfts.datatable');
 
-    const showModal = () => {
-        router.visit(route('biometrias.create'));
+    const handleGenerar = (campaniaEspecie) => {
+        router.visit(route('alimentacionbfts.create', campaniaEspecie));
     };
 
-    // Inicializar Tabla
     const handleTableReady = (dt) => {
         tableInstance.value = dt;
     };
 
-    const reloadTable = () => {
-        tableInstance.value.ajax.reload(null, true) // Recargar y regresa a la primera pagina;
+    const handleEdit = (campaniaEspecie) => {
+        router.visit(route('alimentacionbfts.edit', campaniaEspecie));
     };
 
-    // FUNCIONES DE ACCIONES (BOTONES)
-    const handleEdit = (id) => {
-        router.visit(route('biometrias.edit', id));
+    const handleShow = (campaniaEspecie) => {
+        router.visit(route('alimentacionbfts.show', campaniaEspecie));
     };
 
-    const handleShow = (id) => {
-        router.visit(route('biometrias.show', id));
-    };
-
-    const handleDelete = async(id) => {
-        ElMessageBox.confirm(
-            '¿Estás seguro de que deseas eliminar este registro?',
-            'Advertencia',
-            {
-                confirmButtonText: 'Eliminar',
-                cancelButtonText: 'Cancelar',
-                type: 'warning',
-                center: true,
-            }
-        ).then( async () => {
-            const response = await axios.delete(route('biometrias.destroy', id));
-            ElMessage({
-                message: response.data.message,
-                type: response.data.success ? 'success' : 'error',
-            });
-            reloadTable();
-        }).catch( (e) => {
-            console.log(e);
-        } );
-    };
-
-    const handlePdf = (id) => {
-        const url = route('biometrias.pdf', id);
-        window.open(url, '_blank');
-    };
-
-    // FUNCIONES EXPUESTAS DEL BASEDATATABLE
     const methods = {
         handleEdit,
-        handleDelete,
-        handlePdf,
-        handleShow
+        handleShow,
+        handleGenerar
     };
 
     const { handleDynamicAction } = useDynamicAction(methods);
-
-    function handleActionGrilla(nombre) {
-        const funciones = {
-            handleNew: showModal,
-        }
-
-        if (funciones[nombre]) {
-            funciones[nombre]()
-        } else {
-            console.warn(`No se encontró la función '${nombre}'`);
-        }
-    }
-
-
-
-    onMounted(() => {
-
-    });
 
 </script>
 
 <template>
     <App :title="title" :toolbar="toolbar">
-        <template #btnCreate>
-            <template v-for="(action, index) in accionesGrilla" :key="index">
-                <el-button
-                    :icon="action.icon"
-                    :type="action.type"
-                    class="mr-2"
-                    size="small"
-                    @click="handleActionGrilla(action.name_funcion)"
-                >
-                    {{ action.action }}
-                </el-button>
-            </template>
-        </template>
-
         <BaseDataTable
           :ajax-url="ajaxUrl"
           :columns="columns"

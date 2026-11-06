@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref } from 'vue';
+import { onMounted, ref, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
 import KpiCard from "@/Components/KpiCard.vue";
 import { useDynamicAction } from '@/Composables/useDynamicAction';
@@ -26,7 +26,7 @@ const alarmaStatistics = ref({});
 const tableInstance = ref(null);
 const ajaxUrl = route('alarmas.datatable');
 const formInline = ref({
-    search: '',
+    filtro: '',
     estado: '',
     nivel : '',
     modulo: ''
@@ -37,7 +37,7 @@ const handleTableReady = (dt) => {
 };
 
 const reloadTable = () => {
-    tableInstance.value.ajax.reload(null, true)
+    tableInstance.value?.ajax.reload(null, false);
 };
 
 const getStatistics = async() => {
@@ -49,7 +49,6 @@ const limpiarFiltros = () => {
     Object.keys(formInline.value).forEach(key => {
         formInline.value[key] = '';
     });
-    reloadTable();
 };
 
 const handleResolver = async (id) => {
@@ -87,8 +86,8 @@ const methods = {
 
 const { handleDynamicAction } = useDynamicAction(methods);
 
-onMounted( async() => {
-    await getStatistics();
+onMounted(() => {
+    getStatistics();
 
     window.Echo.channel("alertas.notificaciones").listen(
         ".alarma.generada",
@@ -97,8 +96,17 @@ onMounted( async() => {
             reloadTable();
         },
     );
-
 });
+
+watch(
+    formInline,
+    () => {
+        if (tableInstance.value) {
+            tableInstance.value.ajax.reload(null, true);
+        }
+    },
+    { deep: true }
+);
 
 </script>
 
@@ -149,6 +157,7 @@ onMounted( async() => {
                 @tableReady="handleTableReady"
                 @action="handleDynamicAction"
                 :filters="formInline"
+                :search-ing="false"
             >
                 <template #filters>
                     <el-form :model="formInline" label-position="top" class="w-100">
@@ -156,7 +165,7 @@ onMounted( async() => {
                             <div class="col-lg-4">
                                 <label class="form-label fw-semibold">Buscar</label>
                                 <el-input
-                                    v-model="formInline.search"
+                                    v-model="formInline.filtro"
                                     placeholder="Título, mensaje, parámetro..."
                                     clearable
                                     size="small"

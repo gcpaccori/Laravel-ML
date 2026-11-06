@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\DataTables\BiometriaDataTable;
 use App\Exports\BiometriaExport;
+use App\Exports\BiometriasExport;
 use App\Helpers\DataTableHelper;
 use App\Http\Requests\BiometriaRequest;
 use App\Models\Biometria;
@@ -11,8 +12,10 @@ use App\Models\Campania;
 use App\Models\CampaniaEspecie;
 use App\Models\CampaniaEtapa;
 use App\Models\ParametrosProduccion;
+use App\Services\AlimentacionBftService;
 use App\Services\BiometriaCalculoService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
@@ -70,9 +73,6 @@ class BiometriaController extends Controller
         ]);
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(BiometriaRequest $request)
     {
 
@@ -128,9 +128,6 @@ class BiometriaController extends Controller
         ]);
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
     public function edit( string $id )
     {
         $biometria = Biometria::with(['detalles','campaniaEtapa'])->findOrFail($id);
@@ -145,9 +142,6 @@ class BiometriaController extends Controller
         ]);
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
     public function update(BiometriaRequest $request, Biometria $id)
     {
         // Regla clave: solo se edita si es el último registro de la cadena
@@ -176,6 +170,7 @@ class BiometriaController extends Controller
             $calculados = $this->calculoService->calcular($validated, $anterior, $campaniaEtapa);
 
             $id->update([
+                'campania_etapa_id'           => $validated['campania_etapa_id'],
                 'fecha_muestreo'              => $validated['fecha_muestreo'],
                 'total_alimento_consumido_kg' => $validated['total_alimento_consumido_kg'],
                 'cantidad_peces_actuales'     => $validated['cantidad_peces_actuales'],
@@ -195,9 +190,6 @@ class BiometriaController extends Controller
         ]);
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
     public function destroy(Biometria $id)
     {
 
@@ -241,7 +233,7 @@ class BiometriaController extends Controller
         return $etapa;
     }
 
-    public function exportarExcel(Biometria $biometria)
+    public function exportarExcelBiometria(Biometria $biometria)
     {
         $biometria->load([
             'detalles',
@@ -255,7 +247,6 @@ class BiometriaController extends Controller
 
         return Excel::download(new BiometriaExport($biometria), $nombreArchivo);
     }
-
 
     public function exportarPdf(Biometria $biometria)
     {
@@ -287,6 +278,35 @@ class BiometriaController extends Controller
         $nombreArchivo = "biometria-{$biometria->id}-" . now()->format('Ymd_His') . '.pdf';
 
         return $pdf->download($nombreArchivo);
+    }
+
+    public function exportarExcel(Request $request)
+    {
+        $filters = $request->only(['piscigranja_id', 'campania_id', 'especie_id', 'rango_fecha']);
+        return Excel::download(new BiometriasExport($filters), 'biometrias_' . now()->format('Ymd_His') . '.xlsx', \Maatwebsite\Excel\Excel::XLSX);
+    }
+
+    public function exportarCsv(Request $request)
+    {
+        $filters = $request->only(['piscigranja_id', 'campania_id', 'especie_id', 'rango_fecha']);
+        return Excel::download(new BiometriasExport($filters), 'biometrias_' . now()->format('Ymd_His') . '.csv', \Maatwebsite\Excel\Excel::CSV);
+    }
+
+    public function alimentoReferencial(Request $request, AlimentacionBftService $service)
+    {
+        $data = $request->validate([
+            'campania_etapa_id' => ['required', 'integer', 'exists:campania_etapas,id'],
+            'fecha_muestreo'    => ['required', 'date'],
+            'biometria_id'      => ['nullable', 'integer'],
+        ]);
+
+        return response()->json(
+            $service->calcularAlimento(
+                (int) $data['campania_etapa_id'],
+                $data['fecha_muestreo'],
+                isset($data['biometria_id']) ? (int) $data['biometria_id'] : null,
+            )
+        );
     }
 
     public static function calcularDistribucion(array $valores, float $ancho): array

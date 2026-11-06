@@ -1,7 +1,7 @@
 <script setup>
 import { onMounted, ref } from "vue";
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { Delete, Edit, Check, View } from '@element-plus/icons-vue'
+import { Delete, Edit, Setting, Plus } from '@element-plus/icons-vue'
 import CampaniaEtapaForm from "../Form/CampaniaEtapaForm.vue";
 import ParametroProduccionForm from "../Form/ParametroProduccionForm.vue";
 
@@ -16,6 +16,7 @@ const props = defineProps({
 
 const isLoadingEtapas = ref({});
 const especieEtapas = ref({});
+const activeCollapses = ref([]);
 
 // MODAL
 const dialogVisible = ref(false);
@@ -34,13 +35,11 @@ const showModal = ( campania_especie_id, piscigranja_id ) => {
 
 const showProduccion = async (campania_etapa_id) => {
     const { data } = await axios.get(route('campanias.etapas.edit', campania_etapa_id));
-    // console.log(data);
 
     dataFormProduccion.value.campania_etapa_id = campania_etapa_id;
     dataFormProduccion.value.parametros_produccion = data.parametros_produccion;
     dialogProduccion.value = true;
 };
-
 
 const loadEspecieEtapas = async (campaniaEspecieId) => {
     try {
@@ -65,8 +64,7 @@ const handleSaved = async( res ) => {
 };
 
 const handleSavedProduccion = async( res ) => {
-    // console.log(res);
-    // await loadEspecieEtapas( res.campania_especie_id )
+    //
 };
 
 // FUNCIONES DE ACCIONES (BOTONES)
@@ -100,118 +98,177 @@ const handleDelete = async(campania_etapa_id, campania_especie_id) => {
 };
 
 onMounted(async () => {
-    for (const item of props.campania.especies) {
-        await loadEspecieEtapas(item.id);
+    if (props.campania?.especies) {
+        // Inicializar todos los paneles desplegados
+        activeCollapses.value = props.campania.especies.map(item => item.id);
+        for (const item of props.campania.especies) {
+            await loadEspecieEtapas(item.id);
+        }
     }
 });
-
 </script>
 
 <template>
     <App :title="title" :toolbar="toolbar">
         <div class="row">
-            <div v-if="campania.especies.length > 0">
-                <div  v-for="item in campania.especies" :key="item.id" class="col-lg-12 mb-4">
-                    <div class="card shadow-sm">
-                        <div class="card-header collapsible cursor-pointer rotate" data-bs-toggle="collapse" :data-bs-target="`#car_${item.id}`">
-                            <h3 class="card-title align-items-start flex-column">
-                                <span class="card-label fs-5 fw-bold text-dark">{{ item.especie.nombre }} - <span class="text-uppercase">{{ campania.sistema_crianza }}</span></span>
-                                <span class="text-gray-700 mt-3 fw-semibold fs-6">
-                                    <span>Fecha Siembra: {{ item.fecha_siembra_formateada }}</span> |
-                                    <span>N° alevines inicial: {{ item.cantidad_siembra }}</span> |
-                                    <span>N° peces final: {{ item.cantidad_cosechada }}</span> |
-                                    <span>Peso inicial Alevin: {{ item.peso_inicial_gr }} g</span> |
-                                    <span>Peso Final Pez: {{ item.peso_final_gr }} g</span>
+            <div v-if="campania.especies && campania.especies.length > 0" class="col-12">
+                <el-collapse v-model="activeCollapses" class="mb-4 border-0">
+                    <el-collapse-item
+                        v-for="item in campania.especies"
+                        :key="item.id"
+                        :name="item.id"
+                        class="mb-3 border rounded shadow-sm overflow-hidden"
+                    >
+                        <template #title>
+                            <div class="d-flex align-items-center justify-content-between w-100 px-3">
+                                <span class="fs-4 fw-bold text-dark">
+                                    {{ item.especie.nombre }} - <span class="text-capitalize">{{ campania.sistema_crianza }}</span>
                                 </span>
-                            </h3>
-                            <div class="card-toolbar rotate-180">
-                                <i class="ki-duotone ki-down fs-1"></i>
                             </div>
-                        </div>
-                        <div :id="`car_${item.id}`" class="collapse show">
-                            <div class="card-body">
-                                <div class="mb-2">
-                                    <a @click="showModal( item.id, campania.piscigranja_id )" class="text-primary text-hover-info cursor-pointer">[+Agregar Etapa]</a>
-                                </div>
-                                <el-table
-                                    :data="getEspecieEtapas( item.id )"
-                                    style="width: 100%"
-                                    v-loading="isLoadingEtapas[item.id]"
+                        </template>
+
+                        <div class="p-3 bg-light-subtle border-top">
+                            <el-descriptions
+                                class="mb-4"
+                                :column="3"
+                                border
+                                size="small"
+                            >
+                                <el-descriptions-item label="Fecha Siembra">
+                                    {{ item.fecha_siembra_formateada }}
+                                </el-descriptions-item>
+                                <el-descriptions-item label="N° Alevines Inicial">
+                                    {{ item.cantidad_siembra }}
+                                </el-descriptions-item>
+                                <el-descriptions-item label="N° Peces Final">
+                                    {{ item.cantidad_cosechada }}
+                                </el-descriptions-item>
+                                <el-descriptions-item label="Peso Inicial Alevín">
+                                    {{ item.peso_inicial_gr }} g
+                                </el-descriptions-item>
+                                <el-descriptions-item label="Peso Final Pez">
+                                    {{ item.peso_final_gr }} g
+                                </el-descriptions-item>
+                            </el-descriptions>
+
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h6 class="m-0 fw-bold text-muted">Etapas de Producción</h6>
+                                <el-button
+                                    type="primary"
+                                    size="small"
+                                    :icon="Plus"
+                                    @click="showModal(item.id, campania.piscigranja_id)"
                                 >
-                                    <el-table-column label="Etapa" min-width="100">
-                                        <template #default="{ row }">
-                                            {{row.etapa?.nombre}}
-                                        </template>
-                                    </el-table-column>
-
-                                    <el-table-column label="Piscina" min-width="130">
-                                        <template #default="{ row }">
-                                            {{ row.piscina?.nombre }}
-                                        </template>
-                                    </el-table-column>
-
-                                    <el-table-column label="Fecha Inicio" min-width="130">
-                                        <template #default="{ row }">
-                                            {{ row.fecha_inicio_formato }}
-                                        </template>
-                                    </el-table-column>
-
-                                    <el-table-column label="Fecha Fin" min-width="130">
-                                        <template #default="{ row }">
-                                            {{ row.fecha_fin_formato }}
-                                        </template>
-                                    </el-table-column>
-
-                                    <el-table-column class-name="text-center" prop="numero_peces_inicial" label="Cantidad Inicial" min-width="130"/>
-                                    <el-table-column class-name="text-center" prop="numero_peces_final" label="Cantidad Final"  min-width="130"/>
-                                    <el-table-column class-name="text-center" prop="peso_inicial_gr" label="Peso Inicial (g)" min-width="130"/>
-                                    <el-table-column class-name="text-center" prop="peso_final_gr" label="Peso Final (g)" min-width="130"/>
-                                    <el-table-column class-name="text-center" prop="densidad_siembra" label="Densidad (Peces/m3)" min-width="130"/>
-                                    <el-table-column class-name="text-center" label="Parámetros" min-width="130">
-                                        <template #default="{ row }">
-                                            <el-button @click="showProduccion( row.id )" icon="Setting" type="success" size="small" round>Parámetros</el-button>
-                                        </template>
-                                    </el-table-column>
-                                    <el-table-column class-name="text-center" label="Estado" min-width="130">
-                                        <template #default="{ row }">
-                                            <el-tag v-if="row.estado === 'planificada'" type="info" effect="dark" size="small" round>Planificada</el-tag>
-                                            <el-tag v-if="row.estado === 'en_proceso'" type="warning" effect="dark" size="small" round>En Proceso</el-tag>
-                                            <el-tag v-if="row.estado === 'finalizada'" type="success" effect="dark" size="small" round>Finalizada</el-tag>
-                                            <el-tag v-if="row.estado === 'cancelada'" type="danger" effect="dark" size="small" round>Cancelada</el-tag>
-                                        </template>
-                                    </el-table-column>
-
-                                    <el-table-column class-name="text-center" label="Opciones" min-width="130">
-                                        <template #default="{ row }">
-                                            <el-button-group class="ml-4">
-                                                <el-button @click="handleEdit( row.id, campania.piscigranja_id )" type="primary" size="small" :icon="Edit" />
-                                                <el-button @click="handleDelete( row.id, row.campania_especie_id )" type="danger" size="small" :icon="Delete" />
-                                            </el-button-group>
-                                        </template>
-                                    </el-table-column>
-
-                                </el-table>
+                                    Agregar Etapa
+                                </el-button>
                             </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div v-else="">
-                <div class="alert alert-info d-flex align-items-center p-5">
-                    <i class="ki-duotone ki-information-5 fs-2hx text-info me-4">
-                        <span class="path1"></span>
-                        <span class="path2"></span>
-                        <span class="path3"></span>
-                    </i>
 
-                    <div class="d-flex flex-column">
-                        <h4 class="mb-1 text-dark">Sin especies registradas</h4>
-                        <span>Esta campaña no tiene especies agregadas. Agrega especies para comenzar el registro de siembra y seguimiento de la producción.</span>
-                    </div>
-                </div>
+                            <!-- Tabla de Etapas -->
+                            <el-table
+                                :data="getEspecieEtapas(item.id)"
+                                class="w-100"
+                                v-loading="isLoadingEtapas[item.id]"
+                                border
+                                stripe
+                                size="small"
+                            >
+                                <el-table-column label="Etapa" min-width="120">
+                                    <template #default="{ row }">
+                                        <span class="fw-semibold">{{ row.etapa?.nombre }}</span>
+                                    </template>
+                                </el-table-column>
+
+                                <el-table-column label="Piscina" min-width="130">
+                                    <template #default="{ row }">
+                                        {{ row.piscina?.nombre }}
+                                    </template>
+                                </el-table-column>
+
+                                <el-table-column label="Fecha Inicio" min-width="120" align="center">
+                                    <template #default="{ row }">
+                                        {{ row.fecha_inicio_formato }}
+                                    </template>
+                                </el-table-column>
+
+                                <el-table-column label="Fecha Fin" min-width="120" align="center">
+                                    <template #default="{ row }">
+                                        {{ row.fecha_fin_formato }}
+                                    </template>
+                                </el-table-column>
+
+                                <el-table-column align="center" prop="numero_peces_inicial" label="Cant. Inicial" min-width="110"/>
+                                <el-table-column align="center" prop="numero_peces_final" label="Cant. Final" min-width="110"/>
+                                <el-table-column align="center" prop="peso_inicial_gr" label="Peso Inc. (g)" min-width="110"/>
+                                <el-table-column align="center" prop="peso_final_gr" label="Peso Fin. (g)" min-width="110"/>
+                                <el-table-column align="center" prop="densidad_siembra" label="Densidad (Peces/m³)" min-width="140"/>
+
+                                <el-table-column align="center" label="Parámetros" min-width="130">
+                                    <template #default="{ row }">
+                                        <el-button
+                                            @click="showProduccion(row.id)"
+                                            :icon="Setting"
+                                            type="success"
+                                            size="small"
+                                            plain
+                                        >
+                                            Ver
+                                        </el-button>
+                                    </template>
+                                </el-table-column>
+
+                                <el-table-column align="center" label="Estado" min-width="120">
+                                    <template #default="{ row }">
+                                        <el-tag v-if="row.estado === 'planificada'" type="info" effect="light" round>Planificada</el-tag>
+                                        <el-tag v-else-if="row.estado === 'en_proceso'" type="warning" effect="light" round>En Proceso</el-tag>
+                                        <el-tag v-else-if="row.estado === 'finalizada'" type="success" effect="light" round>Finalizada</el-tag>
+                                        <el-tag v-else-if="row.estado === 'cancelada'" type="danger" effect="light" round>Cancelada</el-tag>
+                                    </template>
+                                </el-table-column>
+
+                                <el-table-column align="center" label="Opciones" min-width="110">
+                                    <template #default="{ row }">
+                                        <el-button-group>
+                                            <el-button @click="handleEdit(row.id, campania.piscigranja_id)" type="primary" size="small" :icon="Edit" />
+                                            <el-button @click="handleDelete(row.id, row.campania_especie_id)" type="danger" size="small" :icon="Delete" />
+                                        </el-button-group>
+                                    </template>
+                                </el-table-column>
+                            </el-table>
+                        </div>
+                    </el-collapse-item>
+                </el-collapse>
+            </div>
+
+            <!-- Estado Vacío -->
+            <div v-else class="col-12">
+                <el-card shadow="never" class="text-center py-4">
+                    <el-empty
+                        description="Sin especies registradas"
+                        :image-size="120"
+                    >
+                        <template #description>
+                            <p class="text-muted fs-6">
+                                Esta campaña no tiene especies agregadas.<br>
+                                Agrega especies para comenzar el registro de siembra y seguimiento de la producción.
+                            </p>
+                        </template>
+                    </el-empty>
+                </el-card>
             </div>
         </div>
+
         <CampaniaEtapaForm v-model="dialogVisible" :dataForm="dataForm" @saved="handleSaved"/>
         <ParametroProduccionForm v-model="dialogProduccion" :dataForm="dataFormProduccion" @saved="handleSavedProduccion"/>
     </App>
 </template>
+
+<style scoped>
+:deep(.el-collapse-item__header) {
+    font-size: 1rem;
+    height: auto;
+    padding: 12px 0;
+}
+:deep(.el-descriptions__label) {
+    font-weight: 600;
+}
+</style>
