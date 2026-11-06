@@ -1,13 +1,13 @@
 <?php
 
-use App\Events\AlarmaGenerada;
+use App\Events\AlarmaModeloGenerada;
 use App\Models\Piscigranja;
 use App\Services\ModelAlarmPersistenceService;
 use App\Services\ModelAlertDashboardService;
 use Illuminate\Support\Facades\Event;
 
 it('persists a productive model event once in the shared alarm table', function () {
-    Event::fake([AlarmaGenerada::class]);
+    Event::fake([AlarmaModeloGenerada::class]);
     $farm = Piscigranja::create(['nombre' => 'Granja de prueba']);
     $pond = $farm->piscinas()->create(['nombre' => 'Piscina 1']);
     $service = app(ModelAlarmPersistenceService::class);
@@ -49,7 +49,7 @@ it('persists a productive model event once in the shared alarm table', function 
         'model_code' => 'SVM_OD_FORECAST_1H',
         'model_version' => 'v1',
     ]);
-    Event::assertDispatchedTimes(AlarmaGenerada::class, 1);
+    Event::assertDispatchedTimes(AlarmaModeloGenerada::class, 1);
 });
 
 it('does not persist technical observations or unknown model sources', function () {
