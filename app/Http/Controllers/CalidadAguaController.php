@@ -126,8 +126,6 @@ class CalidadAguaController extends Controller
         }
 
         $ultimo = $parametroQuery->first();
-        $nitratoRaw = $ultimo?->ion_nitrato;
-        $nitratoFueraRango = $nitratoRaw !== null && ((float) $nitratoRaw < 0 || (float) $nitratoRaw > 100);
 
         // ======================
         // 3) Respuesta JSON
@@ -138,9 +136,7 @@ class CalidadAguaController extends Controller
                 'temperatura'    => $ultimo?->temperatura ?? 0,
                 'ph'             => $ultimo?->ph ?? 0,
                 'oxigeno_disuelto'        => $ultimo?->oxigeno_disuelto ?? 0,
-                'ion_nitrato'        => $nitratoFueraRango ? null : ($ultimo?->ion_nitrato ?? null),
-                'ion_nitrato_raw'    => $nitratoRaw,
-                'ion_nitrato_fuera_rango' => $nitratoFueraRango,
+                'ion_nitrato'        => $ultimo?->ion_nitrato ?? 0,
                 'fecha_medicion' => $ultimo?->fecha_medicion?->format('d/m/Y H:i:s'),
                 'fecha_registro' => $ultimo?->created_at?->format('d/m/Y H:i:s'),
                 'piscina' => $ultimo?->piscina ? [
