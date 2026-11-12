@@ -3,7 +3,7 @@ import { onMounted, ref, watch, watchEffect } from "vue";
 import * as echarts from "echarts";
 
 const props = defineProps({
-  value: { default: null },
+  value: { type: Number, default: 0 },
   min: { type: Number, default: 0 },
   max: { type: Number, required: true },
   bandsData: { type: Array, default: () => [] },
@@ -26,10 +26,6 @@ const renderChart = () => {
     myChart = echarts.init(chartRef.value, null, { renderer: "svg" });
   }
 
-  const numericValue = Number(props.value);
-  const hasValue = props.value !== null && props.value !== undefined && Number.isFinite(numericValue);
-  const shownValue = hasValue ? numericValue : props.min;
-
   const colorRanges = props.bandsData.map((band) => [
     band.highScore / props.max,
     band.color,
@@ -50,14 +46,13 @@ const renderChart = () => {
           fontSize: 14,
           offsetCenter: [0, "90%"],
           formatter: function (v) {
-            if (!hasValue) return "Sin dato válido\n(sensor fuera de rango)";
             let band = getBandTitle(v);
             return v.toFixed(2) + " " + props.unit + "\n" + band;
           },
         },
         min: props.min,
         max: props.max,
-        data: [{ value: shownValue }],
+        data: [{ value: props.value }],
       },
     ],
   };
@@ -74,7 +69,7 @@ onMounted(() => {
 watch(() => props.value, (newVal) => {
   if (myChart) {
     myChart.setOption({
-      series: [{ data: [{ value: (newVal === null || newVal === undefined || !Number.isFinite(Number(newVal))) ? props.min : Number(newVal) }] }],
+      series: [{ data: [{ value: newVal }] }],
     });
   }
 });
